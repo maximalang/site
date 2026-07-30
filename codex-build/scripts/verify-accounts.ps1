@@ -52,7 +52,7 @@ function Account-Key([object]$Account) {
                 }
             }
         }
-        if (-not [string]::IsNullOrWhiteSpace($workspace)) { return "chatgpt:$user:$workspace" }
+        if (-not [string]::IsNullOrWhiteSpace($workspace)) { return "chatgpt:${user}:$workspace" }
         return "chatgpt-local-id:$([string]$Account.id)"
     }
     return "api-local-id:$([string]$Account.id)"
