@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - build/codex-switcher-hardened-0.3.0
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
