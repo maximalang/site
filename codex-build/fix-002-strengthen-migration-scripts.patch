@@ -1,0 +1,454 @@
+diff --git a/tools/migrate-accounts.ps1 b/tools/migrate-accounts.ps1
+index e6eae74..42d1a11 100644
+--- a/tools/migrate-accounts.ps1
++++ b/tools/migrate-accounts.ps1
+@@ -1,26 +1,92 @@
+ [CmdletBinding()]
+ param(
+-    [switch]$Force
++    [switch]$Force,
++    [string]$SourceDir = (Join-Path $env:USERPROFILE '.codex-switcher'),
++    [string]$TargetDir = (Join-Path $env:USERPROFILE '.codex-switcher-hardened'),
++    [string]$CodexDir = (Join-Path $env:USERPROFILE '.codex'),
++    [string]$BackupRoot,
++    [switch]$SkipProcessCheck
+ )
+ 
+ $ErrorActionPreference = 'Stop'
+ Set-StrictMode -Version Latest
+ 
+-$legacyDir = Join-Path $env:USERPROFILE '.codex-switcher'
+-$targetDir = Join-Path $env:USERPROFILE '.codex-switcher-hardened'
+-$legacyAccounts = Join-Path $legacyDir 'accounts.json'
+-$targetAccounts = Join-Path $targetDir 'accounts.json'
+-$codexAuth = Join-Path (Join-Path $env:USERPROFILE '.codex') 'auth.json'
++$legacyAccounts = Join-Path $SourceDir 'accounts.json'
++$targetAccounts = Join-Path $TargetDir 'accounts.json'
++$codexAuth = Join-Path $CodexDir 'auth.json'
+ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+-$backupRoot = Join-Path ([Environment]::GetFolderPath('Desktop')) "CodexSwitcher-migration-backup-$stamp"
++if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
++    $desktop = [Environment]::GetFolderPath('Desktop')
++    if ([string]::IsNullOrWhiteSpace($desktop)) { $desktop = $env:USERPROFILE }
++    $BackupRoot = Join-Path $desktop "CodexSwitcher-migration-backup-$stamp"
++}
+ 
+-function Assert-JsonFile([string]$Path) {
+-    if (-not (Test-Path -LiteralPath $Path)) {
++function Read-JsonFile([string]$Path) {
++    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+         throw "File not found: $Path"
+     }
+     try {
+@@ -36,78 +102,151 @@ function Normalize-AuthType([object]$Value) {
+     if ($null -eq $Value) { return $Value }
+     $text = [string]$Value
+-    if ($text -in @('chatgpt', 'chat_gpt', 'chat_g_pt', 'chat_g_p_t')) { return 'chat_gpt' }
++    if ($text -in @('chatgpt', 'chat_gpt', 'chat_g_pt', 'chat_g_p_t', 'ChatGPT')) { return 'chat_gpt' }
+     if ($text -in @('ApiKey', 'api_key')) { return 'api_key' }
+     return $text
+ }
+ 
+-$blocking = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+-    $_.ProcessName -match '^(codex-switcher|codex-switcher-hardened|Codex)$'
++function Decode-JwtPayload([string]$Token) {
++    if ([string]::IsNullOrWhiteSpace($Token)) { return $null }
++    $parts = $Token.Split('.')
++    if ($parts.Count -ne 3) { return $null }
++    try {
++        $payload = $parts[1].Replace('-', '+').Replace('_', '/')
++        switch ($payload.Length % 4) {
++            2 { $payload += '==' }
++            3 { $payload += '=' }
++        }
++        $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload))
++        return $json | ConvertFrom-Json
++    }
++    catch { return $null }
+ }
+-if ($blocking) {
+-    $names = ($blocking | Select-Object -ExpandProperty ProcessName -Unique) -join ', '
+-    throw "Close Codex and both Switcher applications before migration. Running: $names"
++
++function Ensure-Property([object]$Object, [string]$Name, [object]$Value) {
++    if ($Object.PSObject.Properties.Name -contains $Name) {
++        $Object.$Name = $Value
++    }
++    else {
++        $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value
++    }
+ }
+ 
+-$store = Assert-JsonFile $legacyAccounts
+-if ($null -eq $store.accounts) {
+-    throw 'Legacy accounts.json has no accounts array.'
++function Assert-Store([object]$Store, [string]$Label) {
++    if ($null -eq $Store.accounts) { throw "$Label has no accounts array." }
++    $accounts = @($Store.accounts)
++    if ($accounts.Count -lt 1) { throw "$Label contains no accounts." }
++
++    $ids = @($accounts | ForEach-Object { [string]$_.id })
++    if (@($ids | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
++        throw "$Label contains an account with an empty id."
++    }
++    $duplicates = @($ids | Group-Object | Where-Object Count -gt 1)
++    if ($duplicates.Count -gt 0) {
++        throw "$Label contains duplicate account ids: $((@($duplicates.Name) -join ', '))"
++    }
++
++    $activeId = [string]$Store.active_account_id
++    if (-not [string]::IsNullOrWhiteSpace($activeId) -and $activeId -notin $ids) {
++        throw "$Label references missing active_account_id: $activeId"
++    }
++    return $accounts
+ }
+-$legacyCount = @($store.accounts).Count
+-if ($legacyCount -lt 1) {
+-    throw 'No accounts were found in the legacy store.'
++
++if (-not $SkipProcessCheck) {
++    $blocking = Get-Process -ErrorAction SilentlyContinue | Where-Object {
++        $_.ProcessName -match '^(codex-switcher|codex-switcher-hardened|Codex|ChatGPT)$'
++    }
++    if ($blocking) {
++        $names = ($blocking | Select-Object -ExpandProperty ProcessName -Unique) -join ', '
++        throw "Close Codex, ChatGPT and both Switcher applications before migration. Running: $names"
++    }
+ }
+ 
+-New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+-Copy-Item -LiteralPath $legacyDir -Destination (Join-Path $backupRoot '.codex-switcher') -Recurse -Force
+-if (Test-Path -LiteralPath $codexAuth) {
+-    New-Item -ItemType Directory -Path (Join-Path $backupRoot '.codex') -Force | Out-Null
+-    Copy-Item -LiteralPath $codexAuth -Destination (Join-Path $backupRoot '.codex\auth.json') -Force
++$store = Read-JsonFile $legacyAccounts
++$legacyAccountsList = Assert-Store $store 'Legacy accounts.json'
++$legacyCount = $legacyAccountsList.Count
++$sourceHashBefore = (Get-FileHash -LiteralPath $legacyAccounts -Algorithm SHA256).Hash
++$authHashBefore = if (Test-Path -LiteralPath $codexAuth -PathType Leaf) {
++    (Get-FileHash -LiteralPath $codexAuth -Algorithm SHA256).Hash
++} else { $null }
++
++New-Item -ItemType Directory -Path $BackupRoot -Force | Out-Null
++Copy-Item -LiteralPath $SourceDir -Destination (Join-Path $BackupRoot '.codex-switcher') -Recurse -Force
++if (Test-Path -LiteralPath $codexAuth -PathType Leaf) {
++    New-Item -ItemType Directory -Path (Join-Path $BackupRoot '.codex') -Force | Out-Null
++    Copy-Item -LiteralPath $codexAuth -Destination (Join-Path $BackupRoot '.codex\auth.json') -Force
+ }
+ 
+-if (Test-Path -LiteralPath $targetDir) {
+-    Copy-Item -LiteralPath $targetDir -Destination (Join-Path $backupRoot '.codex-switcher-hardened-before') -Recurse -Force
+-    if ((Test-Path -LiteralPath $targetAccounts) -and -not $Force) {
+-        throw "Hardened account store already exists. Backup created at $backupRoot. Re-run with -Force only after reviewing it."
++if (Test-Path -LiteralPath $TargetDir) {
++    Copy-Item -LiteralPath $TargetDir -Destination (Join-Path $BackupRoot '.codex-switcher-hardened-before') -Recurse -Force
++    if ((Test-Path -LiteralPath $targetAccounts -PathType Leaf) -and -not $Force) {
++        throw "Hardened account store already exists. Backup created at $BackupRoot. Re-run with -Force only after reviewing it."
+     }
+ }
+ 
+-foreach ($account in @($store.accounts)) {
+-    $account.auth_mode = Normalize-AuthType $account.auth_mode
++foreach ($account in $legacyAccountsList) {
++    Ensure-Property $account 'auth_mode' (Normalize-AuthType $account.auth_mode)
+     if ($null -ne $account.auth_data -and $account.auth_data.PSObject.Properties.Name -contains 'type') {
+         $account.auth_data.type = Normalize-AuthType $account.auth_data.type
+     }
+-    if (-not ($account.PSObject.Properties.Name -contains 'user_id')) {
+-        $account | Add-Member -NotePropertyName user_id -NotePropertyValue $null
++
++    $userId = if ($account.PSObject.Properties.Name -contains 'user_id') { $account.user_id } else { $null }
++    if ([string]::IsNullOrWhiteSpace([string]$userId) -and $null -ne $account.auth_data) {
++        $idToken = if ($account.auth_data.PSObject.Properties.Name -contains 'id_token') {
++            [string]$account.auth_data.id_token
++        } else { '' }
++        $claims = Decode-JwtPayload $idToken
++        if ($null -ne $claims) {
++            if ($claims.PSObject.Properties.Name -contains 'chatgpt_user_id') {
++                $userId = [string]$claims.chatgpt_user_id
++            }
++            elseif ($claims.PSObject.Properties.Name -contains 'sub') {
++                $userId = [string]$claims.sub
++            }
++        }
+     }
++    Ensure-Property $account 'user_id' $userId
+ }
+-$store.version = 2
++Ensure-Property $store 'version' 2
+ 
+-New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
++New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+ $tempPath = "$targetAccounts.tmp-$stamp"
+-$json = $store | ConvertTo-Json -Depth 30
++$json = $store | ConvertTo-Json -Depth 40
+ [System.IO.File]::WriteAllText($tempPath, $json, [System.Text.UTF8Encoding]::new($false))
+ 
+-$validated = Assert-JsonFile $tempPath
+-$newCount = @($validated.accounts).Count
++$validated = Read-JsonFile $tempPath
++$newAccountsList = Assert-Store $validated 'Migrated accounts.json'
++$newCount = $newAccountsList.Count
+ if ($newCount -ne $legacyCount) {
+     Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+     throw "Account count mismatch: source=$legacyCount, migrated=$newCount"
+ }
+ 
+-if (Test-Path -LiteralPath $targetAccounts) {
++if (Test-Path -LiteralPath $targetAccounts -PathType Leaf) {
+     Move-Item -LiteralPath $targetAccounts -Destination "$targetAccounts.pre-migration-$stamp.bak" -Force
+ }
+ Move-Item -LiteralPath $tempPath -Destination $targetAccounts -Force
++$null = Assert-Store (Read-JsonFile $targetAccounts) 'Committed hardened accounts.json'
+ 
+-$legacySettings = Join-Path $legacyDir 'settings.json'
+-if (Test-Path -LiteralPath $legacySettings) {
+-    $null = Assert-JsonFile $legacySettings
+-    Copy-Item -LiteralPath $legacySettings -Destination (Join-Path $targetDir 'settings.json') -Force
++$legacySettings = Join-Path $SourceDir 'settings.json'
++if (Test-Path -LiteralPath $legacySettings -PathType Leaf) {
++    $null = Read-JsonFile $legacySettings
++    Copy-Item -LiteralPath $legacySettings -Destination (Join-Path $TargetDir 'settings.json') -Force
++}
++
++$sourceHashAfter = (Get-FileHash -LiteralPath $legacyAccounts -Algorithm SHA256).Hash
++if ($sourceHashAfter -ne $sourceHashBefore) {
++    throw 'Safety check failed: legacy accounts.json changed during migration.'
++}
++$authHashAfter = if (Test-Path -LiteralPath $codexAuth -PathType Leaf) {
++    (Get-FileHash -LiteralPath $codexAuth -Algorithm SHA256).Hash
++} else { $null }
++if ($authHashAfter -ne $authHashBefore) {
++    throw 'Safety check failed: Codex auth.json changed during migration.'
+ }
+ 
+ $report = [ordered]@{
++    status = 'OK'
+     migrated_at = (Get-Date).ToString('o')
+     source = $legacyAccounts
+     destination = $targetAccounts
+@@ -115,23 +254,26 @@ $report = [ordered]@{
+     destination_account_count = $newCount
+     active_account_id = $validated.active_account_id
+-    source_sha256 = (Get-FileHash -LiteralPath $legacyAccounts -Algorithm SHA256).Hash
++    source_sha256_before = $sourceHashBefore
++    source_sha256_after = $sourceHashAfter
+     destination_sha256 = (Get-FileHash -LiteralPath $targetAccounts -Algorithm SHA256).Hash
+-    backup_directory = $backupRoot
++    codex_auth_sha256_before = $authHashBefore
++    codex_auth_sha256_after = $authHashAfter
++    backup_directory = $BackupRoot
+ }
+-$reportPath = Join-Path $targetDir 'migration-report.json'
++$reportPath = Join-Path $TargetDir 'migration-report.json'
+ [System.IO.File]::WriteAllText(
+     $reportPath,
+-    ($report | ConvertTo-Json -Depth 5),
++    ($report | ConvertTo-Json -Depth 6),
+     [System.Text.UTF8Encoding]::new($false)
+ )
+ 
+-Write-Host "Migration completed safely." -ForegroundColor Green
++Write-Host 'Migration completed safely.' -ForegroundColor Green
+ Write-Host "Accounts: $newCount"
+-Write-Host "Backup: $backupRoot"
++Write-Host "Backup: $BackupRoot"
+ Write-Host "Report: $reportPath"
+-Write-Host 'The original .codex-switcher directory was not modified.'
++Write-Host 'Legacy accounts and Codex auth.json were not modified.'
+diff --git a/tools/remove-old-switcher.ps1 b/tools/remove-old-switcher.ps1
+index 1035481..d40a226 100644
+--- a/tools/remove-old-switcher.ps1
++++ b/tools/remove-old-switcher.ps1
+@@ -1,10 +1,27 @@
+ [CmdletBinding()]
+-param([switch]$Apply)
++param(
++    [switch]$Apply,
++    [switch]$Force
++)
+ 
+ $ErrorActionPreference = 'Stop'
+-$entries = Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue |
++Set-StrictMode -Version Latest
++
++$legacyAccountsPath = Join-Path $env:USERPROFILE '.codex-switcher\accounts.json'
++$hardenedAccountsPath = Join-Path $env:USERPROFILE '.codex-switcher-hardened\accounts.json'
++
++function Read-Count([string]$Path) {
++    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
++    $store = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
++    return @($store.accounts).Count
++}
++
++$entries = Get-ChildItem \
++    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall', \
++    'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall', \
++    'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall' \
++    -ErrorAction SilentlyContinue |
+     Get-ItemProperty -ErrorAction SilentlyContinue |
+     Where-Object { $_.DisplayName -eq 'Codex Switcher' }
+ 
+@@ -13,15 +30,25 @@ if (-not $entries) {
+     exit 0
+ }
+ 
++$legacyCount = Read-Count $legacyAccountsPath
++$hardenedCount = Read-Count $hardenedAccountsPath
+ $entries | Select-Object DisplayName, DisplayVersion, UninstallString | Format-List
++Write-Host "Legacy accounts: $legacyCount"
++Write-Host "Hardened accounts: $hardenedCount"
++
+ if (-not $Apply) {
+     Write-Host 'Dry run only. Re-run with -Apply after the hardened version is verified.' -ForegroundColor Yellow
+     exit 0
+ }
+ 
++if (-not $Force -and ($null -eq $legacyCount -or $null -eq $hardenedCount -or $legacyCount -ne $hardenedCount)) {
++    throw 'Account stores are missing or counts differ. Old application was not removed. Use -Force only after manual verification.'
++}
++
+ foreach ($entry in $entries) {
+     $command = [string]$entry.UninstallString
+-    if (-not $command) { continue }
+-    Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $command -Wait
++    if ([string]::IsNullOrWhiteSpace($command)) { continue }
++    Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/s', '/c', $command -Wait
+ }
+-Write-Host 'Old application uninstall was started. Legacy account data was intentionally kept.' -ForegroundColor Green
++Write-Host 'Old application uninstall completed or was started. Legacy account data was intentionally kept.' -ForegroundColor Green
+diff --git a/tools/verify-accounts.ps1 b/tools/verify-accounts.ps1
+index 2aa5b67..b8c9107 100644
+--- a/tools/verify-accounts.ps1
++++ b/tools/verify-accounts.ps1
+@@ -1,20 +1,30 @@
+ [CmdletBinding()]
+-param()
++param(
++    [string]$SourceDir = (Join-Path $env:USERPROFILE '.codex-switcher'),
++    [string]$TargetDir = (Join-Path $env:USERPROFILE '.codex-switcher-hardened'),
++    [string]$CodexDir = (Join-Path $env:USERPROFILE '.codex')
++)
+ 
+ $ErrorActionPreference = 'Stop'
+ Set-StrictMode -Version Latest
+ 
+-$legacy = Join-Path $env:USERPROFILE '.codex-switcher\accounts.json'
+-$hardened = Join-Path $env:USERPROFILE '.codex-switcher-hardened\accounts.json'
+-$codexAuth = Join-Path $env:USERPROFILE '.codex\auth.json'
++$legacy = Join-Path $SourceDir 'accounts.json'
++$hardened = Join-Path $TargetDir 'accounts.json'
++$reportPath = Join-Path $TargetDir 'migration-report.json'
++$codexAuth = Join-Path $CodexDir 'auth.json'
+ 
+ function Read-Json([string]$Path) {
+-    if (-not (Test-Path -LiteralPath $Path)) { throw "File not found: $Path" }
++    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "File not found: $Path" }
+     Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+ }
+ 
+ function Account-Key([object]$Account) {
+-    $type = [string]$Account.auth_data.type
+-    if ($type -in @('chatgpt', 'chat_gpt', 'chat_g_pt', 'chat_g_p_t')) {
++    $type = if ($null -ne $Account.auth_data -and $Account.auth_data.PSObject.Properties.Name -contains 'type') {
++        [string]$Account.auth_data.type
++    } else { [string]$Account.auth_mode }
++    if ($type -in @('chatgpt', 'chat_gpt', 'chat_g_pt', 'chat_g_p_t', 'ChatGPT')) {
+         $workspace = [string]$Account.auth_data.account_id
+         $user = if ($Account.PSObject.Properties.Name -contains 'user_id') { [string]$Account.user_id } else { '' }
+-        if ($workspace) { return "chatgpt:$user:$workspace" }
+-        return "chatgpt-name:$($Account.name)"
++        if (-not [string]::IsNullOrWhiteSpace($workspace)) { return "chatgpt:$user:$workspace" }
++        return "chatgpt-local-id:$([string]$Account.id)"
++    }
++    return "api-local-id:$([string]$Account.id)"
++}
++
++function To-Multiset([string[]]$Values) {
++    $map = @{}
++    foreach ($value in $Values) {
++        if (-not $map.ContainsKey($value)) { $map[$value] = 0 }
++        $map[$value] += 1
+     }
+-    return "api-name:$($Account.name)"
++    return $map
+ }
+ 
+ $old = Read-Json $legacy
+ $new = Read-Json $hardened
++$report = Read-Json $reportPath
+ $oldAccounts = @($old.accounts)
+ $newAccounts = @($new.accounts)
+ 
+-$oldKeys = @($oldAccounts | ForEach-Object { Account-Key $_ } | Sort-Object)
+-$newKeys = @($newAccounts | ForEach-Object { Account-Key $_ } | Sort-Object)
+-$missing = @($oldKeys | Where-Object { $_ -notin $newKeys })
+-$extra = @($newKeys | Where-Object { $_ -notin $oldKeys })
++$oldIds = @($oldAccounts | ForEach-Object { [string]$_.id })
++$newIds = @($newAccounts | ForEach-Object { [string]$_.id })
++$duplicateOldIds = @($oldIds | Group-Object | Where-Object Count -gt 1)
++$duplicateNewIds = @($newIds | Group-Object | Where-Object Count -gt 1)
++
++$oldMap = To-Multiset @($oldAccounts | ForEach-Object { Account-Key $_ })
++$newMap = To-Multiset @($newAccounts | ForEach-Object { Account-Key $_ })
++$allKeys = @($oldMap.Keys + $newMap.Keys | Sort-Object -Unique)
++$mismatches = @($allKeys | Where-Object {
++    $oldValue = if ($oldMap.ContainsKey($_)) { $oldMap[$_] } else { 0 }
++    $newValue = if ($newMap.ContainsKey($_)) { $newMap[$_] } else { 0 }
++    $oldValue -ne $newValue
++})
++
++$activeId = [string]$new.active_account_id
++$activeValid = [string]::IsNullOrWhiteSpace($activeId) -or $activeId -in $newIds
++$sourceHashCurrent = (Get-FileHash -LiteralPath $legacy -Algorithm SHA256).Hash
++$sourceUnchanged = $sourceHashCurrent -eq [string]$report.source_sha256_before
++$codexAuthPresent = Test-Path -LiteralPath $codexAuth -PathType Leaf
++$authUnchangedSinceMigration = $true
++if ($codexAuthPresent -and $report.PSObject.Properties.Name -contains 'codex_auth_sha256_after') {
++    $authUnchangedSinceMigration = (Get-FileHash -LiteralPath $codexAuth -Algorithm SHA256).Hash -eq [string]$report.codex_auth_sha256_after
++}
++
++$statusOk = (
++    $oldAccounts.Count -eq $newAccounts.Count -and
++    $mismatches.Count -eq 0 -and
++    $duplicateOldIds.Count -eq 0 -and
++    $duplicateNewIds.Count -eq 0 -and
++    $activeValid -and
++    $sourceUnchanged -and
++    $authUnchangedSinceMigration -and
++    [string]$report.status -eq 'OK'
++)
+ 
+ $result = [ordered]@{
+     legacy_count = $oldAccounts.Count
+     hardened_count = $newAccounts.Count
+-    active_account_id = $new.active_account_id
+-    missing_identity_count = $missing.Count
+-    extra_identity_count = $extra.Count
+-    codex_auth_present = Test-Path -LiteralPath $codexAuth
+-    status = if ($oldAccounts.Count -eq $newAccounts.Count -and $missing.Count -eq 0 -and $extra.Count -eq 0) { 'OK' } else { 'REVIEW' }
++    active_account_id = $activeId
++    active_account_valid = $activeValid
++    identity_multiset_mismatches = $mismatches.Count
++    duplicate_legacy_ids = $duplicateOldIds.Count
++    duplicate_hardened_ids = $duplicateNewIds.Count
++    legacy_store_unchanged = $sourceUnchanged
++    codex_auth_present = $codexAuthPresent
++    codex_auth_unchanged_since_migration = $authUnchangedSinceMigration
++    status = if ($statusOk) { 'OK' } else { 'REVIEW' }
+ }
+ 
+ $result | Format-List
+-if ($result.status -ne 'OK') {
+-    Write-Host 'Missing identities:' -ForegroundColor Yellow
+-    $missing | ForEach-Object { Write-Host "  $_" }
+-    Write-Host 'Extra identities:' -ForegroundColor Yellow
+-    $extra | ForEach-Object { Write-Host "  $_" }
++if (-not $statusOk) {
++    if ($mismatches.Count -gt 0) {
++        Write-Host 'Identity count mismatches:' -ForegroundColor Yellow
++        $mismatches | ForEach-Object { Write-Host "  $_ old=$($oldMap[$_]) new=$($newMap[$_])" }
++    }
+     exit 2
+ }
+ Write-Host 'Account migration verification passed.' -ForegroundColor Green
