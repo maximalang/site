@@ -1,0 +1,21 @@
+diff --git a/tools/remove-old-switcher.ps1 b/tools/remove-old-switcher.ps1
+--- a/tools/remove-old-switcher.ps1
++++ b/tools/remove-old-switcher.ps1
+@@ -18,11 +18,12 @@ function Read-Count([string]$Path) {
+     return @($store.accounts).Count
+ }
+ 
+-$entries = Get-ChildItem \
+-    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall', \
+-    'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall', \
+-    'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall' \
+-    -ErrorAction SilentlyContinue |
++$uninstallRoots = @(
++    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
++    'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
++    'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
++)
++$entries = Get-ChildItem -Path $uninstallRoots -ErrorAction SilentlyContinue |
+     Get-ItemProperty -ErrorAction SilentlyContinue |
+     Where-Object { $_.DisplayName -eq 'Codex Switcher' }
+ 
