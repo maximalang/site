@@ -1,0 +1,12 @@
+diff --git a/src-tauri/capabilities/default.json b/src-tauri/capabilities/default.json
+index e8ccdf9..7d8de19 100644
+--- a/src-tauri/capabilities/default.json
++++ b/src-tauri/capabilities/default.json
+@@ -12,7 +12,6 @@
+     "core:window:allow-toggle-maximize",
+     "opener:default",
+     "dialog:default",
+-    "updater:default",
+     "process:default"
+   ]
+ }
