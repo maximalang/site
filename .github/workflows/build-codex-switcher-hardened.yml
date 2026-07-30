@@ -1,0 +1,95 @@
+name: Build Codex Switcher Hardened
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout build payload
+        uses: actions/checkout@v4
+
+      - name: Reconstruct hardened patch
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem 'codex-build\patch.part*' | Sort-Object Name
+          if ($parts.Count -ne 8) { throw "Expected 8 patch parts, found $($parts.Count)" }
+          $encoded = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ''
+          [IO.File]::WriteAllBytes('hardened.patch.gz', [Convert]::FromBase64String($encoded))
+          $input = [IO.File]::OpenRead('hardened.patch.gz')
+          $output = [IO.File]::Create('hardened.patch')
+          $gzip = [IO.Compression.GZipStream]::new($input, [IO.Compression.CompressionMode]::Decompress)
+          try { $gzip.CopyTo($output) } finally { $gzip.Dispose(); $output.Dispose(); $input.Dispose() }
+          if ((Get-Item 'hardened.patch').Length -lt 1000) { throw 'Reconstructed patch is unexpectedly small' }
+
+      - name: Fetch exact upstream v0.2.9 source
+        shell: pwsh
+        run: |
+          git clone https://github.com/Lampese/codex-switcher.git source
+          Set-Location source
+          git checkout 31e2b962009a51f27e964fa5c1984b1aeb237079
+          git apply --check ..\hardened.patch
+          git apply ..\hardened.patch
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt
+
+      - name: Install frontend dependencies
+        working-directory: source
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: source
+        run: pnpm build
+
+      - name: Check Rust formatting
+        working-directory: source
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Run Rust tests
+        working-directory: source
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build Windows NSIS installer
+        working-directory: source
+        run: pnpm tauri:win build --target x86_64-pc-windows-msvc
+
+      - name: Collect deliverables
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path deliverables -Force | Out-Null
+          $installer = Get-ChildItem 'source\src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not produced' }
+          Copy-Item $installer.FullName 'deliverables\Codex-Switcher-Hardened-0.3.0-x64-setup.exe'
+          Copy-Item 'source\tools\migrate-accounts.ps1' deliverables\
+          Copy-Item 'source\tools\verify-accounts.ps1' deliverables\
+          Copy-Item 'source\tools\remove-old-switcher.ps1' deliverables\
+          Copy-Item 'source\HARDENED-README.md' deliverables\
+          Get-FileHash deliverables\* -Algorithm SHA256 | Format-Table -AutoSize | Out-File 'deliverables\SHA256SUMS.txt'
+
+      - name: Upload Windows bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Codex-Switcher-Hardened-0.3.0-Windows-x64
+          path: deliverables
+          if-no-files-found: error
+          retention-days: 7
