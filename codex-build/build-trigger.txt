@@ -1,0 +1,1 @@
+Codex Switcher Hardened 0.3.0 Windows build trigger.
