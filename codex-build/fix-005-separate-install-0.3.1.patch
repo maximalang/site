@@ -1,0 +1,81 @@
+diff --git a/package.json b/package.json
+index 1745cff..20d45cf 100644
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "codex-switcher",
+   "private": true,
+-  "version": "0.3.0",
++  "version": "0.3.1",
+   "description": "Hardened multi-account manager for Codex on Windows",
+   "type": "module",
+   "scripts": {
+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
+index 8da90c6..1e0bd89 100644
+--- a/src-tauri/Cargo.toml
++++ b/src-tauri/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "codex-switcher-hardened"
+-version = "0.3.0"
++version = "0.3.1"
+ description = "Hardened multi-account manager for Codex"
+ authors = ["lampese"]
+ edition = "2021"
+diff --git a/src-tauri/src/auth/storage.rs b/src-tauri/src/auth/storage.rs
+index 2425bc2..a249650 100644
+--- a/src-tauri/src/auth/storage.rs
++++ b/src-tauri/src/auth/storage.rs
+@@ -18,7 +18,7 @@ static PROCESS_STORE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+ 
+ /// Hardened builds intentionally use a separate store from the upstream application.
+ pub fn get_config_dir() -> Result<PathBuf> {
+-    if let Ok(path) = std::env::var("CODEX_SWITCHER_HOME") {
++    if let Ok(path) = std::env::var("CODEX_SWITCHER_HARDENED_HOME") {
+         return Ok(PathBuf::from(path));
+     }
+     let home = dirs::home_dir().context("Could not find home directory")?;
+diff --git a/src-tauri/tauri.conf.json b/src-tauri/tauri.conf.json
+index 327ee48..c7ba18d 100644
+--- a/src-tauri/tauri.conf.json
++++ b/src-tauri/tauri.conf.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "https://schema.tauri.app/config/2",
+   "productName": "Codex Switcher Hardened",
+-  "version": "0.3.0",
++  "version": "0.3.1",
+   "identifier": "com.maximalang.codex-switcher-hardened",
+   "build": {
+     "beforeDevCommand": "pnpm dev",
+@@ -36,6 +36,15 @@
+       "icons/icon.icns",
+       "icons/icon.ico"
+     ],
+-    "createUpdaterArtifacts": false
++    "createUpdaterArtifacts": false,
++    "windows": {
++      "webviewInstallMode": {
++        "type": "skip"
++      },
++      "nsis": {
++        "installMode": "currentUser",
++        "displayLanguageSelector": false
++      }
++    }
+   }
+ }
+diff --git a/src-tauri/tauri.windows.conf.json b/src-tauri/tauri.windows.conf.json
+index e6d81a8..0fd9f83 100644
+--- a/src-tauri/tauri.windows.conf.json
++++ b/src-tauri/tauri.windows.conf.json
+@@ -3,7 +3,7 @@
+   "app": {
+     "windows": [
+       {
+-        "title": "Codex Switcher",
++        "title": "Codex Switcher Hardened",
+         "width": 900,
+         "height": 700,
+         "minWidth": 600,
