@@ -15,7 +15,12 @@ const bindings = [
   },
 ] as const;
 
-function createHarness(overrides?: { agents?: unknown; sessions?: unknown; presence?: unknown }) {
+function createHarness(overrides?: {
+  agents?: unknown;
+  sessions?: unknown;
+  presence?: unknown;
+  onSnapshot?: () => void | Promise<void>;
+}) {
   let callbacks: OpenClawReadGatewayCallbacks | undefined;
   const telemetry: OpenClawTelemetryEvent[] = [];
   const snapshots: unknown[] = [];
@@ -70,7 +75,10 @@ function createHarness(overrides?: { agents?: unknown; sessions?: unknown; prese
       return gateway;
     },
     telemetry: { record: (event) => telemetry.push(event) },
-    onSnapshot: (snapshot) => snapshots.push(snapshot),
+    onSnapshot: (snapshot) => {
+      snapshots.push(snapshot);
+      return overrides?.onSnapshot?.();
+    },
     now: () => new Date("2026-08-13T06:00:00.000Z"),
     correlationId: "corr-test",
   });
@@ -291,5 +299,76 @@ describe("OpenClawReadAdapter", () => {
         outcome: "INVALID_RESPONSE",
       }),
     );
+  });
+
+  it("does not become ready until the authoritative snapshot is persisted", async () => {
+    const persisted = Promise.withResolvers<void>();
+    const harness = createHarness({ onSnapshot: () => persisted.promise });
+    await harness.adapter.start();
+    const hello = harness.callbacks.onHello(readHello);
+    await vi.waitFor(() => expect(harness.snapshots).toHaveLength(1));
+    expect(harness.adapter.state).toBe("SYNCING");
+    persisted.resolve();
+    await hello;
+    expect(harness.adapter.state).toBe("READY");
+  });
+
+  it("degrades without publishing readiness when snapshot persistence fails", async () => {
+    const harness = createHarness({
+      onSnapshot: async () => {
+        throw new Error("database unavailable");
+      },
+    });
+    await harness.adapter.start();
+    await harness.callbacks.onHello(readHello);
+    expect(harness.adapter.state).toBe("DEGRADED");
+    expect(harness.telemetry).toContainEqual(
+      expect.objectContaining({ event: "openclaw_sync_completed", outcome: "READ_FAILED" }),
+    );
+  });
+
+  it("serializes disconnect after an in-flight snapshot and never restores stale readiness", async () => {
+    const firstPersisted = Promise.withResolvers<void>();
+    const persistenceOrder: string[] = [];
+    let snapshotNumber = 0;
+    const harness = createHarness({
+      onSnapshot: async () => {
+        snapshotNumber += 1;
+        const current = snapshotNumber;
+        persistenceOrder.push(`start:${current}`);
+        if (current === 1) await firstPersisted.promise;
+        persistenceOrder.push(`finish:${current}`);
+      },
+    });
+    await harness.adapter.start();
+    const hello = harness.callbacks.onHello(readHello);
+    await vi.waitFor(() => expect(persistenceOrder).toEqual(["start:1"]));
+    const close = harness.callbacks.onClose({ phase: "post-hello", code: 1006 });
+    expect(persistenceOrder).toEqual(["start:1"]);
+    firstPersisted.resolve();
+    await Promise.all([hello, close]);
+    expect(persistenceOrder).toEqual(["start:1", "finish:1", "start:2", "finish:2"]);
+    expect(harness.adapter.state).toBe("DEGRADED");
+    expect(harness.telemetry).toContainEqual(
+      expect.objectContaining({ event: "openclaw_sync_completed", outcome: "STALE_CONNECTION" }),
+    );
+  });
+
+  it("waits for in-flight snapshot persistence before shutdown completes", async () => {
+    const persisted = Promise.withResolvers<void>();
+    const harness = createHarness({ onSnapshot: () => persisted.promise });
+    await harness.adapter.start();
+    const hello = harness.callbacks.onHello(readHello);
+    await vi.waitFor(() => expect(harness.snapshots).toHaveLength(1));
+    let stopped = false;
+    const stop = harness.adapter.stop().then(() => {
+      stopped = true;
+    });
+    await Promise.resolve();
+    expect(stopped).toBe(false);
+    persisted.resolve();
+    await Promise.all([hello, stop]);
+    expect(stopped).toBe(true);
+    expect(harness.adapter.state).toBe("STOPPED");
   });
 });

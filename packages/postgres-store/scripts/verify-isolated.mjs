@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   AgentIdSchema,
+  AgentSchema,
   ConversationIdSchema,
   MessageIdSchema,
   SendMessageIntentSchema,
@@ -15,6 +16,7 @@ import {
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresOwnerSessionStore,
+  PostgresWorldProjectionStore,
 } from "../dist/index.js";
 
 const IMAGE =
@@ -47,6 +49,16 @@ function runDocker(args, { allowFailure = false } = {}) {
       }
     });
   });
+}
+
+async function expectRejected(promise, message) {
+  let rejected = false;
+  try {
+    await promise;
+  } catch {
+    rejected = true;
+  }
+  if (!rejected) throw new Error(message);
 }
 
 const suffix = randomBytes(8).toString("hex");
@@ -135,7 +147,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 2
+    ledger.rows.at(-1)?.version !== 3
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -155,6 +167,9 @@ try {
     "owner_sessions",
     "runtime_bindings",
     "schema_migrations",
+    "world_event_stream",
+    "world_agent_status",
+    "world_events",
   ]) {
     if (!names.includes(required)) {
       throw new Error(`Canonical table is missing after migration: ${required}`);
@@ -248,6 +263,71 @@ try {
      VALUES ($1, $2, $3, 'OPENCLAW', $4)`,
     [ids.binding, ids.agent, ids.route, "researcher"],
   );
+  const worldEventIds = [
+    "event_13131313-1313-1313-1313-131313131313",
+    "event_14141414-1414-1414-1414-141414141414",
+    "event_15151515-1515-1515-1515-151515151515",
+  ];
+  const worldStore = new PostgresWorldProjectionStore(pool, {
+    eventId: () => {
+      const eventId = worldEventIds.shift();
+      if (!eventId) throw new Error("Isolated World event identities were exhausted");
+      return eventId;
+    },
+  });
+  const worldAgent = AgentSchema.parse({
+    schemaVersion: 1,
+    id: ids.agent,
+    slug: "researcher",
+    displayName: "Researcher",
+    role: "Protocol verification",
+    instructions: "Verify protocol contracts with evidence.",
+    isEnabled: true,
+  });
+  await worldStore.applyOpenClawSnapshot({
+    observedAt: "2026-08-13T09:15:00.000Z",
+    observationId: "isolated-runtime:epoch-1:sequence-1",
+    statuses: [{ agentId: ids.agent, bindingId: ids.binding, status: "RUNNING" }],
+  });
+  const restartRead = await new PostgresWorldProjectionStore(pool).readWorld([worldAgent]);
+  if (restartRead.cursor.lastSequence !== 1 || restartRead.agents[0]?.status !== "RUNNING") {
+    throw new Error("Restarted World reader did not restore the persisted runtime status");
+  }
+  await worldStore.applyOpenClawSnapshot({
+    observedAt: "2026-08-13T09:16:00.000Z",
+    observationId: "isolated-runtime:epoch-1:sequence-2",
+    statuses: [{ agentId: ids.agent, bindingId: ids.binding, status: "RUNNING" }],
+  });
+  await expectRejected(
+    worldStore.applyOpenClawSnapshot({
+      observedAt: "2026-08-13T09:16:30.000Z",
+      observationId: "isolated-runtime:epoch-1:invalid-binding",
+      statuses: [
+        {
+          agentId: ids.agent,
+          bindingId: "binding_16161616-1616-1616-1616-161616161616",
+          status: "FAILED",
+        },
+      ],
+    }),
+    "World projection accepted an unbound runtime identity",
+  );
+  await worldStore.applyOpenClawSnapshot({
+    observedAt: "2026-08-13T09:17:00.000Z",
+    observationId: "isolated-runtime:epoch-2:offline",
+    statuses: [{ agentId: ids.agent, bindingId: ids.binding, status: "OFFLINE" }],
+  });
+  const worldEvidence = await pool.query(
+    "SELECT count(*)::integer AS event_count, array_agg(sequence ORDER BY sequence) AS sequences FROM agent_world.world_events",
+  );
+  if (
+    worldEvidence.rows[0]?.event_count !== 2 ||
+    JSON.stringify(worldEvidence.rows[0]?.sequences) !== JSON.stringify(["1", "2"])
+  ) {
+    throw new Error(
+      "World projection did not preserve gapless replay across duplicate, rollback, and disconnect",
+    );
+  }
   await pool.query(
     `INSERT INTO agent_world.conversations
        (id, agent_id, project_id, title, created_at)
@@ -440,7 +520,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

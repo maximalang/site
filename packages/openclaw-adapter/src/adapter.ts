@@ -128,7 +128,7 @@ export type OpenClawReadAdapterOptions = {
   credentialProvider: () => Promise<OpenClawCredential>;
   gatewayFactory?: OpenClawReadGatewayFactory;
   telemetry: { record: (event: OpenClawTelemetryEvent) => void };
-  onSnapshot: (snapshot: OpenClawAdapterSnapshot) => void;
+  onSnapshot: (snapshot: OpenClawAdapterSnapshot) => void | Promise<void>;
   now?: () => Date;
   correlationId: string;
 };
@@ -165,6 +165,7 @@ export class OpenClawReadAdapter {
   private connectionActive = false;
   private syncPromise: Promise<void> | undefined;
   private pendingSync: PendingSync | undefined;
+  private snapshotTail: Promise<void> = Promise.resolve();
 
   constructor(options: OpenClawReadAdapterOptions) {
     this.endpoint = parseOpenClawEndpoint(options.config.endpoint);
@@ -224,6 +225,8 @@ export class OpenClawReadAdapter {
     this.pendingSync = undefined;
     this.setState("STOPPED");
     await gateway?.stopAndWait();
+    await this.syncPromise;
+    await this.snapshotTail;
   }
 
   private async handleHello(input: unknown): Promise<void> {
@@ -326,7 +329,10 @@ export class OpenClawReadAdapter {
     });
   }
 
-  private handleClose(info: { phase: "pre-hello" | "post-hello"; code: number }): void {
+  private async handleClose(info: {
+    phase: "pre-hello" | "post-hello";
+    code: number;
+  }): Promise<void> {
     if (this.adapterState === "STOPPED") {
       return;
     }
@@ -337,7 +343,7 @@ export class OpenClawReadAdapter {
       phase: "CLOSE",
       code: info.phase === "post-hello" ? "POST_HELLO_CLOSE" : "PRE_HELLO_CLOSE",
     });
-    this.onSnapshot({
+    await this.publishSnapshot({
       runtime: createOfflineOpenClawSnapshot(this.bindings, this.now().toISOString()),
       sourceCursor: this.cursor(),
     });
@@ -395,7 +401,11 @@ export class OpenClawReadAdapter {
         this.recordSync(sync.trigger, "STALE_CONNECTION", startedAt);
         return;
       }
-      this.onSnapshot({ runtime, sourceCursor: this.cursor() });
+      await this.publishSnapshot({ runtime, sourceCursor: this.cursor() });
+      if (epoch !== this.connectionEpoch || !this.connectionActive || this.isStopped()) {
+        this.recordSync(sync.trigger, "STALE_CONNECTION", startedAt);
+        return;
+      }
       this.setState("READY");
       this.recordSync(sync.trigger, "SUCCEEDED", startedAt, runtime.ignoredUnboundAgentCount);
     } catch (error) {
@@ -406,6 +416,12 @@ export class OpenClawReadAdapter {
         startedAt,
       );
     }
+  }
+
+  private publishSnapshot(snapshot: OpenClawAdapterSnapshot): Promise<void> {
+    const current = this.snapshotTail.then(() => this.onSnapshot(snapshot));
+    this.snapshotTail = current.catch(() => undefined);
+    return current;
   }
 
   private cursor(): OpenClawAdapterSnapshot["sourceCursor"] {

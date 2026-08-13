@@ -13,12 +13,8 @@ import {
   PostgresConversationStore,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
+  PostgresWorldProjectionStore,
 } from "@agent-world/postgres-store";
-import {
-  buildLiveRuntimeWorldReadModel,
-  buildUnavailableWorldReadModel,
-  type WorldReadModel,
-} from "@agent-world/read-model";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
 import { OwnerSessionManager } from "./owner-session";
@@ -143,8 +139,21 @@ export async function createProductionRuntime(
     const conversationReader = new PostgresConversationReader(pool);
     const conversationStore = new PostgresConversationStore(pool);
     const configuration = await new PostgresOpenClawConfigurationReader(pool).read();
-    let world: WorldReadModel = buildUnavailableWorldReadModel(new Date().toISOString());
-    let worldRevision = 0;
+    const runtimeObservationId = randomUUID();
+    const worldStore = new PostgresWorldProjectionStore(pool, {
+      eventId: () => `event_${randomUUID()}`,
+    });
+    if (configuration.bindings.length > 0) {
+      await worldStore.applyOpenClawSnapshot({
+        observedAt: new Date().toISOString(),
+        observationId: `openclaw-start:${runtimeObservationId}`,
+        statuses: configuration.bindings.map(({ agentId, bindingId }) => ({
+          agentId,
+          bindingId,
+          status: "OFFLINE",
+        })),
+      });
+    }
 
     let openClawConfig: OpenClawRuntimeConfig | undefined;
     try {
@@ -166,23 +175,16 @@ export async function createProductionRuntime(
           bindings: configuration.bindings,
           credentialProvider,
           telemetry: { record: (event) => record("openclaw-read", event) },
-          onSnapshot: (snapshot) => {
-            worldRevision += 1;
-            world = buildLiveRuntimeWorldReadModel({
-              generatedAt: snapshot.runtime.receivedAt,
-              cursor: {
-                schemaVersion: 1,
-                stream: "WORLD",
-                lastSequence: worldRevision,
-                lastEventId: `event_${randomUUID()}`,
-              },
-              agents: configuration.agents,
-              runtimeStatuses: snapshot.runtime.agents.map(({ agentId, status }) => ({
+          onSnapshot: (snapshot) =>
+            worldStore.applyOpenClawSnapshot({
+              observedAt: snapshot.runtime.receivedAt,
+              observationId: `openclaw-observation:${runtimeObservationId}:${snapshot.sourceCursor.connectionEpoch}:${snapshot.sourceCursor.connectionSequence ?? "snapshot"}:${randomUUID()}`,
+              statuses: snapshot.runtime.agents.map(({ agentId, bindingId, status }) => ({
                 agentId,
+                bindingId,
                 status,
               })),
-            });
-          },
+            }),
           correlationId: "openclaw-read-runtime",
         });
         writeAdapter = new OpenClawWriteAdapter({
@@ -217,7 +219,7 @@ export async function createProductionRuntime(
       readAgentConversations: (agentId) => agentConversationReader.read(agentId),
       readConversation: (input) => conversationReader.read(input),
       sendConversation: (input) => sender.send(input),
-      readWorld: async () => world,
+      readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
         await pool.end();
