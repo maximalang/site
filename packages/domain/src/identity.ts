@@ -11,15 +11,25 @@ function canonicalId<const Brand extends string>(prefix: string, brand: Brand) {
 
 export const AccountIdSchema = canonicalId("account", "AccountId");
 export const AgentIdSchema = canonicalId("agent", "AgentId");
+export const ApprovalIdSchema = canonicalId("approval", "ApprovalId");
 export const BindingIdSchema = canonicalId("binding", "BindingId");
+export const EventIdSchema = canonicalId("event", "EventId");
+export const ProjectIdSchema = canonicalId("project", "ProjectId");
 export const RouteIdSchema = canonicalId("route", "RouteId");
+export const RunIdSchema = canonicalId("run", "RunId");
 export const SessionIdSchema = canonicalId("session", "SessionId");
+export const TaskIdSchema = canonicalId("task", "TaskId");
 
 export type AccountId = z.infer<typeof AccountIdSchema>;
 export type AgentId = z.infer<typeof AgentIdSchema>;
+export type ApprovalId = z.infer<typeof ApprovalIdSchema>;
 export type BindingId = z.infer<typeof BindingIdSchema>;
+export type EventId = z.infer<typeof EventIdSchema>;
+export type ProjectId = z.infer<typeof ProjectIdSchema>;
 export type RouteId = z.infer<typeof RouteIdSchema>;
+export type RunId = z.infer<typeof RunIdSchema>;
 export type SessionId = z.infer<typeof SessionIdSchema>;
+export type TaskId = z.infer<typeof TaskIdSchema>;
 
 export const ExecutionModeSchema = z.enum(["CHAT", "WORK", "CODEX", "API", "LOCAL"]);
 export type ExecutionMode = z.infer<typeof ExecutionModeSchema>;
@@ -67,7 +77,7 @@ export const ExecutionRouteSchema = z.strictObject({
 });
 export type ExecutionRoute = z.infer<typeof ExecutionRouteSchema>;
 
-const ExternalRuntimeIdSchema = z
+export const OpaqueExternalIdSchema = z
   .string()
   .trim()
   .min(1)
@@ -87,7 +97,7 @@ export const RuntimeBindingSchema = z.strictObject({
   agentId: AgentIdSchema,
   routeId: RouteIdSchema,
   adapterKind: ExecutionAdapterKindSchema,
-  externalAgentId: ExternalRuntimeIdSchema,
+  externalAgentId: OpaqueExternalIdSchema,
   isEnabled: z.boolean(),
 });
 export type RuntimeBinding = z.infer<typeof RuntimeBindingSchema>;
