@@ -3,6 +3,7 @@
   "compilerOptions": {
     "incremental": false,
     "paths": {
+      "@agent-world/conversation-service": ["../../packages/conversation-service/src/index.ts"],
       "@agent-world/domain": ["../../packages/domain/src/index.ts"],
       "@agent-world/read-model": ["../../packages/read-model/src/index.ts"]
     }

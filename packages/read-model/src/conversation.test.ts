@@ -3,6 +3,9 @@ import {
   buildConversationReadModel,
   type ConversationReadModelInput,
   ConversationReadModelSchema,
+  ConversationSendRequestSchema,
+  ConversationSendResponseSchema,
+  projectConversationMessage,
 } from "./conversation.js";
 
 const messages = [
@@ -128,5 +131,38 @@ describe("buildConversationReadModel", () => {
     expect(() =>
       buildConversationReadModel({ ...input, messages: [], hasOlderMessages: true }),
     ).toThrow("cannot advertise older messages");
+  });
+
+  it("defines a strict browser send contract without runtime or server-owned fields", () => {
+    const request = ConversationSendRequestSchema.parse({
+      schemaVersion: 1,
+      messageId: "message_44444444-4444-4444-4444-444444444444",
+      agentId: "agent_22222222-2222-2222-2222-222222222222",
+      content: "Verify the protocol.",
+    });
+    expect(request).not.toHaveProperty("conversationId");
+    expect(request).not.toHaveProperty("createdAt");
+    expect(request).not.toHaveProperty("idempotencyKey");
+    expect(() =>
+      ConversationSendRequestSchema.parse({ ...request, sessionId: messages[0].sessionId }),
+    ).toThrow();
+  });
+
+  it("projects a safe send response without session or provider identifiers", () => {
+    const response = ConversationSendResponseSchema.parse({
+      schemaVersion: 1,
+      outcome: "DISPATCHED",
+      message: projectConversationMessage(messages[1]),
+    });
+
+    expect(response.message).toEqual({
+      messageId: "message_44444444-4444-4444-4444-444444444444",
+      author: "OWNER",
+      content: "Verify the protocol.",
+      delivery: "DISPATCHED",
+      createdAt: "2026-08-13T10:00:01.000Z",
+      provenance: { kind: "DOMAIN" },
+    });
+    expect(JSON.stringify(response)).not.toMatch(/session_|binding_|commandId/);
   });
 });

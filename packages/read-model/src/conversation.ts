@@ -1,11 +1,13 @@
 import {
   type Agent,
+  AgentIdSchema,
   AgentSchema,
   type Conversation,
   type ConversationMessage,
   ConversationMessageSchema,
   ConversationSchema,
   ExecutionAdapterKindSchema,
+  MessageContentSchema,
   MessageIdSchema,
   TimestampSchema,
 } from "@agent-world/domain";
@@ -19,7 +21,7 @@ export const ConversationMessageCursorSchema = z.strictObject({
 });
 export type ConversationMessageCursor = z.infer<typeof ConversationMessageCursorSchema>;
 
-const ConversationReadMessageSchema = z.strictObject({
+export const ConversationReadMessageSchema = z.strictObject({
   messageId: MessageIdSchema,
   author: z.enum(["OWNER", "AGENT"]),
   content: z.string().min(1).max(32_000),
@@ -34,6 +36,21 @@ const ConversationReadMessageSchema = z.strictObject({
   ]),
 });
 export type ConversationReadMessage = z.infer<typeof ConversationReadMessageSchema>;
+
+export const ConversationSendRequestSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  messageId: MessageIdSchema,
+  agentId: AgentIdSchema,
+  content: MessageContentSchema,
+});
+export type ConversationSendRequest = z.infer<typeof ConversationSendRequestSchema>;
+
+export const ConversationSendResponseSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  outcome: z.enum(["DISPATCHED", "REPLAYED"]),
+  message: ConversationReadMessageSchema,
+});
+export type ConversationSendResponse = z.infer<typeof ConversationSendResponseSchema>;
 
 export const ConversationReadModelSchema = z.strictObject({
   schemaVersion: z.literal(1),
@@ -69,7 +86,8 @@ function compareMessages(left: ConversationMessage, right: ConversationMessage):
   );
 }
 
-function projectMessage(message: ConversationMessage): ConversationReadMessage {
+export function projectConversationMessage(messageInput: unknown): ConversationReadMessage {
+  const message = ConversationMessageSchema.parse(messageInput);
   return ConversationReadMessageSchema.parse({
     messageId: message.id,
     author: message.author,
@@ -138,7 +156,7 @@ export function buildConversationReadModel(
       role: agent.role,
       isEnabled: agent.isEnabled,
     },
-    messages: orderedMessages.map(projectMessage),
+    messages: orderedMessages.map(projectConversationMessage),
     ...(input.hasOlderMessages && oldest
       ? { nextOlderThan: { createdAt: oldest.createdAt, messageId: oldest.id } }
       : {}),
