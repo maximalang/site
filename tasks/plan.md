@@ -61,7 +61,7 @@ Phase 0 reuse and license audit
 
 ### Phases 3-4: Model and Codex execution
 
-- [ ] Integrate one `ModelGateway` implementation and local-model routes.
+- [x] Integrate one `ModelGateway` implementation and local-model routes.
 - [ ] Integrate official ChatGPT-authenticated Codex execution.
 - [ ] Represent Chat/Work transports explicitly as official, experimental,
       unsupported or disabled.
