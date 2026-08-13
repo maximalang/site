@@ -1,0 +1,39 @@
+# `@agent-world/postgres-store`
+
+Canonical PostgreSQL persistence and migrations for the Agent Operating
+Environment. Runtime systems are projections; they do not replace these tables
+as product authority.
+
+## Migration contract
+
+- Migration filenames are ordered `NNNN_name.sql` and carry SHA-256 checksums.
+- A transaction-scoped PostgreSQL advisory lock serializes migration runners.
+- The migration ledger rejects unknown applied versions and checksum/name drift.
+- Every migration and its ledger insert commit together or roll back together.
+- SQL constraints mirror the branded domain prefixes, Agent/Conversation/
+  Session joins, one active Session per Conversation, delivery states and
+  domain/runtime provenance.
+
+The runner uses one checked-out `pg` client for the whole transaction and
+parameterizes ledger values. Application query methods must follow the same
+rule; no string-interpolated user or runtime values are permitted.
+
+## Isolated verification
+
+The verifier refuses arbitrary database URLs. It requires an explicit isolated
+acknowledgement and creates a unique Docker container on a random loopback port
+with PostgreSQL data on tmpfs:
+
+```powershell
+$env:AGENT_WORLD_DB_TEST_ACK='isolated'
+npm run test:db
+```
+
+It pins the official `postgres:18.3-bookworm` linux/amd64 manifest digest
+`sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7`,
+applies the migration set twice, checks the ledger/tables, and removes only its
+strictly named container plus attached anonymous volumes in `finally`.
+
+This proves migration compatibility on an isolated database. It does not prove
+backup/restore, production credentials, production deployment, or upgrade from
+an earlier released schema.

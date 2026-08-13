@@ -58,6 +58,8 @@ browser once with `npm exec --workspace @agent-world/web -- playwright install c
   projection. It does not execute tasks.
 - [`@agent-world/read-model`](packages/read-model/README.md) replays canonical
   events into one bounded, versioned World/Command read boundary.
+- [`@agent-world/postgres-store`](packages/postgres-store/README.md) owns the
+  checksum-locked canonical PostgreSQL schema and durable store adapters.
 - [`@agent-world/web`](apps/web) exposes one `/api/world` endpoint and derives
   both the primary Canvas World and the Command agent table from its validated
   response. The browser has no direct runtime connection.
@@ -74,6 +76,7 @@ Key evidence and decisions:
 - [Canonical contract decision](docs/decisions/0004-canonical-domain-contracts.md)
 - [OpenClaw read-adapter decision](docs/decisions/0005-openclaw-read-adapter-boundary.md)
 - [World/Command read-surface decision](docs/decisions/0006-shared-world-command-read-surface.md)
+- [Canonical PostgreSQL decision](docs/decisions/0007-canonical-postgresql-boundary.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
 
 ## Security baseline

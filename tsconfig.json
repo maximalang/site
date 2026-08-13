@@ -11,6 +11,9 @@
       "path": "./packages/openclaw-adapter"
     },
     {
+      "path": "./packages/postgres-store"
+    },
+    {
       "path": "./packages/read-model"
     }
   ]
