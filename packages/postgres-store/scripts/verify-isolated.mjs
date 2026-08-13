@@ -1,8 +1,14 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import {
+  AgentIdSchema,
+  ConversationIdSchema,
+  MessageIdSchema,
+  SendMessageIntentSchema,
+} from "@agent-world/domain";
 import { Pool } from "pg";
-import { applyMigrations, discoverMigrations } from "../dist/index.js";
+import { applyMigrations, discoverMigrations, PostgresConversationStore } from "../dist/index.js";
 
 const IMAGE =
   "postgres:18.3-bookworm@sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7";
@@ -142,8 +148,190 @@ try {
     }
   }
 
+  const ids = {
+    account: "account_11111111-1111-1111-1111-111111111111",
+    agent: AgentIdSchema.parse("agent_22222222-2222-2222-2222-222222222222"),
+    binding: "binding_33333333-3333-3333-3333-333333333333",
+    conversation: ConversationIdSchema.parse("conversation_44444444-4444-4444-4444-444444444444"),
+    project: "project_55555555-5555-5555-5555-555555555555",
+    route: "route_66666666-6666-6666-6666-666666666666",
+    session: "session_77777777-7777-7777-7777-777777777777",
+  };
+  await pool.query("INSERT INTO agent_world.accounts (id, label) VALUES ($1, $2)", [
+    ids.account,
+    "OpenClaw account",
+  ]);
+  await pool.query("INSERT INTO agent_world.projects (id, name) VALUES ($1, $2)", [
+    ids.project,
+    "Protocol project",
+  ]);
+  await pool.query(
+    `INSERT INTO agent_world.agents
+       (id, slug, display_name, role, instructions)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      ids.agent,
+      "researcher",
+      "Researcher",
+      "Protocol verification",
+      "Verify protocol contracts with evidence.",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.execution_routes
+       (id, label, mode, adapter_kind, account_id)
+     VALUES ($1, $2, 'CHAT', 'OPENCLAW', $3)`,
+    [ids.route, "OpenClaw chat", ids.account],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runtime_bindings
+       (id, agent_id, route_id, adapter_kind, external_agent_id)
+     VALUES ($1, $2, $3, 'OPENCLAW', $4)`,
+    [ids.binding, ids.agent, ids.route, "researcher"],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.conversations
+       (id, agent_id, project_id, title, created_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [ids.conversation, ids.agent, ids.project, "Protocol review", "2026-08-13T09:00:00.000Z"],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.conversation_sessions
+       (id, conversation_id, agent_id, binding_id, adapter_kind,
+        external_session_ref, started_at)
+     VALUES ($1, $2, $3, $4, 'OPENCLAW', $5, $6)`,
+    [
+      ids.session,
+      ids.conversation,
+      ids.agent,
+      ids.binding,
+      "agent:researcher:protocol-review",
+      "2026-08-13T09:30:00.000Z",
+    ],
+  );
+
+  const store = new PostgresConversationStore(pool);
+  const makeIntent = (
+    messageId,
+    content = "Verify the protocol.",
+    key = `message:${messageId.slice(8)}`,
+  ) =>
+    SendMessageIntentSchema.parse({
+      schemaVersion: 1,
+      id: MessageIdSchema.parse(messageId),
+      conversationId: ids.conversation,
+      agentId: ids.agent,
+      content,
+      idempotencyKey: key,
+      createdAt: "2026-08-13T10:00:00.000Z",
+    });
+  const firstIntent = makeIntent("message_88888888-8888-8888-8888-888888888888");
+  const ready = await store.prepareSend({
+    intent: firstIntent,
+    acceptedAt: "2026-08-13T10:00:01.000Z",
+  });
+  if (ready.kind !== "READY" || ready.session.id !== ids.session) {
+    throw new Error("PostgreSQL store did not prepare the canonical Session");
+  }
+  const failed = await store.markFailed({
+    messageId: firstIntent.id,
+    sessionId: ready.session.id,
+    failedAt: "2026-08-13T10:00:02.000Z",
+    failureCode: "ADAPTER_REJECTED",
+  });
+  if (failed.delivery !== "FAILED") {
+    throw new Error("PostgreSQL store did not persist a bounded delivery failure");
+  }
+  const retry = await store.prepareSend({
+    intent: firstIntent,
+    acceptedAt: "2026-08-13T10:00:03.000Z",
+  });
+  if (retry.kind !== "READY" || retry.session.id !== ready.session.id) {
+    throw new Error("PostgreSQL store did not resume the originally selected Session");
+  }
+  const dispatched = await store.markDispatched({
+    messageId: firstIntent.id,
+    sessionId: ready.session.id,
+    dispatchedAt: "2026-08-13T10:00:04.000Z",
+    receipt: { acceptedAt: "2026-08-13T10:00:04.000Z", externalRequestId: "run-1" },
+  });
+  if (dispatched.delivery !== "DISPATCHED") {
+    throw new Error("PostgreSQL store did not persist dispatch");
+  }
+  const replay = await store.prepareSend({
+    intent: firstIntent,
+    acceptedAt: "2026-08-13T10:00:05.000Z",
+  });
+  if (replay.kind !== "REPLAY") {
+    throw new Error("PostgreSQL store did not return an exact completed replay");
+  }
+  const keyConflict = await store.prepareSend({
+    intent: makeIntent(
+      "message_99999999-9999-9999-9999-999999999999",
+      "Different immutable content.",
+      firstIntent.idempotencyKey,
+    ),
+    acceptedAt: "2026-08-13T10:00:06.000Z",
+  });
+  if (keyConflict.kind !== "REJECTED" || keyConflict.code !== "IDEMPOTENCY_CONFLICT") {
+    throw new Error("PostgreSQL store did not reject idempotency-key reuse");
+  }
+  const idConflict = await store.prepareSend({
+    intent: makeIntent(firstIntent.id, "Different immutable content.", "message:different-key"),
+    acceptedAt: "2026-08-13T10:00:07.000Z",
+  });
+  if (idConflict.kind !== "REJECTED" || idConflict.code !== "IDEMPOTENCY_CONFLICT") {
+    throw new Error("PostgreSQL store did not reject canonical message-ID reuse");
+  }
+  const concurrentIntent = makeIntent("message_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+  const concurrent = await Promise.all([
+    store.prepareSend({ intent: concurrentIntent, acceptedAt: "2026-08-13T10:00:08.000Z" }),
+    store.prepareSend({ intent: concurrentIntent, acceptedAt: "2026-08-13T10:00:08.000Z" }),
+  ]);
+  if (concurrent.some(({ kind }) => kind !== "READY")) {
+    throw new Error("Concurrent exact delivery preparation was not safely serialized");
+  }
+  const duplicateCount = await pool.query(
+    "SELECT count(*)::integer AS count FROM agent_world.conversation_messages WHERE id = $1",
+    [concurrentIntent.id],
+  );
+  if (duplicateCount.rows[0]?.count !== 1) {
+    throw new Error("Concurrent preparation created duplicate canonical messages");
+  }
+  const missing = await store.prepareSend({
+    intent: SendMessageIntentSchema.parse({
+      ...makeIntent("message_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+      conversationId: "conversation_cccccccc-cccc-cccc-cccc-cccccccccccc",
+    }),
+    acceptedAt: "2026-08-13T10:00:09.000Z",
+  });
+  if (missing.kind !== "REJECTED" || missing.code !== "CONVERSATION_NOT_FOUND") {
+    throw new Error("PostgreSQL store did not reject a missing Conversation");
+  }
+  const mismatch = await store.prepareSend({
+    intent: SendMessageIntentSchema.parse({
+      ...makeIntent("message_dddddddd-dddd-dddd-dddd-dddddddddddd"),
+      agentId: "agent_eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+    }),
+    acceptedAt: "2026-08-13T10:00:10.000Z",
+  });
+  if (mismatch.kind !== "REJECTED" || mismatch.code !== "AGENT_MISMATCH") {
+    throw new Error("PostgreSQL store did not reject an Agent mismatch");
+  }
+  await pool.query("UPDATE agent_world.conversation_sessions SET ended_at = $2 WHERE id = $1", [
+    ids.session,
+    "2026-08-13T10:00:11.000Z",
+  ]);
+  const noSession = await store.prepareSend({
+    intent: makeIntent("message_ffffffff-ffff-ffff-ffff-ffffffffffff"),
+    acceptedAt: "2026-08-13T10:00:12.000Z",
+  });
+  if (noSession.kind !== "REJECTED" || noSession.code !== "NO_ACTIVE_SESSION") {
+    throw new Error("PostgreSQL store did not reject a Conversation without an active Session");
+  }
+
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, storeScenarios: 11 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

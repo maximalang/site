@@ -24,6 +24,9 @@ migrations rather than adding an ORM before query requirements justify one.
   relational ownership, session continuity, message delivery and provenance.
 - `ConversationCommandStore.prepareSend` will atomically claim idempotency,
   select the active Session/Binding and persist the owner message.
+- Automatic retry reuses that persisted Session/Binding. It fails closed if the
+  Session is no longer active; changing runtime provenance requires an explicit
+  audited rebind command rather than an implicit retry side effect.
 - Runtime transcripts and OpenClaw receipts remain evidence/projections, never
   canonical truth.
 

@@ -18,6 +18,25 @@ The runner uses one checked-out `pg` client for the whole transaction and
 parameterizes ledger values. Application query methods must follow the same
 rule; no string-interpolated user or runtime values are permitted.
 
+## Conversation send semantics
+
+`PostgresConversationStore.prepareSend` takes transaction-scoped advisory locks
+for both the idempotency key and canonical Message ID. It then claims or loads
+the immutable intent, verifies the canonical Conversation/Agent pair, and
+persists one active Session plus enabled same-Agent Binding before any runtime
+call.
+
+- A completed exact duplicate is `REPLAY` and creates no runtime call.
+- An `ACCEPTED` or `FAILED` exact duplicate resumes through the same persisted
+  Session and Binding.
+- A reused key or Message ID with different immutable input is
+  `IDEMPOTENCY_CONFLICT`.
+- A closed original Session is not silently replaced during retry; explicit
+  rebinding is a separate future audited domain command.
+- Delivery transitions use compare-and-set updates. Provider errors and raw
+  database details are mapped by the application service, not returned to API
+  callers.
+
 ## Isolated verification
 
 The verifier refuses arbitrary database URLs. It requires an explicit isolated
@@ -31,7 +50,8 @@ npm run test:db
 
 It pins the official `postgres:18.3-bookworm` linux/amd64 manifest digest
 `sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7`,
-applies the migration set twice, checks the ledger/tables, and removes only its
+applies the migration set twice, exercises eleven store scenarios including
+concurrent exact preparation, checks the ledger/tables, and removes only its
 strictly named container plus attached anonymous volumes in `finally`.
 
 This proves migration compatibility on an isolated database. It does not prove
