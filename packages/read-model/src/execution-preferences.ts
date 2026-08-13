@@ -3,13 +3,15 @@ import {
   AgentIdSchema,
   CanonicalModelIdSchema,
   ExecutionModeSchema,
+  ModelRouteIdSchema,
   ProjectIdSchema,
+  ProviderIdSchema,
   RunIdSchema,
   TaskIdSchema,
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const PreferenceScopeSchema = z.discriminatedUnion("kind", [
+export const PreferenceScopeSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("SYSTEM") }),
   z.strictObject({ kind: z.literal("PROJECT"), projectId: ProjectIdSchema }),
   z.strictObject({ kind: z.literal("AGENT"), agentId: AgentIdSchema }),
@@ -31,7 +33,7 @@ const ModePreferenceSchema = z.union([z.literal("AUTO"), ExecutionModeSchema]);
 const ContextPreferenceSchema = z.enum(["AUTO", "LEAN", "BALANCED", "RICH"]);
 const BudgetPreferenceSchema = z.enum(["AUTO", "ECONOMY", "BALANCED", "QUALITY"]);
 
-const ExecutionPreferenceOverridesSchema = z.strictObject({
+export const ExecutionPreferenceOverridesSchema = z.strictObject({
   model: ModelPreferenceSchema.optional(),
   account: AccountPreferenceSchema.optional(),
   mode: ModePreferenceSchema.optional(),
@@ -55,6 +57,81 @@ export const ResolvedExecutionPreferencesSchema = z.strictObject({
   budget: z.strictObject({ value: BudgetPreferenceSchema, source: PreferenceScopeSchema }),
 });
 export type ResolvedExecutionPreferences = z.infer<typeof ResolvedExecutionPreferencesSchema>;
+
+export const ExecutionPreferenceSelectionSchema = z
+  .strictObject({
+    projectId: ProjectIdSchema.optional(),
+    agentId: AgentIdSchema.optional(),
+    taskId: TaskIdSchema.optional(),
+  })
+  .refine((value) => value.taskId === undefined || (value.projectId && value.agentId), {
+    message: "Task preference selection requires Project and Agent",
+  });
+export type ExecutionPreferenceSelection = z.infer<typeof ExecutionPreferenceSelectionSchema>;
+
+export const ExecutionPreferenceReadModelSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  selection: ExecutionPreferenceSelectionSchema,
+  local: ExecutionPreferenceLayerSchema,
+  resolved: ResolvedExecutionPreferencesSchema,
+});
+export type ExecutionPreferenceReadModel = z.infer<typeof ExecutionPreferenceReadModelSchema>;
+
+export const ExecutionRouteCandidateSchema = z.strictObject({
+  modelRouteId: ModelRouteIdSchema,
+  modelId: CanonicalModelIdSchema,
+  providerId: ProviderIdSchema,
+  accountId: AccountIdSchema.optional(),
+  mode: ExecutionModeSchema,
+  availability: z.enum(["AVAILABLE", "DEGRADED", "UNAVAILABLE", "UNKNOWN"]),
+  providerEnabled: z.boolean(),
+  modelEnabled: z.boolean(),
+  routeEnabled: z.boolean(),
+  accountEnabled: z.boolean().optional(),
+  accountHealth: z.enum(["ACTIVE", "DEGRADED", "EXHAUSTED", "DISABLED", "UNCONFIGURED"]).optional(),
+});
+export type ExecutionRouteCandidate = z.infer<typeof ExecutionRouteCandidateSchema>;
+
+const availabilityRank = { AVAILABLE: 0, DEGRADED: 1 } as const;
+const healthRank = { ACTIVE: 0, DEGRADED: 1 } as const;
+
+export function eligibleExecutionRoutes(
+  preferences: ResolvedExecutionPreferences,
+  input: readonly ExecutionRouteCandidate[],
+): ExecutionRouteCandidate[] {
+  const resolved = ResolvedExecutionPreferencesSchema.parse(preferences);
+  return input
+    .map((candidate) => ExecutionRouteCandidateSchema.parse(candidate))
+    .filter(
+      (candidate) =>
+        candidate.providerEnabled &&
+        candidate.modelEnabled &&
+        candidate.routeEnabled &&
+        candidate.availability in availabilityRank &&
+        (candidate.accountId === undefined ||
+          (candidate.accountEnabled === true &&
+            candidate.accountHealth !== undefined &&
+            candidate.accountHealth in healthRank)) &&
+        (resolved.model.value.kind === "AUTO" ||
+          resolved.model.value.modelId === candidate.modelId) &&
+        (resolved.account.value.kind === "AUTO" ||
+          resolved.account.value.accountId === candidate.accountId) &&
+        (resolved.mode.value === "AUTO" || resolved.mode.value === candidate.mode),
+    )
+    .sort((left, right) => {
+      const availability =
+        availabilityRank[left.availability as keyof typeof availabilityRank] -
+        availabilityRank[right.availability as keyof typeof availabilityRank];
+      if (availability !== 0) return availability;
+      const leftHealth = left.accountHealth
+        ? healthRank[left.accountHealth as keyof typeof healthRank]
+        : 0;
+      const rightHealth = right.accountHealth
+        ? healthRank[right.accountHealth as keyof typeof healthRank]
+        : 0;
+      return leftHealth - rightHealth || left.modelRouteId.localeCompare(right.modelRouteId);
+    });
+}
 
 const rank: Record<ExecutionPreferenceLayer["scope"]["kind"], number> = {
   SYSTEM: 0,
