@@ -49,6 +49,7 @@ type EventRow = QueryResultRow & {
   id: string;
   occurred_at: Date | string;
   source_kind: string;
+  source_actor: string | null;
   adapter_kind: string | null;
   binding_id: string | null;
   external_event_id: string | null;
@@ -57,6 +58,13 @@ type EventRow = QueryResultRow & {
   agent_id: string;
   status: string | null;
   task_id: string | null;
+  run_id: string | null;
+  approval_id: string | null;
+  approval_state: string | null;
+  approval_requested_at: Date | string | null;
+  approval_expires_at: Date | string | null;
+  approval_decided_at: Date | string | null;
+  approval_reason: string | null;
 };
 type SequenceRow = QueryResultRow & { last_sequence: string | number };
 type TaskRow = QueryResultRow & {
@@ -317,7 +325,7 @@ export class PostgresWorldProjectionStore {
          VALUES ($1, $2, 'PENDING', $3, $4)`,
         [approvalId, task.id, task.createdAt, expiresAt],
       );
-      const eventId = EventIdSchema.parse(this.eventId());
+      const taskEventId = EventIdSchema.parse(this.eventId());
       const sequence = await client.query<SequenceRow>(
         `UPDATE agent_world.world_event_stream
             SET last_sequence = last_sequence + 1
@@ -329,16 +337,44 @@ export class PostgresWorldProjectionStore {
       }
       await client.query(
         `INSERT INTO agent_world.world_events
-           (sequence, id, occurred_at, source_kind, command_id,
+           (sequence, id, occurred_at, source_kind, source_actor, command_id,
             event_type, agent_id, task_id)
-         VALUES ($1, $2, $3, 'DOMAIN', $4, 'TASK_ASSIGNED', $5, $6)`,
+         VALUES ($1, $2, $3, 'DOMAIN', 'OWNER', $4, 'TASK_ASSIGNED', $5, $6)`,
         [
           safeSequence(sequence.rows[0].last_sequence),
-          eventId,
+          taskEventId,
           task.createdAt,
           task.idempotencyKey,
           task.assigneeAgentId,
           task.id,
+        ],
+      );
+      const approvalEventId = EventIdSchema.parse(this.eventId());
+      const approvalSequence = await client.query<SequenceRow>(
+        `UPDATE agent_world.world_event_stream
+            SET last_sequence = last_sequence + 1
+          WHERE singleton = true
+        RETURNING last_sequence`,
+      );
+      if (approvalSequence.rows.length !== 1 || !approvalSequence.rows[0]) {
+        throw new Error("World event stream counter is unavailable");
+      }
+      await client.query(
+        `INSERT INTO agent_world.world_events
+           (sequence, id, occurred_at, source_kind, source_actor, command_id,
+            event_type, agent_id, task_id, approval_id, approval_state,
+            approval_requested_at, approval_expires_at)
+         VALUES ($1, $2, $3, 'DOMAIN', 'OWNER', $4, 'APPROVAL_STATE_CHANGED',
+                 $5, $6, $7, 'PENDING', $3, $8)`,
+        [
+          safeSequence(approvalSequence.rows[0].last_sequence),
+          approvalEventId,
+          task.createdAt,
+          task.idempotencyKey,
+          task.assigneeAgentId,
+          task.id,
+          approvalId,
+          expiresAt,
         ],
       );
       await client.query("COMMIT");
@@ -370,9 +406,11 @@ export class PostgresWorldProjectionStore {
             LIMIT 2001`,
       );
       const events = await client.query<EventRow>(
-        `SELECT sequence, id, occurred_at, source_kind, adapter_kind,
+        `SELECT sequence, id, occurred_at, source_kind, source_actor, adapter_kind,
                   binding_id, external_event_id, command_id, event_type,
-                  agent_id, status, task_id
+                  agent_id, status, task_id, run_id, approval_id, approval_state,
+                  approval_requested_at, approval_expires_at, approval_decided_at,
+                  approval_reason
              FROM agent_world.world_events
             ORDER BY sequence
             LIMIT 100001`,
@@ -395,14 +433,53 @@ export class PostgresWorldProjectionStore {
               }
             : {
                 kind: "DOMAIN" as const,
-                actor: "OWNER" as const,
+                actor: row.source_actor,
                 commandId: row.command_id,
               },
         eventType: row.event_type,
         payload:
           row.event_type === "AGENT_STATUS_CHANGED"
-            ? { agentId: row.agent_id, status: row.status }
-            : { taskId: row.task_id, agentId: row.agent_id },
+            ? {
+                agentId: row.agent_id,
+                status: row.status,
+                ...(row.task_id === null ? {} : { taskId: row.task_id }),
+                ...(row.run_id === null ? {} : { runId: row.run_id }),
+              }
+            : row.event_type === "TASK_ASSIGNED"
+              ? { taskId: row.task_id, agentId: row.agent_id }
+              : {
+                  taskId: row.task_id,
+                  state:
+                    row.approval_state === "PENDING"
+                      ? {
+                          type: "PENDING" as const,
+                          approvalId: row.approval_id,
+                          requestedAt:
+                            row.approval_requested_at === null
+                              ? null
+                              : iso(row.approval_requested_at),
+                          expiresAt:
+                            row.approval_expires_at === null ? null : iso(row.approval_expires_at),
+                        }
+                      : row.approval_state === "APPROVED"
+                        ? {
+                            type: "APPROVED" as const,
+                            approvalId: row.approval_id,
+                            decidedAt:
+                              row.approval_decided_at === null
+                                ? null
+                                : iso(row.approval_decided_at),
+                          }
+                        : {
+                            type: row.approval_state,
+                            approvalId: row.approval_id,
+                            decidedAt:
+                              row.approval_decided_at === null
+                                ? null
+                                : iso(row.approval_decided_at),
+                            reason: row.approval_reason,
+                          },
+                },
       }));
       const latest = events.rows.at(-1);
       const model = buildWorldReadModel({

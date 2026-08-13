@@ -14,6 +14,7 @@ import {
   applyMigrations,
   discoverMigrations,
   PostgresAgentConversationReader,
+  PostgresApprovalRunStore,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresExecutionPreferenceStore,
@@ -648,6 +649,7 @@ try {
     "event_14141414-1414-1414-1414-141414141414",
     "event_15151515-1515-1515-1515-151515151515",
     "event_16161616-1616-1616-1616-161616161616",
+    "event_17171717-1717-1717-1717-171717171717",
   ];
   const worldStore = new PostgresWorldProjectionStore(pool, {
     eventId: () => {
@@ -768,6 +770,56 @@ try {
   if (assignmentReplay.outcome !== "REPLAY") {
     throw new Error("Task assignment did not return an idempotent replay");
   }
+  const approvalEventIds = [
+    "event_19191919-1919-1919-1919-191919191919",
+    "event_20202020-2020-2020-2020-202020202020",
+  ];
+  const approvalStore = new PostgresApprovalRunStore(pool, {
+    eventId: () => {
+      const eventId = approvalEventIds.shift();
+      if (!eventId) throw new Error("Isolated approval event identities were exhausted");
+      return eventId;
+    },
+  });
+  const approvalDecision = await approvalStore.decide({
+    taskId: taskAssignment.taskId,
+    approvalId: "approval_17171717-1717-1717-1717-171717171717",
+    decision: "APPROVE",
+    commandId: "approval-decision:approve:17171717-1717-1717-1717-171717171717",
+    decidedAt: "2026-08-13T09:45:00.000Z",
+  });
+  if (
+    approvalDecision.outcome !== "DECIDED" ||
+    approvalDecision.approval.type !== "APPROVED" ||
+    approvalDecision.run?.status !== "DISPATCH_PENDING"
+  ) {
+    throw new Error("Approval decision did not create one dispatch-pending canonical Run");
+  }
+  const approvalReplay = await approvalStore.decide({
+    taskId: taskAssignment.taskId,
+    approvalId: "approval_17171717-1717-1717-1717-171717171717",
+    decision: "APPROVE",
+    commandId: "approval-decision:approve:17171717-1717-1717-1717-171717171717",
+    decidedAt: "2026-08-13T09:45:00.000Z",
+  });
+  if (approvalReplay.outcome !== "REPLAY" || approvalReplay.run?.id !== approvalDecision.run.id) {
+    throw new Error("Approval decision replay created or selected a different Run");
+  }
+  const runEvidence = await pool.query(
+    `SELECT status, attempt, dispatch_idempotency_key, external_run_id
+       FROM agent_world.runs
+      WHERE task_id = $1`,
+    [taskAssignment.taskId],
+  );
+  if (
+    runEvidence.rows.length !== 1 ||
+    runEvidence.rows[0]?.status !== "DISPATCH_PENDING" ||
+    runEvidence.rows[0]?.attempt !== 0 ||
+    runEvidence.rows[0]?.dispatch_idempotency_key !== "run:17171717-1717-1717-1717-171717171717" ||
+    runEvidence.rows[0]?.external_run_id !== null
+  ) {
+    throw new Error("Canonical Run persistence claimed unsupported dispatch evidence");
+  }
   const unrelatedProject = "project_18181818-1818-1818-1818-181818181818";
   await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
     unrelatedProject,
@@ -794,8 +846,9 @@ try {
   );
   const taskWorld = await new PostgresWorldProjectionStore(pool).readWorld([worldAgent]);
   if (
-    taskWorld.cursor.lastSequence !== 3 ||
-    taskWorld.tasks[0]?.approval !== "REQUIRED" ||
+    taskWorld.cursor.lastSequence !== 6 ||
+    taskWorld.tasks[0]?.approval !== "APPROVED" ||
+    taskWorld.agents[0]?.status !== "QUEUED" ||
     taskWorld.agents[0]?.currentTask?.taskId !== taskAssignment.taskId
   ) {
     throw new Error("Restarted World projection did not restore the canonical Task assignment");

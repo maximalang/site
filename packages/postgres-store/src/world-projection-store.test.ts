@@ -90,6 +90,7 @@ describe("PostgresWorldProjectionStore", () => {
           id: "event_44444444-4444-4444-4444-444444444444",
           occurred_at: "2026-08-13T10:00:00.000Z",
           source_kind: "RUNTIME",
+          source_actor: null,
           adapter_kind: "OPENCLAW",
           binding_id: bindingId,
           external_event_id: "runtime-start:epoch-1:sequence-4",
@@ -98,6 +99,13 @@ describe("PostgresWorldProjectionStore", () => {
           agent_id: agent.id,
           status: "RUNNING",
           task_id: null,
+          run_id: null,
+          approval_id: null,
+          approval_state: null,
+          approval_requested_at: null,
+          approval_expires_at: null,
+          approval_decided_at: null,
+          approval_reason: null,
         },
       ],
       [],
@@ -133,10 +141,16 @@ describe("PostgresWorldProjectionStore", () => {
       [],
       [{ last_sequence: "2" }],
       [],
+      [{ last_sequence: "3" }],
+      [],
       [],
     ]);
+    const eventIds = [
+      "event_77777777-7777-7777-7777-777777777777",
+      "event_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    ];
     const store = new PostgresWorldProjectionStore(fake.value, {
-      eventId: () => "event_77777777-7777-7777-7777-777777777777",
+      eventId: () => eventIds.shift() ?? "invalid",
     });
     const task = await store.assignTask({
       taskId: "task_88888888-8888-8888-8888-888888888888",
@@ -155,6 +169,7 @@ describe("PostgresWorldProjectionStore", () => {
         expect.stringContaining("INSERT INTO agent_world.tasks"),
         expect.stringContaining("INSERT INTO agent_world.approvals"),
         expect.stringContaining("'TASK_ASSIGNED'"),
+        expect.stringContaining("'APPROVAL_STATE_CHANGED'"),
       ]),
     );
     expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
