@@ -130,6 +130,7 @@ describe("PostgresWorldProjectionStore", () => {
       [],
       [{ project_id: "project_66666666-6666-6666-6666-666666666666" }],
       [],
+      [],
       [{ last_sequence: "2" }],
       [],
       [],
@@ -152,6 +153,7 @@ describe("PostgresWorldProjectionStore", () => {
       expect.arrayContaining([
         expect.stringContaining("FROM agent_world.conversations"),
         expect.stringContaining("INSERT INTO agent_world.tasks"),
+        expect.stringContaining("INSERT INTO agent_world.approvals"),
         expect.stringContaining("'TASK_ASSIGNED'"),
       ]),
     );

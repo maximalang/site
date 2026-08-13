@@ -747,6 +747,20 @@ try {
   if (assigned.outcome !== "CREATED" || assigned.task.approvalRequirement !== "REQUIRED") {
     throw new Error("Task assignment did not persist the required approval policy");
   }
+  const assignedApproval = await pool.query(
+    `SELECT state, requested_at, expires_at
+       FROM agent_world.approvals
+      WHERE task_id = $1`,
+    [taskAssignment.taskId],
+  );
+  if (
+    assignedApproval.rows.length !== 1 ||
+    assignedApproval.rows[0]?.state !== "PENDING" ||
+    Date.parse(assignedApproval.rows[0].expires_at) <=
+      Date.parse(assignedApproval.rows[0].requested_at)
+  ) {
+    throw new Error("Task assignment did not create one expiring pending approval");
+  }
   const assignmentReplay = await worldStore.assignTask({
     ...taskAssignment,
     createdAt: "2026-08-13T09:41:00.000Z",
@@ -1061,7 +1075,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

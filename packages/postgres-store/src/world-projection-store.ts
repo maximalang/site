@@ -2,6 +2,7 @@ import {
   type Agent,
   AgentIdSchema,
   AgentStatusSchema,
+  ApprovalIdSchema,
   BindingIdSchema,
   ConversationIdSchema,
   EventIdSchema,
@@ -307,6 +308,14 @@ export class PostgresWorldProjectionStore {
           task.idempotencyKey,
           task.createdAt,
         ],
+      );
+      const approvalId = ApprovalIdSchema.parse(`approval_${task.id.slice("task_".length)}`);
+      const expiresAt = new Date(Date.parse(task.createdAt) + 15 * 60 * 1_000).toISOString();
+      await client.query(
+        `INSERT INTO agent_world.approvals
+           (id, task_id, state, requested_at, expires_at)
+         VALUES ($1, $2, 'PENDING', $3, $4)`,
+        [approvalId, task.id, task.createdAt, expiresAt],
       );
       const eventId = EventIdSchema.parse(this.eventId());
       const sequence = await client.query<SequenceRow>(
