@@ -44,11 +44,11 @@ Define strict schemas for shared-context items, RAG documents/chunks,
 structured Agent output, compiler input, selected evidence and rendered
 `ContextPack`.
 
-- [ ] All identifiers are canonical branded IDs.
-- [ ] Structured output preserves `fullOutput` but handoff defaults to summary,
+- [x] All identifiers are canonical branded IDs.
+- [x] Structured output preserves `fullOutput` but handoff defaults to summary,
       findings, decisions, artifact references and next actions.
-- [ ] ContextPack has the required stable sections and exact token accounting.
-- [ ] Invalid provenance, unknown sections and oversized content are rejected.
+- [x] ContextPack has the required stable sections and exact token accounting.
+- [x] Invalid provenance, unknown sections and oversized content are rejected.
 
 ## Slice 2: PostgreSQL + pgvector canonical store
 
