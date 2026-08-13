@@ -1,7 +1,11 @@
 import { AgentSchema, BindingIdSchema } from "@agent-world/domain";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionPool } from "./conversation-store.js";
-import { PostgresWorldProjectionStore } from "./world-projection-store.js";
+import {
+  isTaskAssignmentStoreError,
+  PostgresWorldProjectionStore,
+  TaskAssignmentStoreError,
+} from "./world-projection-store.js";
 
 const agent = AgentSchema.parse({
   schemaVersion: 1,
@@ -26,6 +30,23 @@ function pool(rows: unknown[][]) {
 }
 
 describe("PostgresWorldProjectionStore", () => {
+  it("recognizes bounded assignment errors across a production bundle boundary", () => {
+    expect(
+      isTaskAssignmentStoreError({
+        name: "TaskAssignmentStoreError",
+        code: "NO_ACTIVE_SESSION",
+        message: "must-not-be-reflected",
+      }),
+    ).toBe(true);
+    expect(
+      isTaskAssignmentStoreError({
+        name: "TaskAssignmentStoreError",
+        code: "DATABASE_SECRET",
+      }),
+    ).toBe(false);
+    expect(isTaskAssignmentStoreError(new Error("provider-secret"))).toBe(false);
+  });
+
   it("appends one monotonic event and projection update for a changed runtime status", async () => {
     const fake = pool([[], [], [], [{ last_sequence: "7" }], [], [], []]);
     const store = new PostgresWorldProjectionStore(fake.value, {
@@ -61,14 +82,25 @@ describe("PostgresWorldProjectionStore", () => {
 
   it("reads a restart-safe cursor and defaults Agents without events to OFFLINE", async () => {
     const fake = pool([
-      [{ agent_id: agent.id, status: "RUNNING" }],
+      [],
+      [],
       [
         {
-          sequence: "9",
+          sequence: "1",
           id: "event_44444444-4444-4444-4444-444444444444",
           occurred_at: "2026-08-13T10:00:00.000Z",
+          source_kind: "RUNTIME",
+          adapter_kind: "OPENCLAW",
+          binding_id: bindingId,
+          external_event_id: "runtime-start:epoch-1:sequence-4",
+          command_id: null,
+          event_type: "AGENT_STATUS_CHANGED",
+          agent_id: agent.id,
+          status: "RUNNING",
+          task_id: null,
         },
       ],
+      [],
     ]);
     const model = await new PostgresWorldProjectionStore(fake.value).readWorld([
       agent,
@@ -81,9 +113,93 @@ describe("PostgresWorldProjectionStore", () => {
     expect(model.cursor).toEqual({
       schemaVersion: 1,
       stream: "WORLD",
-      lastSequence: 9,
+      lastSequence: 1,
       lastEventId: "event_44444444-4444-4444-4444-444444444444",
     });
     expect(model.agents.map(({ status }) => status)).toEqual(["RUNNING", "OFFLINE"]);
+    expect(fake.query).toHaveBeenCalledWith(
+      "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+    );
+    expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
+  it("assigns an approval-gated canonical Task through an active conversation Session", async () => {
+    const fake = pool([
+      [],
+      [],
+      [],
+      [{ project_id: "project_66666666-6666-6666-6666-666666666666" }],
+      [],
+      [{ last_sequence: "2" }],
+      [],
+      [],
+    ]);
+    const store = new PostgresWorldProjectionStore(fake.value, {
+      eventId: () => "event_77777777-7777-7777-7777-777777777777",
+    });
+    const task = await store.assignTask({
+      taskId: "task_88888888-8888-8888-8888-888888888888",
+      conversationId: "conversation_99999999-9999-9999-9999-999999999999",
+      agentId: agent.id,
+      title: "Verify the protocol",
+      description: "Use primary sources.",
+      idempotencyKey: "task:88888888-8888-8888-8888-888888888888",
+      createdAt: "2026-08-13T10:01:00.000Z",
+    });
+    expect(task.outcome).toBe("CREATED");
+    expect(task.task.approvalRequirement).toBe("REQUIRED");
+    expect(fake.query.mock.calls.map(([sql]) => String(sql))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("FROM agent_world.conversations"),
+        expect.stringContaining("INSERT INTO agent_world.tasks"),
+        expect.stringContaining("'TASK_ASSIGNED'"),
+      ]),
+    );
+    expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
+  it("reports crossed task and idempotency identities as a conflict", async () => {
+    const fake = pool([
+      [],
+      [],
+      [
+        {
+          id: "task_88888888-8888-8888-8888-888888888888",
+          conversation_id: "conversation_99999999-9999-9999-9999-999999999999",
+          project_id: "project_66666666-6666-6666-6666-666666666666",
+          assignee_agent_id: agent.id,
+          title: "First task",
+          description: null,
+          approval_requirement: "REQUIRED",
+          idempotency_key: "task:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          created_at: "2026-08-13T10:00:00.000Z",
+        },
+        {
+          id: "task_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          conversation_id: "conversation_99999999-9999-9999-9999-999999999999",
+          project_id: "project_66666666-6666-6666-6666-666666666666",
+          assignee_agent_id: agent.id,
+          title: "Second task",
+          description: null,
+          approval_requirement: "REQUIRED",
+          idempotency_key: "task:88888888-8888-8888-8888-888888888888",
+          created_at: "2026-08-13T10:00:00.000Z",
+        },
+      ],
+      [],
+    ]);
+    const store = new PostgresWorldProjectionStore(fake.value);
+
+    await expect(
+      store.assignTask({
+        taskId: "task_88888888-8888-8888-8888-888888888888",
+        conversationId: "conversation_99999999-9999-9999-9999-999999999999",
+        agentId: agent.id,
+        title: "Verify the protocol",
+        idempotencyKey: "task:88888888-8888-8888-8888-888888888888",
+        createdAt: "2026-08-13T10:01:00.000Z",
+      }),
+    ).rejects.toEqual(new TaskAssignmentStoreError("IDEMPOTENCY_CONFLICT"));
+    expect(fake.query).toHaveBeenLastCalledWith("ROLLBACK");
   });
 });

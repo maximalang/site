@@ -29,6 +29,12 @@ export const applicationAgentConversationDependencies = {
     runtime().readAgentConversations(agentId),
 };
 
+export const applicationTaskDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  assign: (input: Parameters<ReturnType<typeof runtime>["assignTask"]>[0]) =>
+    runtime().assignTask(input),
+};
+
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {
   try {
     return runtime().auth.authorize(request);

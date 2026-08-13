@@ -66,6 +66,7 @@ export const AgentConversationListSchema = z.strictObject({
         projectId: ConversationSchema.shape.projectId,
         title: ConversationSchema.shape.title,
         createdAt: TimestampSchema,
+        taskAssignmentAvailable: z.boolean(),
       }),
     )
     .max(100),

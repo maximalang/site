@@ -25,6 +25,7 @@ describe("PostgresAgentConversationReader", () => {
           project_id: "project_33333333-3333-3333-3333-333333333333",
           title: "Protocol review",
           created_at: new Date("2026-08-13T09:00:00.000Z"),
+          task_assignment_available: true,
         },
       ],
     ]);
@@ -37,6 +38,7 @@ describe("PostgresAgentConversationReader", () => {
       projectId: "project_33333333-3333-3333-3333-333333333333",
       title: "Protocol review",
       createdAt: "2026-08-13T09:00:00.000Z",
+      taskAssignmentAvailable: true,
     });
     expect(JSON.stringify(list)).not.toMatch(/session_|binding_|external/);
     expect(fake.release).toHaveBeenCalledOnce();

@@ -227,6 +227,7 @@ export async function createProductionRuntime(
       readAgentConversations: (agentId) => agentConversationReader.read(agentId),
       readConversation: (input) => conversationReader.read(input),
       sendConversation: (input) => sender.send(input),
+      assignTask: (input) => worldStore.assignTask(input),
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);

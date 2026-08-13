@@ -246,6 +246,37 @@ try {
     }),
   });
   if (send.status !== 404) throw new Error(`Missing Conversation send returned ${send.status}`);
+  const taskBody = JSON.stringify({
+    schemaVersion: 1,
+    taskId: "task_44444444-4444-4444-4444-444444444444",
+    conversationId,
+    agentId,
+    title: "Verify the runtime boundary",
+  });
+  const anonymousTask = await fetch(`${baseUrl}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: taskBody,
+  });
+  if (anonymousTask.status !== 401) {
+    throw new Error(`Anonymous Task assignment returned ${anonymousTask.status}`);
+  }
+  const missingTaskTarget = await fetch(`${baseUrl}/api/tasks`, {
+    method: "POST",
+    headers: {
+      cookie,
+      "content-type": "application/json",
+      origin: baseUrl,
+      "x-agent-world-csrf": loginBody.csrfToken,
+    },
+    body: taskBody,
+  });
+  const missingTaskBody = await missingTaskTarget.json();
+  if (missingTaskTarget.status !== 409 || missingTaskBody.error?.code !== "NO_ACTIVE_SESSION") {
+    throw new Error(
+      `Task assignment target guard returned ${missingTaskTarget.status}/${String(missingTaskBody.error?.code).slice(0, 64)}`,
+    );
+  }
   const logout = await fetch(`${baseUrl}/api/auth/logout`, {
     method: "POST",
     headers: { cookie, origin: baseUrl, "x-agent-world-csrf": loginBody.csrfToken },
@@ -280,12 +311,12 @@ try {
        (SELECT count(*)::integer FROM agent_world.schema_migrations) AS migrations,
        (SELECT count(*)::integer FROM agent_world.owner_sessions WHERE revoked_at IS NOT NULL) AS revoked_sessions`,
   );
-  if (evidence.rows[0]?.migrations !== 4 || evidence.rows[0]?.revoked_sessions !== 1) {
+  if (evidence.rows[0]?.migrations !== 5 || evidence.rows[0]?.revoked_sessions !== 1) {
     throw new Error("Standalone runtime did not preserve migration or revocation evidence");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 4, authLifecycle: true, worldAuth: true, conversationAuth: true, agentConversationAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 5, authLifecycle: true, worldAuth: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

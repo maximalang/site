@@ -17,12 +17,14 @@ describe("discoverMigrations", () => {
       { version: 2, name: "0002_owner_auth.sql" },
       { version: 3, name: "0003_world_projection.sql" },
       { version: 4, name: "0004_runtime_message_inbox.sql" },
+      { version: 5, name: "0005_task_assignment.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
     expect(migrations[1]?.sql).toContain("CREATE TABLE agent_world.owner_sessions");
     expect(migrations[2]?.sql).toContain("CREATE TABLE agent_world.world_events");
     expect(migrations[3]?.sql).toContain("conversation_messages_runtime_identity");
+    expect(migrations[4]?.sql).toContain("CREATE TABLE agent_world.tasks");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {

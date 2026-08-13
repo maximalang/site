@@ -148,7 +148,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 4
+    ledger.rows.at(-1)?.version !== 5
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -168,6 +168,7 @@ try {
     "owner_sessions",
     "runtime_bindings",
     "schema_migrations",
+    "tasks",
     "world_event_stream",
     "world_agent_status",
     "world_events",
@@ -268,6 +269,7 @@ try {
     "event_13131313-1313-1313-1313-131313131313",
     "event_14141414-1414-1414-1414-141414141414",
     "event_15151515-1515-1515-1515-151515151515",
+    "event_16161616-1616-1616-1616-161616161616",
   ];
   const worldStore = new PostgresWorldProjectionStore(pool, {
     eventId: () => {
@@ -349,6 +351,57 @@ try {
       "2026-08-13T09:30:00.000Z",
     ],
   );
+  const taskAssignment = {
+    taskId: "task_17171717-1717-1717-1717-171717171717",
+    conversationId: ids.conversation,
+    agentId: ids.agent,
+    title: "Verify the canonical protocol",
+    description: "Use primary sources and preserve evidence.",
+    idempotencyKey: "task:17171717-1717-1717-1717-171717171717",
+    createdAt: "2026-08-13T09:40:00.000Z",
+  };
+  const assigned = await worldStore.assignTask(taskAssignment);
+  if (assigned.outcome !== "CREATED" || assigned.task.approvalRequirement !== "REQUIRED") {
+    throw new Error("Task assignment did not persist the required approval policy");
+  }
+  const assignmentReplay = await worldStore.assignTask({
+    ...taskAssignment,
+    createdAt: "2026-08-13T09:41:00.000Z",
+  });
+  if (assignmentReplay.outcome !== "REPLAY") {
+    throw new Error("Task assignment did not return an idempotent replay");
+  }
+  const unrelatedProject = "project_18181818-1818-1818-1818-181818181818";
+  await pool.query("INSERT INTO agent_world.projects (id, name) VALUES ($1, $2)", [
+    unrelatedProject,
+    "Unrelated project",
+  ]);
+  await expectRejected(
+    pool.query(
+      `INSERT INTO agent_world.tasks
+         (id, conversation_id, project_id, assignee_agent_id, title,
+          approval_requirement, idempotency_key, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'REQUIRED', $6, $7)`,
+      [
+        "task_18181818-1818-1818-1818-181818181818",
+        ids.conversation,
+        unrelatedProject,
+        ids.agent,
+        "Cross-context task",
+        "task:18181818-1818-1818-1818-181818181818",
+        "2026-08-13T09:41:00.000Z",
+      ],
+    ),
+    "Task persistence accepted a Project outside its canonical Conversation scope",
+  );
+  const taskWorld = await new PostgresWorldProjectionStore(pool).readWorld([worldAgent]);
+  if (
+    taskWorld.cursor.lastSequence !== 3 ||
+    taskWorld.tasks[0]?.approval !== "REQUIRED" ||
+    taskWorld.agents[0]?.currentTask?.taskId !== taskAssignment.taskId
+  ) {
+    throw new Error("Restarted World projection did not restore the canonical Task assignment");
+  }
   const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
     messageId: () => "message_0a0a0a0a-0a0a-0a0a-0a0a-0a0a0a0a0a0a",
   });
@@ -563,7 +616,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

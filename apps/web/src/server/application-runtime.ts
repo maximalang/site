@@ -1,6 +1,6 @@
 import type { ConversationSendResult } from "@agent-world/conversation-service";
 import type { AgentId, SendMessageIntent } from "@agent-world/domain";
-import type { ConversationReadInput } from "@agent-world/postgres-store";
+import type { AssignTaskInput, ConversationReadInput } from "@agent-world/postgres-store";
 import type { WorldReadModel } from "@agent-world/read-model";
 import type { OwnerSessionManager } from "./owner-session";
 
@@ -9,6 +9,7 @@ export type ApplicationRuntime = {
   readAgentConversations(agentId: AgentId): Promise<unknown | undefined>;
   readConversation(input: ConversationReadInput): Promise<unknown | undefined>;
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;
+  assignTask(input: AssignTaskInput): Promise<unknown>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
 };

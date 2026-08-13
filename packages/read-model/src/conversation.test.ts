@@ -181,6 +181,7 @@ describe("buildConversationReadModel", () => {
           projectId: "project_33333333-3333-3333-3333-333333333333",
           title: "Protocol review",
           createdAt: "2026-08-13T09:00:00.000Z",
+          taskAssignmentAvailable: true,
         },
       ],
     });

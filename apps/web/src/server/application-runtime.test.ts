@@ -12,6 +12,7 @@ function runtime() {
     readAgentConversations: vi.fn(),
     readConversation: vi.fn(),
     sendConversation: vi.fn(),
+    assignTask: vi.fn(),
     readWorld: vi.fn(),
     stop: vi.fn(async () => undefined),
   };

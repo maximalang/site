@@ -22,6 +22,7 @@ const index = AgentConversationListSchema.parse({
       projectId: "project_33333333-3333-3333-3333-333333333333",
       title: "Protocol review",
       createdAt: "2026-08-13T09:00:00.000Z",
+      taskAssignmentAvailable: true,
     },
   ],
 });
@@ -30,7 +31,12 @@ if (!indexedConversation) throw new Error("Conversation fixture is incomplete");
 const conversation = ConversationReadModelSchema.parse({
   schemaVersion: 1,
   generatedAt: "2026-08-13T10:00:00.000Z",
-  conversation: indexedConversation,
+  conversation: {
+    conversationId: indexedConversation.conversationId,
+    projectId: indexedConversation.projectId,
+    ...(indexedConversation.title === undefined ? {} : { title: indexedConversation.title }),
+    createdAt: indexedConversation.createdAt,
+  },
   agent: { agentId, displayName: "Research Lead", role: "Research", isEnabled: true },
   messages: [],
 });

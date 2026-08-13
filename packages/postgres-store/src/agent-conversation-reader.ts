@@ -9,6 +9,7 @@ type ConversationRow = QueryResultRow & {
   project_id: string;
   title: string | null;
   created_at: Date | string;
+  task_assignment_available: boolean;
 };
 
 function iso(value: Date | string): string {
@@ -36,10 +37,23 @@ export class PostgresAgentConversationReader {
         throw new Error("Canonical Agent query returned an invalid cardinality");
       }
       const conversations = await client.query<ConversationRow>(
-        `SELECT id, project_id, title, created_at
-           FROM agent_world.conversations
-          WHERE agent_id = $1
-          ORDER BY created_at DESC, id DESC
+        `SELECT c.id, c.project_id, c.title, c.created_at,
+                EXISTS (
+                  SELECT 1
+                    FROM agent_world.conversation_sessions s
+                    JOIN agent_world.runtime_bindings b
+                      ON b.id = s.binding_id
+                     AND b.agent_id = s.agent_id
+                     AND b.adapter_kind = s.adapter_kind
+                   WHERE s.conversation_id = c.id
+                     AND s.agent_id = c.agent_id
+                     AND s.ended_at IS NULL
+                     AND s.adapter_kind = 'OPENCLAW'
+                     AND b.is_enabled = true
+                ) AS task_assignment_available
+           FROM agent_world.conversations c
+          WHERE c.agent_id = $1
+          ORDER BY c.created_at DESC, c.id DESC
           LIMIT 100`,
         [agentId],
       );
@@ -52,6 +66,7 @@ export class PostgresAgentConversationReader {
           projectId: row.project_id,
           ...(row.title === null ? {} : { title: row.title }),
           createdAt: iso(row.created_at),
+          taskAssignmentAvailable: row.task_assignment_available,
         })),
       });
     } finally {
