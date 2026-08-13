@@ -99,3 +99,162 @@ describe("PostgresCodexExecutionStore dispatch", () => {
     expect(database.queries).toEqual([]);
   });
 });
+
+const jobRow = {
+  id: "codex_execution_88888888-8888-8888-8888-888888888888",
+  run_id: request.runId,
+  task_id: request.taskId,
+  agent_id: request.agentId,
+  binding_id: request.bindingId,
+  route_id: request.routeId,
+  account_id: request.accountId,
+  session_id: request.sessionId,
+  idempotency_key: request.idempotencyKey,
+  codex_thread_id: request.codexThreadId,
+  prompt: request.prompt,
+  working_directory: request.policy.workingDirectory,
+  sandbox: request.policy.sandbox,
+  approval_policy: request.policy.approvalPolicy,
+  network_access: request.policy.networkAccess,
+  timeout_ms: request.policy.timeoutMs,
+  model: null,
+  reasoning_effort: null,
+  status: "LEASED",
+  lease_owner: "worker-1",
+  lease_expires_at: "2026-08-13T12:01:00.000Z",
+  attempt: 1,
+  accepted_at: "2026-08-13T12:00:00.000Z",
+  started_at: null,
+  completed_at: null,
+  failure_code: null,
+  final_output: null,
+  input_tokens: null,
+  cached_input_tokens: null,
+  output_tokens: null,
+  updated_at: "2026-08-13T12:00:00.000Z",
+};
+
+describe("PostgresCodexExecutionStore worker lifecycle", () => {
+  it("claims one queued request with a bounded lease", async () => {
+    const client: TransactionClient = {
+      async query<Row>(text: string) {
+        if (text.includes("UPDATE agent_world.codex_execution_jobs AS job")) {
+          return { rows: [jobRow] as Row[] };
+        }
+        return { rows: [] as Row[] };
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore(
+      { connect: async () => client },
+      { now: () => "2026-08-13T12:00:00.000Z" },
+    );
+
+    await expect(store.claim("worker-1", 60_000)).resolves.toEqual({
+      externalRunId: jobRow.id,
+      attempt: 1,
+      leaseExpiresAt: "2026-08-13T12:01:00.000Z",
+      request,
+    });
+  });
+
+  it("appends an event once and replays only its exact fingerprint", async () => {
+    const events = new Map<number, string>();
+    let status = "LEASED";
+    const client: TransactionClient = {
+      async query<Row>(text: string, values: unknown[] = []) {
+        if (text.includes("FROM agent_world.codex_execution_jobs") && text.includes("FOR UPDATE")) {
+          return { rows: [{ ...jobRow, status }] as Row[] };
+        }
+        if (
+          text.includes("FROM agent_world.codex_execution_events") &&
+          text.includes("sequence =")
+        ) {
+          const fingerprint = events.get(Number(values[1]));
+          return { rows: (fingerprint ? [{ event_sha256: fingerprint }] : []) as Row[] };
+        }
+        if (text.includes("max(sequence)")) {
+          return { rows: [{ last_sequence: events.size }] as Row[] };
+        }
+        if (text.includes("INSERT INTO agent_world.codex_execution_events")) {
+          events.set(Number(values[1]), String(values[4]));
+        }
+        if (text.includes("SET status = 'RUNNING'")) status = "RUNNING";
+        return { rows: [] as Row[] };
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore(
+      { connect: async () => client },
+      { now: () => "2026-08-13T12:00:01.000Z" },
+    );
+    const event = {
+      schemaVersion: 1,
+      sequence: 1,
+      eventType: "RUN_STARTED",
+      occurredAt: "2026-08-13T12:00:01.000Z",
+      threadId: request.codexThreadId,
+    } as const;
+
+    await expect(store.appendEvent(jobRow.id, "worker-1", event)).resolves.toEqual({
+      outcome: "APPLIED",
+      sequence: 1,
+    });
+    await expect(store.appendEvent(jobRow.id, "worker-1", event)).resolves.toEqual({
+      outcome: "REPLAY",
+      sequence: 1,
+    });
+    await expect(
+      store.appendEvent(jobRow.id, "worker-1", { ...event, threadId: "different-thread" }),
+    ).rejects.toMatchObject({ code: "EVENT_CONFLICT" });
+    await expect(
+      store.appendEvent(jobRow.id, "worker-1", {
+        schemaVersion: 1,
+        sequence: 2,
+        eventType: "ITEM_COMPLETED",
+        occurredAt: "2026-08-13T11:59:59.000Z",
+        itemId: "item-out-of-order",
+        itemType: "COMMAND",
+      }),
+    ).rejects.toMatchObject({ code: "LEASE_CONFLICT" });
+    expect(events).toHaveLength(1);
+  });
+
+  it("bounds persistence failures while observing", async () => {
+    const client: TransactionClient = {
+      async query() {
+        throw new Error("private database locator");
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore({ connect: async () => client });
+
+    await expect(store.observe(jobRow.id, 0)).rejects.toMatchObject({
+      code: "PERSISTENCE_FAILED",
+      message: "PERSISTENCE_FAILED",
+    });
+  });
+
+  it("records expired running leases as interrupted instead of rerunning them", async () => {
+    const inserted: unknown[][] = [];
+    const client: TransactionClient = {
+      async query<Row>(text: string, values: unknown[] = []) {
+        if (text.includes("WHERE status IN ('LEASED', 'RUNNING')") && text.includes("FOR UPDATE")) {
+          return { rows: [{ ...jobRow, status: "RUNNING" }] as Row[] };
+        }
+        if (text.includes("max(sequence)")) return { rows: [{ last_sequence: 2 }] as Row[] };
+        if (text.includes("INSERT INTO agent_world.codex_execution_events")) inserted.push(values);
+        return { rows: [] as Row[] };
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore(
+      { connect: async () => client },
+      { now: () => "2026-08-13T12:02:00.000Z" },
+    );
+
+    await expect(store.recoverExpired()).resolves.toEqual({ interrupted: 1 });
+    expect(inserted[0]?.[1]).toBe(3);
+    expect(inserted[0]).toContain("WORKER_INTERRUPTED");
+  });
+});

@@ -15,6 +15,7 @@ import {
   discoverMigrations,
   PostgresAgentConversationReader,
   PostgresApprovalRunStore,
+  PostgresCodexExecutionStore,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresEncryptedSecretStore,
@@ -252,6 +253,8 @@ try {
     "conversations",
     "conversation_sessions",
     "conversation_messages",
+    "codex_execution_events",
+    "codex_execution_jobs",
     "hub_command_receipts",
     "execution_preference_overrides",
     "encrypted_secrets",
@@ -955,6 +958,269 @@ try {
   if (markedCompleted.outcome !== "UPDATED" || markedCompleted.run.status !== "COMPLETED") {
     throw new Error("Observed upstream terminal evidence did not complete the canonical Run");
   }
+  const codex = {
+    account: "account_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+    route: "route_a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
+    binding: "binding_a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3",
+    conversation: "conversation_a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4",
+    session: "session_a5a5a5a5-a5a5-a5a5-a5a5-a5a5a5a5a5a5",
+    task: "task_a6a6a6a6-a6a6-a6a6-a6a6-a6a6a6a6a6a6",
+    approval: "approval_a6a6a6a6-a6a6-a6a6-a6a6-a6a6a6a6a6a6",
+    run: "run_a7a7a7a7-a7a7-a7a7-a7a7-a7a7a7a7a7a7",
+    execution: "codex_execution_a8a8a8a8-a8a8-a8a8-a8a8-a8a8a8a8a8a8",
+    interruptedTask: "task_a9a9a9a9-a9a9-a9a9-a9a9-a9a9a9a9a9a9",
+    interruptedApproval: "approval_a9a9a9a9-a9a9-a9a9-a9a9-a9a9a9a9a9a9",
+    interruptedRun: "run_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    interruptedExecution: "codex_execution_abababab-abab-abab-abab-abababababab",
+  };
+  await pool.query(
+    `INSERT INTO agent_world.accounts
+       (id, provider_id, label, auth_mechanism, subscription, health)
+     VALUES ($1, $2, 'Owner ChatGPT subscription', 'CHATGPT_INTERACTIVE', 'Plus', 'ACTIVE')`,
+    [codex.account, hub.provider],
+  );
+  await pool.query(
+    "INSERT INTO agent_world.account_surfaces (account_id, surface) VALUES ($1, 'CODEX')",
+    [codex.account],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.execution_routes
+       (id, label, mode, adapter_kind, account_id)
+     VALUES ($1, 'Official Codex SDK', 'CODEX', 'CODEX', $2)`,
+    [codex.route, codex.account],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runtime_bindings
+       (id, agent_id, route_id, adapter_kind, external_agent_id)
+     VALUES ($1, $2, $3, 'CODEX', 'codex:researcher')`,
+    [codex.binding, ids.agent, codex.route],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.conversations
+       (id, agent_id, project_id, title, created_at)
+     VALUES ($1, $2, $3, 'Codex repository verification', $4)`,
+    [codex.conversation, ids.agent, ids.project, "2026-08-13T11:50:00.000Z"],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.conversation_sessions
+       (id, conversation_id, agent_id, binding_id, adapter_kind,
+        external_session_ref, started_at)
+     VALUES ($1, $2, $3, $4, 'CODEX', 'codex-thread-isolated-1', $5)`,
+    [codex.session, codex.conversation, ids.agent, codex.binding, "2026-08-13T11:51:00.000Z"],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.tasks
+       (id, conversation_id, project_id, assignee_agent_id, title, description,
+        approval_requirement, idempotency_key, created_at)
+     VALUES
+       ($1, $3, $4, $5, 'Verify Codex lifecycle', 'Persist normalized execution evidence.',
+        'REQUIRED', 'task:codex-lifecycle', $6),
+       ($2, $3, $4, $5, 'Verify interrupted Codex worker', 'Fail closed without an implicit rerun.',
+        'REQUIRED', 'task:codex-interrupted', $6)`,
+    [
+      codex.task,
+      codex.interruptedTask,
+      codex.conversation,
+      ids.project,
+      ids.agent,
+      "2026-08-13T11:52:00.000Z",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.approvals
+       (id, task_id, state, requested_at, expires_at, decided_at, decision_command_id)
+     VALUES
+       ($1, $2, 'APPROVED', $5, $6, $7, 'approve:codex-lifecycle'),
+       ($3, $4, 'APPROVED', $5, $6, $7, 'approve:codex-interrupted')`,
+    [
+      codex.approval,
+      codex.task,
+      codex.interruptedApproval,
+      codex.interruptedTask,
+      "2026-08-13T11:52:00.000Z",
+      "2026-08-14T11:52:00.000Z",
+      "2026-08-13T11:53:00.000Z",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runs
+       (id, task_id, conversation_id, agent_id, approval_id, adapter_kind,
+        binding_id, session_id, status, dispatch_idempotency_key, created_at)
+     VALUES
+       ($1, $2, $5, $6, $7, 'CODEX', $9, $10, 'DISPATCH_PENDING', 'run:codex-lifecycle', $11),
+       ($3, $4, $5, $6, $8, 'CODEX', $9, $10, 'DISPATCH_PENDING', 'run:codex-interrupted', $11)`,
+    [
+      codex.run,
+      codex.task,
+      codex.interruptedRun,
+      codex.interruptedTask,
+      codex.conversation,
+      ids.agent,
+      codex.approval,
+      codex.interruptedApproval,
+      codex.binding,
+      codex.session,
+      "2026-08-13T11:54:00.000Z",
+    ],
+  );
+  let codexExecutionId = codex.execution;
+  let codexNow = "2026-08-13T12:00:00.000Z";
+  const codexStore = new PostgresCodexExecutionStore(pool, {
+    executionId: () => codexExecutionId,
+    now: () => codexNow,
+  });
+  const codexRequest = {
+    schemaVersion: 1,
+    runId: codex.run,
+    taskId: codex.task,
+    agentId: ids.agent,
+    bindingId: codex.binding,
+    routeId: codex.route,
+    accountId: codex.account,
+    sessionId: codex.session,
+    codexThreadId: "codex-thread-isolated-1",
+    idempotencyKey: "codex:isolated-lifecycle",
+    prompt: "Verify the repository contracts and return bounded evidence.",
+    policy: {
+      workingDirectory: "C:/isolated/agent-world",
+      sandbox: "WORKSPACE_WRITE",
+      approvalPolicy: "ON_REQUEST",
+      networkAccess: false,
+      timeoutMs: 60_000,
+      model: "gpt-5.6-codex",
+      reasoningEffort: "HIGH",
+    },
+  };
+  const codexReceipt = await codexStore.dispatch(codexRequest);
+  const codexReplay = await codexStore.dispatch(codexRequest);
+  if (
+    codexReceipt.externalRunId !== codex.execution ||
+    JSON.stringify(codexReplay) !== JSON.stringify(codexReceipt)
+  ) {
+    throw new Error("Codex dispatch did not return the exact durable replay");
+  }
+  await expectRejected(
+    codexStore.dispatch({ ...codexRequest, prompt: "Changed immutable prompt." }),
+    "Codex dispatch accepted changed input under an existing idempotency key",
+  );
+  codexNow = "2026-08-13T12:00:01.000Z";
+  const claimedCodex = await codexStore.claim("isolated-codex-worker", 60_000);
+  if (claimedCodex?.externalRunId !== codex.execution || claimedCodex.attempt !== 1) {
+    throw new Error("Codex worker did not claim exactly one queued execution");
+  }
+  codexNow = "2026-08-13T12:00:02.000Z";
+  const codexEvents = [
+    {
+      schemaVersion: 1,
+      sequence: 1,
+      eventType: "RUN_STARTED",
+      occurredAt: codexNow,
+      threadId: codexRequest.codexThreadId,
+    },
+    {
+      schemaVersion: 1,
+      sequence: 2,
+      eventType: "ITEM_COMPLETED",
+      occurredAt: "2026-08-13T12:00:03.000Z",
+      itemId: "item-isolated-1",
+      itemType: "COMMAND",
+      summary: "Verified repository contracts.",
+    },
+    {
+      schemaVersion: 1,
+      sequence: 3,
+      eventType: "FINAL_OUTPUT",
+      occurredAt: "2026-08-13T12:00:04.000Z",
+      content: "All selected contracts passed.",
+    },
+    {
+      schemaVersion: 1,
+      sequence: 4,
+      eventType: "USAGE_RECORDED",
+      occurredAt: "2026-08-13T12:00:05.000Z",
+      usage: { inputTokens: 120, cachedInputTokens: 20, outputTokens: 30 },
+    },
+    {
+      schemaVersion: 1,
+      sequence: 5,
+      eventType: "RUN_COMPLETED",
+      occurredAt: "2026-08-13T12:00:06.000Z",
+    },
+  ];
+  for (const event of codexEvents) {
+    codexNow = event.occurredAt;
+    await codexStore.appendEvent(codex.execution, "isolated-codex-worker", event);
+  }
+  const eventReplay = await codexStore.appendEvent(
+    codex.execution,
+    "isolated-codex-worker",
+    codexEvents[1],
+  );
+  if (eventReplay.outcome !== "REPLAY") throw new Error("Codex event replay was not idempotent");
+  await expectRejected(
+    codexStore.appendEvent(codex.execution, "isolated-codex-worker", {
+      ...codexEvents[1],
+      summary: "Conflicting summary.",
+    }),
+    "Codex event sequence accepted a conflicting fingerprint",
+  );
+  const codexObservation = await codexStore.observe(codex.execution, 0);
+  const codexEvidence = await pool.query(
+    `SELECT job.status, job.attempt, job.final_output, job.input_tokens,
+            job.cached_input_tokens, job.output_tokens,
+            count(event.*)::integer AS event_count,
+            max(event.summary) FILTER (WHERE event.event_type = 'ITEM_COMPLETED') AS item_summary
+       FROM agent_world.codex_execution_jobs job
+       JOIN agent_world.codex_execution_events event ON event.execution_id = job.id
+      WHERE job.id = $1
+      GROUP BY job.id`,
+    [codex.execution],
+  );
+  if (
+    codexObservation.status !== "COMPLETED" ||
+    codexEvidence.rows[0]?.status !== "COMPLETED" ||
+    codexEvidence.rows[0]?.attempt !== 1 ||
+    codexEvidence.rows[0]?.final_output !== "All selected contracts passed." ||
+    codexEvidence.rows[0]?.input_tokens !== "120" ||
+    codexEvidence.rows[0]?.cached_input_tokens !== "20" ||
+    codexEvidence.rows[0]?.output_tokens !== "30" ||
+    codexEvidence.rows[0]?.event_count !== 5 ||
+    codexEvidence.rows[0]?.item_summary !== "Verified repository contracts."
+  ) {
+    throw new Error(
+      "Codex lifecycle did not preserve normalized output, usage, and event provenance",
+    );
+  }
+  codexExecutionId = codex.interruptedExecution;
+  codexNow = "2026-08-13T12:02:00.000Z";
+  const interruptedRequest = {
+    ...codexRequest,
+    runId: codex.interruptedRun,
+    taskId: codex.interruptedTask,
+    idempotencyKey: "codex:isolated-interrupted",
+  };
+  await codexStore.dispatch(interruptedRequest);
+  codexNow = "2026-08-13T12:02:01.000Z";
+  await codexStore.claim("isolated-codex-worker", 10_000);
+  codexNow = "2026-08-13T12:02:02.000Z";
+  await codexStore.appendEvent(codex.interruptedExecution, "isolated-codex-worker", {
+    schemaVersion: 1,
+    sequence: 1,
+    eventType: "RUN_STARTED",
+    occurredAt: codexNow,
+    threadId: codexRequest.codexThreadId,
+  });
+  codexNow = "2026-08-13T12:02:12.000Z";
+  const recovery = await codexStore.recoverExpired();
+  const interruptedObservation = await codexStore.observe(codex.interruptedExecution, 0);
+  if (
+    recovery.interrupted !== 1 ||
+    interruptedObservation.status !== "FAILED" ||
+    interruptedObservation.failureCode !== "WORKER_INTERRUPTED" ||
+    (await codexStore.claim("isolated-codex-worker", 10_000)) !== undefined
+  ) {
+    throw new Error("Expired Codex lease was rerun or did not fail closed as interrupted");
+  }
   const unrelatedProject = "project_18181818-1818-1818-1818-181818181818";
   await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
     unrelatedProject,
@@ -1250,20 +1516,31 @@ try {
     () => new Date("2026-08-13T10:00:15.000Z"),
   ).read(ids.agent);
   const serializedIndex = JSON.stringify(agentConversationIndex);
+  const indexedConversationIds = agentConversationIndex?.conversations.map(
+    ({ conversationId }) => conversationId,
+  );
   if (
-    agentConversationIndex?.conversations.length !== 1 ||
-    agentConversationIndex.conversations[0]?.conversationId !== ids.conversation
+    agentConversationIndex?.conversations.length !== 2 ||
+    !indexedConversationIds?.includes(ids.conversation) ||
+    !indexedConversationIds.includes(codex.conversation)
   ) {
-    throw new Error("PostgreSQL reader did not list the Agent's canonical Conversation");
+    throw new Error("PostgreSQL reader did not list both canonical Agent Conversations");
   }
-  for (const forbidden of [ids.session, ids.binding, "gateway-message-private-locator"]) {
+  for (const forbidden of [
+    ids.session,
+    ids.binding,
+    "gateway-message-private-locator",
+    codex.session,
+    codex.binding,
+    "codex-thread-isolated-1",
+  ]) {
     if (serializedIndex.includes(forbidden)) {
       throw new Error("PostgreSQL Agent index leaked a runtime locator");
     }
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 10 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

@@ -146,6 +146,7 @@ export const CodexExecutionFailureCodeSchema = z.enum([
   "SDK_UNAVAILABLE",
   "TIMEOUT",
   "CANCELLED",
+  "WORKER_INTERRUPTED",
   "MALFORMED_EVENT",
   "EXECUTION_FAILED",
 ]);

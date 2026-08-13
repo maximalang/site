@@ -153,6 +153,7 @@ CREATE TABLE agent_world.codex_execution_events (
       'REASONING', 'TODO', 'ERROR'
     )
   ),
+  summary text CHECK (summary IS NULL OR char_length(summary) BETWEEN 1 AND 20000),
   content text CHECK (content IS NULL OR char_length(content) BETWEEN 1 AND 200000),
   input_tokens bigint CHECK (input_tokens IS NULL OR input_tokens >= 0),
   cached_input_tokens bigint CHECK (cached_input_tokens IS NULL OR cached_input_tokens >= 0),
@@ -161,27 +162,34 @@ CREATE TABLE agent_world.codex_execution_events (
   PRIMARY KEY (execution_id, sequence),
   CHECK (
     (event_type = 'RUN_STARTED' AND thread_id IS NOT NULL AND item_id IS NULL
-      AND content IS NULL AND input_tokens IS NULL AND failure_code IS NULL)
+      AND item_type IS NULL AND summary IS NULL AND content IS NULL
+      AND input_tokens IS NULL AND cached_input_tokens IS NULL AND output_tokens IS NULL
+      AND failure_code IS NULL)
     OR
     (event_type = 'ITEM_COMPLETED' AND item_id IS NOT NULL AND item_type IS NOT NULL
       AND thread_id IS NULL AND upstream_turn_id IS NULL AND content IS NULL
-      AND input_tokens IS NULL AND failure_code IS NULL)
+      AND input_tokens IS NULL AND cached_input_tokens IS NULL AND output_tokens IS NULL
+      AND failure_code IS NULL)
     OR
     (event_type = 'FINAL_OUTPUT' AND content IS NOT NULL AND thread_id IS NULL
-      AND upstream_turn_id IS NULL AND item_id IS NULL AND input_tokens IS NULL
-      AND failure_code IS NULL)
+      AND upstream_turn_id IS NULL AND item_id IS NULL AND item_type IS NULL
+      AND summary IS NULL AND input_tokens IS NULL AND cached_input_tokens IS NULL
+      AND output_tokens IS NULL AND failure_code IS NULL)
     OR
     (event_type = 'USAGE_RECORDED' AND input_tokens IS NOT NULL
       AND cached_input_tokens BETWEEN 0 AND input_tokens AND output_tokens IS NOT NULL
-      AND thread_id IS NULL AND upstream_turn_id IS NULL AND item_id IS NULL
-      AND content IS NULL AND failure_code IS NULL)
+      AND thread_id IS NULL AND upstream_turn_id IS NULL AND item_id IS NULL AND item_type IS NULL
+      AND summary IS NULL AND content IS NULL AND failure_code IS NULL)
     OR
     (event_type = 'RUN_COMPLETED' AND thread_id IS NULL AND upstream_turn_id IS NULL
-      AND item_id IS NULL AND content IS NULL AND input_tokens IS NULL AND failure_code IS NULL)
+      AND item_id IS NULL AND item_type IS NULL AND summary IS NULL AND content IS NULL
+      AND input_tokens IS NULL AND cached_input_tokens IS NULL AND output_tokens IS NULL
+      AND failure_code IS NULL)
     OR
     (event_type = 'RUN_FAILED' AND failure_code IS NOT NULL AND thread_id IS NULL
-      AND upstream_turn_id IS NULL AND item_id IS NULL AND content IS NULL
-      AND input_tokens IS NULL)
+      AND upstream_turn_id IS NULL AND item_id IS NULL AND item_type IS NULL
+      AND content IS NULL AND summary IS NULL AND input_tokens IS NULL
+      AND cached_input_tokens IS NULL AND output_tokens IS NULL)
   )
 );
 

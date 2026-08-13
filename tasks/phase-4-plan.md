@@ -53,11 +53,11 @@ request, receipt, observation, normalized event, usage and failure schemas.
 Wrap the official SDK behind an injectable facade for deterministic contract
 tests while preserving the existing `TaskExecutionAdapter` surface.
 
-- [ ] Adapter identity is exactly `CODEX` and no SDK type crosses its boundary.
-- [ ] Agent, Account, Session and Codex thread identities remain distinct.
+- [x] Adapter identity is exactly `CODEX` and no SDK type crosses its boundary.
+- [x] Agent, Account, Session and Codex thread identities remain distinct.
 - [ ] Timeout, cancellation, auth, sandbox, malformed event and SDK failures
       normalize without raw output or credential leakage.
-- [ ] Duplicate dispatch uses canonical idempotency and never creates a second
+- [x] Duplicate dispatch uses canonical idempotency and never creates a second
       Codex turn.
 
 ## Slice 2: Durable execution ledger
@@ -67,10 +67,10 @@ normalized events. Claim work with bounded leases, preserve exact external
 thread/turn provenance and reconcile an interrupted worker without losing or
 double-running a canonical Run.
 
-- [ ] Enqueue and claim are transactional, tenant-safe and idempotent.
-- [ ] Event sequence is monotonic per Run and duplicate SDK events are ignored.
-- [ ] Restart leaves queued/running work recoverable with an explicit outcome.
-- [ ] Final output and token usage are stored as bounded evidence, not memory.
+- [x] Enqueue and claim are transactional, tenant-safe and idempotent.
+- [x] Event sequence is monotonic per Run and duplicate SDK events are ignored.
+- [x] Restart leaves queued/running work recoverable with an explicit outcome.
+- [x] Final output and token usage are stored as bounded evidence, not memory.
 
 ## Slice 3: Isolated Codex worker
 
