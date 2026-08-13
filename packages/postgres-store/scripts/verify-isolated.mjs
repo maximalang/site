@@ -8,7 +8,12 @@ import {
   SendMessageIntentSchema,
 } from "@agent-world/domain";
 import { Pool } from "pg";
-import { applyMigrations, discoverMigrations, PostgresConversationStore } from "../dist/index.js";
+import {
+  applyMigrations,
+  discoverMigrations,
+  PostgresConversationReader,
+  PostgresConversationStore,
+} from "../dist/index.js";
 
 const IMAGE =
   "postgres:18.3-bookworm@sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7";
@@ -329,9 +334,40 @@ try {
   if (noSession.kind !== "REJECTED" || noSession.code !== "NO_ACTIVE_SESSION") {
     throw new Error("PostgreSQL store did not reject a Conversation without an active Session");
   }
+  await pool.query(
+    `INSERT INTO agent_world.conversation_messages (
+       id, conversation_id, session_id, agent_id, author, content, delivery,
+       created_at, source_kind, adapter_kind, binding_id, external_message_id
+     )
+     VALUES ($1, $2, $3, $4, 'AGENT', $5, 'RECEIVED', $6, 'RUNTIME',
+             'OPENCLAW', $7, $8)`,
+    [
+      "message_12121212-1212-1212-1212-121212121212",
+      ids.conversation,
+      ids.session,
+      ids.agent,
+      "The protocol remains version 4.",
+      "2026-08-13T10:00:13.000Z",
+      ids.binding,
+      "gateway-message-private-locator",
+    ],
+  );
+  const reader = new PostgresConversationReader(pool, {
+    now: () => new Date("2026-08-13T10:00:14.000Z"),
+  });
+  const page = await reader.read({ conversationId: ids.conversation, limit: 2 });
+  const serializedPage = JSON.stringify(page);
+  if (page?.messages.length !== 2 || !serializedPage.includes("OPENCLAW")) {
+    throw new Error("PostgreSQL reader did not produce the expected bounded page");
+  }
+  for (const forbidden of [ids.session, ids.binding, "gateway-message-private-locator"]) {
+    if (serializedPage.includes(forbidden)) {
+      throw new Error("PostgreSQL reader leaked a runtime locator into the safe projection");
+    }
+  }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, storeScenarios: 11 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, storeScenarios: 11, readerScenarios: 1 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

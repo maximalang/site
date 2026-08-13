@@ -21,6 +21,7 @@
   "dependencies": {
     "@agent-world/conversation-service": "0.0.0",
     "@agent-world/domain": "0.0.0",
+    "@agent-world/read-model": "0.0.0",
     "pg": "8.23.0"
   },
   "devDependencies": {

@@ -37,6 +37,12 @@ call.
   database details are mapped by the application service, not returned to API
   callers.
 
+`PostgresConversationReader` uses bounded keyset pagination over
+`(created_at, id)` and delegates the browser-safe shape to
+`@agent-world/read-model`. Session IDs, Binding IDs, external message IDs,
+external Agent IDs and Agent instructions are validated server-side but omitted
+from the returned projection.
+
 ## Isolated verification
 
 The verifier refuses arbitrary database URLs. It requires an explicit isolated
@@ -50,8 +56,8 @@ npm run test:db
 
 It pins the official `postgres:18.3-bookworm` linux/amd64 manifest digest
 `sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7`,
-applies the migration set twice, exercises eleven store scenarios including
-concurrent exact preparation, checks the ledger/tables, and removes only its
+applies the migration set twice, exercises eleven store scenarios plus a
+runtime-locator-redaction reader scenario, checks the ledger/tables, and removes only its
 strictly named container plus attached anonymous volumes in `finally`.
 
 This proves migration compatibility on an isolated database. It does not prove
