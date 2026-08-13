@@ -8,14 +8,8 @@ import {
   RunIdSchema,
   TaskIdSchema,
 } from "./identity.js";
+import { CommandIdSchema, TimestampSchema } from "./primitives.js";
 import { ApprovalStateSchema } from "./workflow.js";
-
-const TimestampSchema = z.iso.datetime();
-const CommandIdSchema = z
-  .string()
-  .min(3)
-  .max(200)
-  .regex(/^[a-z][a-z0-9._-]{0,31}:[A-Za-z0-9._:-]+$/);
 
 export const EventSourceSchema = z.discriminatedUnion("kind", [
   z.strictObject({

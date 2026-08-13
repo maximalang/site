@@ -1,12 +1,6 @@
 import * as z from "zod";
 import { AgentIdSchema, ApprovalIdSchema, ProjectIdSchema, TaskIdSchema } from "./identity.js";
-
-const TimestampSchema = z.iso.datetime();
-const IdempotencyKeySchema = z
-  .string()
-  .min(3)
-  .max(200)
-  .regex(/^[a-z][a-z0-9._-]{0,31}:[A-Za-z0-9._:-]+$/);
+import { IdempotencyKeySchema, TimestampSchema } from "./primitives.js";
 
 export const ApprovalRequirementSchema = z.enum(["REQUIRED", "NOT_REQUIRED"]);
 export type ApprovalRequirement = z.infer<typeof ApprovalRequirementSchema>;
