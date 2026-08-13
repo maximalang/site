@@ -215,7 +215,9 @@ export async function createProductionRuntime(
           const route = await routeResolver.resolve(modelRouteId);
           const credential = route.credentialRef
             ? await secretStore.read(route.credentialRef, "PROVIDER_API_KEY")
-            : undefined;
+            : route.providerKind === "LM_STUDIO"
+              ? "local-model-no-secret"
+              : undefined;
           await projectionReconciler.reconcile({
             modelRouteId: route.modelRouteId,
             modelAlias: route.modelAlias,

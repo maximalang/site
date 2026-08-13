@@ -47,7 +47,11 @@ const upstream = createServer(async (request, response) => {
     chunks.push(chunk);
   }
   upstreamRequests += 1;
-  assert.equal(request.headers.authorization, "Bearer loopback-provider-key");
+  assert(
+    ["Bearer loopback-provider-key", "Bearer local-model-no-secret"].includes(
+      request.headers.authorization,
+    ),
+  );
   const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   assert.equal(body.model, "local-test");
   assert.deepEqual(body.messages, [{ role: "user", content: "live contract" }]);
@@ -235,6 +239,15 @@ router_settings:
     apiBase: `http://host.docker.internal:${upstreamPort}/v1`,
     credential: "loopback-provider-key",
   });
+  const localRouteId = "model_route_44444444-4444-4444-4444-444444444444";
+  const localAlias = `route-${localRouteId}`;
+  await reconciler.reconcile({
+    modelRouteId: localRouteId,
+    modelAlias: localAlias,
+    providerModel: "openai/local-test",
+    apiBase: `http://host.docker.internal:${upstreamPort}/v1`,
+    credential: "local-model-no-secret",
+  });
   const projectedGateway = new LiteLlmModelGateway({
     baseUrl: `http://127.0.0.1:${proxyPort}`,
     credentialProvider: async () => "litellm-live-master-key",
@@ -257,6 +270,18 @@ router_settings:
   assert.equal(result.content, "live gateway reply");
   assert.equal(result.upstreamRequestId, "chatcmpl-live-contract");
   assert.deepEqual(result.usage, { inputTokens: 5, outputTokens: 4, totalTokens: 9 });
+  const localGateway = new LiteLlmModelGateway({
+    baseUrl: `http://127.0.0.1:${proxyPort}`,
+    credentialProvider: async () => "litellm-live-master-key",
+    routeResolver: async () => ({ modelRouteId: localRouteId, modelAlias: localAlias }),
+  });
+  const localResult = await localGateway.complete({
+    ...request,
+    runId: "run_55555555-5555-5555-5555-555555555555",
+    modelRouteId: localRouteId,
+    idempotencyKey: "litellm-local-live-contract-1",
+  });
+  assert.equal(localResult.content, "live gateway reply");
 
   upstreamMode = "rate-limited";
   const failure = await projectedGateway.complete(request).catch((error) => error);
@@ -279,6 +304,7 @@ router_settings:
       release: "v1.96.2",
       completion: true,
       projectionReconciliation: true,
+      localModelRoute: true,
       rateLimitNormalization: true,
       upstreamRequests,
       user: inspection.Config.User,

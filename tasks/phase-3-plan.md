@@ -77,6 +77,9 @@ deterministic LiteLLM projection and select only policy-eligible routes.
 - [x] Local routes require explicit allowlisted private endpoints and cannot be
       used as arbitrary SSRF targets.
 
+The live verifier also executes an LM Studio-style local OpenAI-compatible
+route through the same LiteLLM service and `ModelGateway` adapter.
+
 ## Slice 5: Product flow and deployment
 
 Add the single-owner provider/key flow, route health/status and actual execution
