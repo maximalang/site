@@ -194,7 +194,11 @@ export class OpenAiCodexSdkRunner implements CodexExecutionRunner {
         sequence: ++sequence,
         occurredAt: this.now(),
       });
-      await emit(normalized);
+      try {
+        await emit(normalized);
+      } catch {
+        throw new CodexExecutionError("DISPATCH_UNAVAILABLE");
+      }
     };
     const fail = async (code: CodexExecutionFailureCode): Promise<never> => {
       if (!failureEmitted) {

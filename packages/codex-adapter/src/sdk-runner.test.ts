@@ -168,4 +168,24 @@ describe("OpenAiCodexSdkRunner", () => {
     });
     expect(JSON.stringify(emitted)).not.toContain("provider-secret");
   });
+
+  it("stops immediately when the durable event sink rejects", async () => {
+    const runner = new OpenAiCodexSdkRunner({
+      createClient: () => ({
+        resumeThread: () => ({
+          runStreamed: async () => ({ events: eventStream([{ type: "turn.started" }]) }),
+        }),
+      }),
+      environment: {},
+      now: () => "2026-08-13T12:00:00.000Z",
+    });
+    const emit = vi.fn(async () => {
+      throw new Error("private database locator");
+    });
+
+    await expect(runner.run(request, emit)).rejects.toEqual(
+      new CodexExecutionError("DISPATCH_UNAVAILABLE"),
+    );
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
 });
