@@ -204,7 +204,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 10
+    ledger.rows.at(-1)?.version !== 11
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
