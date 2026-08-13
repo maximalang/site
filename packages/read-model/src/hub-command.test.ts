@@ -60,6 +60,15 @@ describe("Hub control-plane command contracts", () => {
     },
     {
       ...base,
+      kind: "CODEX_ROUTE_CREATE",
+      routeId: "route_22222222-2222-2222-2222-222222222222",
+      accountId: "account_55555555-5555-5555-5555-555555555555",
+      modelRouteId: "model_route_22222222-2222-2222-2222-222222222222",
+      label: "Official Codex",
+      reasoningEffort: "HIGH",
+    },
+    {
+      ...base,
       kind: "AGENT_CREATE",
       agentId: "agent_22222222-2222-2222-2222-222222222222",
       slug: "researcher",
@@ -139,8 +148,18 @@ describe("Hub control-plane command contracts", () => {
       supportedToolIds: [],
       openaiOrganization: "provider-specific-drift",
     };
+    const unsafeCodexRoute = {
+      ...base,
+      kind: "CODEX_ROUTE_CREATE",
+      routeId: "route_22222222-2222-2222-2222-222222222222",
+      accountId: "account_55555555-5555-5555-5555-555555555555",
+      modelRouteId: "model_route_22222222-2222-2222-2222-222222222222",
+      label: "Unsafe Codex",
+      reasoningEffort: "HIGH",
+      networkAccess: true,
+    };
 
-    for (const command of [account, tool, route]) {
+    for (const command of [account, tool, route, unsafeCodexRoute]) {
       expect(HubCommandRequestSchema.safeParse(command).success).toBe(false);
     }
   });

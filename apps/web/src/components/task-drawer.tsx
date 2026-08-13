@@ -300,6 +300,26 @@ export function TaskDrawer({
                       ? "Выполнение задачи отклонено."
                       : "Задача назначена. Статус: требует подтверждения; запуск не выполнен."}
                 </p>
+                {decision?.execution ? (
+                  <dl className="task-execution-provenance" aria-label="Execution provenance">
+                    <div>
+                      <dt>Account</dt>
+                      <dd>{decision.execution.accountId ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Model</dt>
+                      <dd>{decision.execution.remoteModelId ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Mode</dt>
+                      <dd>{decision.execution.mode}</dd>
+                    </div>
+                    <div>
+                      <dt>Adapter</dt>
+                      <dd>{decision.execution.adapterKind}</dd>
+                    </div>
+                  </dl>
+                ) : null}
                 {!decision || decision.approval.type === "APPROVED" ? (
                   <>
                     <label htmlFor="task-decision-reason">

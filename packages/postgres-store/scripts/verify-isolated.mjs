@@ -26,6 +26,7 @@ import {
   PostgresModelRouteResolver,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
+  PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
 } from "../dist/index.js";
@@ -206,7 +207,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 12
+    ledger.rows.at(-1)?.version !== 13
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -962,6 +963,7 @@ try {
   }
   const codex = {
     account: "account_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+    modelRoute: "model_route_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
     route: "route_a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
     binding: "binding_a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3",
     conversation: "conversation_a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4",
@@ -986,19 +988,31 @@ try {
     [codex.account],
   );
   await pool.query(
-    `INSERT INTO agent_world.execution_routes
-       (id, label, mode, adapter_kind, account_id)
-     VALUES ($1, 'Official Codex SDK', 'CODEX', 'CODEX', $2)`,
-    [codex.route, codex.account],
+    `INSERT INTO agent_world.model_routes
+       (id, canonical_model_id, provider_id, account_id, surface, remote_model_id,
+        availability, context_window_tokens)
+     VALUES ($1, $2, $3, $4, 'CODEX', 'gpt-5.6-codex', 'AVAILABLE', 200000)`,
+    [codex.modelRoute, hub.model, hub.provider, codex.account],
   );
-  await pool.query(
-    `INSERT INTO agent_world.codex_execution_policies
-       (route_id, account_id, working_directory, sandbox, approval_policy,
-        network_access, timeout_ms, model, reasoning_effort)
-     VALUES ($1, $2, '/workspaces/project', 'WORKSPACE_WRITE', 'ON_REQUEST',
-             false, 600000, 'gpt-5.6-codex', 'HIGH')`,
-    [codex.route, codex.account],
+  const codexRouteReceipt = await new PostgresHubCommandStore(pool).execute(
+    HubCommandRequestSchema.parse({
+      schemaVersion: 1,
+      commandId: "hub_command_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+      kind: "CODEX_ROUTE_CREATE",
+      routeId: codex.route,
+      accountId: codex.account,
+      modelRouteId: codex.modelRoute,
+      label: "Official Codex SDK",
+      reasoningEffort: "HIGH",
+    }),
   );
+  if (
+    codexRouteReceipt.outcome !== "CREATED" ||
+    codexRouteReceipt.resource.kind !== "EXECUTION_ROUTE" ||
+    codexRouteReceipt.resource.id !== codex.route
+  ) {
+    throw new Error("Codex route command did not create an exact canonical route");
+  }
   await expectRejected(
     pool.query(
       `UPDATE agent_world.codex_execution_policies
@@ -1095,6 +1109,17 @@ try {
     codexResolution.policy.workingDirectory !== "/workspaces/project"
   ) {
     throw new Error("Codex binding resolver did not restore exact safe route provenance");
+  }
+  const codexProvenance = await new PostgresRunProvenanceReader(pool).read(codex.run);
+  if (
+    codexProvenance.routeId !== codex.route ||
+    codexProvenance.accountId !== codex.account ||
+    codexProvenance.modelRouteId !== codex.modelRoute ||
+    codexProvenance.remoteModelId !== "gpt-5.6-codex" ||
+    codexProvenance.mode !== "CODEX" ||
+    codexProvenance.adapterKind !== "CODEX"
+  ) {
+    throw new Error("Run provenance projection did not preserve exact Codex identities");
   }
   await pool.query("UPDATE agent_world.accounts SET health = 'UNCONFIGURED' WHERE id = $1", [
     codex.account,
@@ -1596,7 +1621,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 14 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 15 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

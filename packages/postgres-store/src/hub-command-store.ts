@@ -233,6 +233,45 @@ export class PostgresHubCommandStore {
           );
         }
         return created(command.commandId, { kind: "MODEL_ROUTE", id: command.modelRouteId });
+      case "CODEX_ROUTE_CREATE": {
+        const inserted = await client.query<{ id: string; remote_model_id: string }>(
+          `INSERT INTO agent_world.execution_routes
+             (id, label, mode, adapter_kind, account_id, model_route_id)
+           SELECT $1, $2, 'CODEX', 'CODEX', a.id, mr.id
+             FROM agent_world.accounts a
+             JOIN agent_world.account_surfaces surface
+               ON surface.account_id = a.id AND surface.surface = 'CODEX'
+             JOIN agent_world.model_routes mr
+               ON mr.id = $4
+              AND mr.account_id = a.id
+              AND mr.surface = 'CODEX'
+              AND mr.is_enabled = true
+            WHERE a.id = $3
+              AND a.auth_mechanism = 'CHATGPT_INTERACTIVE'
+              AND a.is_enabled = true
+          RETURNING id,
+                    (SELECT remote_model_id FROM agent_world.model_routes WHERE id = $4)
+                      AS remote_model_id`,
+          [command.routeId, command.label, command.accountId, command.modelRouteId],
+        );
+        if (inserted.rows.length !== 1 || !inserted.rows[0]) {
+          throw new HubCommandStoreError("INVALID_REFERENCE");
+        }
+        await client.query(
+          `INSERT INTO agent_world.codex_execution_policies
+             (route_id, account_id, working_directory, sandbox, approval_policy,
+              network_access, timeout_ms, model, reasoning_effort)
+           VALUES ($1, $2, '/workspaces/project', 'WORKSPACE_WRITE', 'ON_REQUEST',
+                   false, 600000, $3, $4)`,
+          [
+            command.routeId,
+            command.accountId,
+            inserted.rows[0].remote_model_id,
+            command.reasoningEffort ?? null,
+          ],
+        );
+        return created(command.commandId, { kind: "EXECUTION_ROUTE", id: command.routeId });
+      }
       case "AGENT_CREATE":
         await client.query(
           `INSERT INTO agent_world.agents

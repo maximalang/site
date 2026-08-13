@@ -1,4 +1,14 @@
-import { ApprovalStateSchema, RunSchema, TaskIdSchema } from "@agent-world/domain";
+import {
+  AccountIdSchema,
+  ApprovalStateSchema,
+  ExecutionAdapterKindSchema,
+  ExecutionModeSchema,
+  ModelRouteIdSchema,
+  OpaqueExternalIdSchema,
+  RouteIdSchema,
+  RunSchema,
+  TaskIdSchema,
+} from "@agent-world/domain";
 import * as z from "zod";
 
 const DecisionIdentity = {
@@ -22,12 +32,23 @@ export const ApprovalDecisionRequestSchema = z.discriminatedUnion("decision", [
 ]);
 export type ApprovalDecisionRequest = z.infer<typeof ApprovalDecisionRequestSchema>;
 
+export const ExecutionProvenanceSchema = z.strictObject({
+  routeId: RouteIdSchema,
+  accountId: AccountIdSchema.optional(),
+  mode: ExecutionModeSchema,
+  adapterKind: ExecutionAdapterKindSchema,
+  modelRouteId: ModelRouteIdSchema.optional(),
+  remoteModelId: OpaqueExternalIdSchema.optional(),
+});
+export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
+
 export const ApprovalDecisionResponseSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
     outcome: z.enum(["DECIDED", "REPLAY"]),
     approval: ApprovalStateSchema,
     run: RunSchema.optional(),
+    execution: ExecutionProvenanceSchema.optional(),
     dispatch: z.enum(["DISPATCHED", "REPLAYED", "PENDING", "NOT_APPLICABLE"]),
   })
   .refine(

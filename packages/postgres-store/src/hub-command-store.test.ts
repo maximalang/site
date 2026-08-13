@@ -100,6 +100,58 @@ describe("PostgresHubCommandStore", () => {
     expect(fake.query).toHaveBeenLastCalledWith("ROLLBACK");
   });
 
+  it("creates a Codex route with server-owned safe policy in the same transaction", async () => {
+    const command = HubCommandRequestSchema.parse({
+      schemaVersion: 1,
+      commandId: "hub_command_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      kind: "CODEX_ROUTE_CREATE",
+      routeId: "route_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      accountId: "account_cccccccc-cccc-cccc-cccc-cccccccccccc",
+      modelRouteId: "model_route_dddddddd-dddd-dddd-dddd-dddddddddddd",
+      label: "Official Codex",
+      reasoningEffort: "HIGH",
+    });
+    if (command.kind !== "CODEX_ROUTE_CREATE") throw new Error("Invalid Codex route fixture");
+    const fake = pool([
+      [],
+      [],
+      [],
+      [{ id: command.routeId, remote_model_id: "gpt-5.6-codex" }],
+      [],
+      [],
+      [],
+    ]);
+
+    await expect(new PostgresHubCommandStore(fake.value).execute(command)).resolves.toMatchObject({
+      outcome: "CREATED",
+      resource: { kind: "EXECUTION_ROUTE", id: command.routeId },
+    });
+    const policyCall = fake.query.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO agent_world.codex_execution_policies"),
+    );
+    expect(policyCall?.[0]).toContain("false, 600000");
+    expect(policyCall?.[1]).toEqual([command.routeId, command.accountId, "gpt-5.6-codex", "HIGH"]);
+    expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
+  it("rejects a Codex route unless Account and ModelRoute have exact Codex provenance", async () => {
+    const command = HubCommandRequestSchema.parse({
+      schemaVersion: 1,
+      commandId: "hub_command_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      kind: "CODEX_ROUTE_CREATE",
+      routeId: "route_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      accountId: "account_cccccccc-cccc-cccc-cccc-cccccccccccc",
+      modelRouteId: "model_route_dddddddd-dddd-dddd-dddd-dddddddddddd",
+      label: "Official Codex",
+    });
+    if (command.kind !== "CODEX_ROUTE_CREATE") throw new Error("Invalid Codex route fixture");
+    const fake = pool([[], [], [], [], []]);
+    await expect(new PostgresHubCommandStore(fake.value).execute(command)).rejects.toEqual(
+      new HubCommandStoreError("INVALID_REFERENCE"),
+    );
+    expect(fake.query).toHaveBeenLastCalledWith("ROLLBACK");
+  });
+
   it.each([
     [
       HubCommandRequestSchema.parse({

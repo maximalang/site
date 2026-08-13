@@ -24,6 +24,8 @@ describe("discoverMigrations", () => {
       { version: 9, name: "0009_approval_runs.sql" },
       { version: 10, name: "0010_encrypted_secrets.sql" },
       { version: 11, name: "0011_codex_execution.sql" },
+      { version: 12, name: "0012_codex_route_policy.sql" },
+      { version: 13, name: "0013_codex_route_command.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -40,6 +42,8 @@ describe("discoverMigrations", () => {
     expect(migrations[9]?.sql).toContain("CREATE TABLE agent_world.encrypted_secrets");
     expect(migrations[10]?.sql).toContain("CREATE TABLE agent_world.codex_execution_jobs");
     expect(migrations[10]?.sql).toContain("CREATE TABLE agent_world.codex_execution_events");
+    expect(migrations[11]?.sql).toContain("CREATE TABLE agent_world.codex_execution_policies");
+    expect(migrations[12]?.sql).toContain("'CODEX_ROUTE_CREATE'");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {

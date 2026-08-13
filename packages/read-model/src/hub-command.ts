@@ -2,10 +2,12 @@ import {
   AccountSchema,
   AgentSchema,
   CanonicalModelSchema,
+  ExecutionRouteSchema,
   HubCommandIdSchema,
   ModelRouteSchema,
   ProjectSchema,
   ProviderSchema,
+  ReasoningEffortSchema,
   SkillSchema,
   ToolSchema,
 } from "@agent-world/domain";
@@ -68,6 +70,16 @@ const ModelRouteCreateCommandSchema = z.strictObject({
   supportedToolIds: ModelRouteSchema.shape.supportedToolIds,
 });
 
+const CodexRouteCreateCommandSchema = z.strictObject({
+  ...commandBase,
+  kind: z.literal("CODEX_ROUTE_CREATE"),
+  routeId: ExecutionRouteSchema.shape.id,
+  accountId: AccountSchema.shape.id,
+  modelRouteId: ModelRouteSchema.shape.id,
+  label: ExecutionRouteSchema.shape.label,
+  reasoningEffort: ReasoningEffortSchema.optional(),
+});
+
 const AgentCreateCommandSchema = z.strictObject({
   ...commandBase,
   kind: z.literal("AGENT_CREATE"),
@@ -116,6 +128,7 @@ export const HubCommandRequestSchema = z.discriminatedUnion("kind", [
   AccountCreateCommandSchema,
   CanonicalModelCreateCommandSchema,
   ModelRouteCreateCommandSchema,
+  CodexRouteCreateCommandSchema,
   AgentCreateCommandSchema,
   SkillCreateCommandSchema,
   ToolCreateCommandSchema,
@@ -128,6 +141,7 @@ const HubCommandResourceSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("ACCOUNT"), id: AccountSchema.shape.id }),
   z.strictObject({ kind: z.literal("CANONICAL_MODEL"), id: CanonicalModelSchema.shape.id }),
   z.strictObject({ kind: z.literal("MODEL_ROUTE"), id: ModelRouteSchema.shape.id }),
+  z.strictObject({ kind: z.literal("EXECUTION_ROUTE"), id: ExecutionRouteSchema.shape.id }),
   z.strictObject({ kind: z.literal("AGENT"), id: AgentSchema.shape.id }),
   z.strictObject({ kind: z.literal("SKILL"), id: SkillSchema.shape.id }),
   z.strictObject({ kind: z.literal("TOOL"), id: ToolSchema.shape.id }),

@@ -172,6 +172,14 @@ describe("TaskDrawer", () => {
           dispatchIdempotencyKey: `run:${input.taskId.slice("task_".length)}`,
           createdAt: "2026-08-13T10:02:00.000Z",
         },
+        execution: {
+          routeId: "route_88888888-8888-8888-8888-888888888888",
+          accountId: "account_99999999-9999-9999-9999-999999999999",
+          mode: "CODEX",
+          adapterKind: "CODEX",
+          modelRouteId: "model_route_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          remoteModelId: "gpt-5.6-codex",
+        },
         dispatch: "PENDING",
       }),
     );
@@ -201,6 +209,9 @@ describe("TaskDrawer", () => {
     expect(
       await screen.findByText("Задача подтверждена и ожидает доступный runtime."),
     ).not.toBeNull();
+    expect(screen.getByText("account_99999999-9999-9999-9999-999999999999")).not.toBeNull();
+    expect(screen.getByText("gpt-5.6-codex")).not.toBeNull();
+    expect(screen.getAllByText("CODEX")).toHaveLength(2);
     expect(onDecided).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("button", { name: "Повторить отправку" }));
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(2));

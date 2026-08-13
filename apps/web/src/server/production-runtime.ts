@@ -25,6 +25,7 @@ import {
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
+  PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
   RouteResolutionError,
@@ -252,6 +253,7 @@ export async function createProductionRuntime(
     const runDispatchStore = new PostgresRunDispatchStore(pool, {
       eventId: () => `event_${randomUUID()}`,
     });
+    const runProvenanceReader = new PostgresRunProvenanceReader(pool);
     const codexAdapter = new CodexTaskExecutionAdapter({
       resolver: new PostgresCodexBindingResolver(pool),
       dispatcher: new PostgresCodexExecutionStore(pool, {
@@ -367,11 +369,12 @@ export async function createProductionRuntime(
           return { ...decision, dispatch: "NOT_APPLICABLE" as const };
         }
         if (!decision.run) throw new Error("Approved decision is missing its canonical Run");
+        const execution = await runProvenanceReader.read(decision.run.id);
         try {
           const dispatched = await taskDispatcher.dispatch(decision.run.id);
-          return { ...decision, run: dispatched.run, dispatch: dispatched.outcome };
+          return { ...decision, run: dispatched.run, execution, dispatch: dispatched.outcome };
         } catch {
-          return { ...decision, dispatch: "PENDING" as const };
+          return { ...decision, execution, dispatch: "PENDING" as const };
         }
       },
       executeHubCommand: (command) => hubCommandStore.execute(command),
