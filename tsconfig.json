@@ -8,6 +8,9 @@
       "path": "./packages/domain"
     },
     {
+      "path": "./packages/model-gateway"
+    },
+    {
       "path": "./packages/openclaw-adapter"
     },
     {

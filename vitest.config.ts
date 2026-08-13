@@ -10,6 +10,9 @@ export default defineConfig({
       "@agent-world/domain": fileURLToPath(
         new URL("./packages/domain/src/index.ts", import.meta.url),
       ),
+      "@agent-world/model-gateway": fileURLToPath(
+        new URL("./packages/model-gateway/src/index.ts", import.meta.url),
+      ),
       "@agent-world/openclaw-adapter": fileURLToPath(
         new URL("./packages/openclaw-adapter/src/index.ts", import.meta.url),
       ),
