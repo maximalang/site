@@ -5,7 +5,11 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { LiteLlmModelGateway, ModelGatewayFailure } from "../dist/index.js";
+import {
+  LiteLlmModelGateway,
+  LiteLlmProjectionReconciler,
+  ModelGatewayFailure,
+} from "../dist/index.js";
 
 if (process.env.AGENT_WORLD_LITELLM_LIVE_TEST_ACK !== "isolated") {
   throw new Error(
@@ -19,6 +23,8 @@ const IMAGE =
 const routeId = "model_route_22222222-2222-2222-2222-222222222222";
 const modelAlias = "route-model_route_22222222";
 const containerName = `agent-world-litellm-${process.pid}-${Date.now()}`;
+const postgresName = `${containerName}-postgres`;
+const networkName = `${containerName}-network`;
 const tempDirectory = await mkdtemp(path.join(tmpdir(), "agent-world-litellm-"));
 const configPath = path.join(tempDirectory, "config.yaml");
 let upstreamMode = "success";
@@ -104,6 +110,39 @@ async function waitForReady(gateway, deadline) {
 let container;
 try {
   const upstreamPort = await listen(upstream);
+  await execFileAsync("docker", ["network", "create", networkName]);
+  await execFileAsync("docker", [
+    "run",
+    "-d",
+    "--name",
+    postgresName,
+    "--network",
+    networkName,
+    "-e",
+    "POSTGRES_PASSWORD=litellm-live-postgres-password",
+    "-e",
+    "POSTGRES_DB=litellm",
+    "--health-cmd",
+    "pg_isready -U postgres -d litellm",
+    "--health-interval",
+    "1s",
+    "--health-timeout",
+    "3s",
+    "--health-retries",
+    "30",
+    "postgres:18.3-bookworm@sha256:80630f83606d8db77d30b3851b16a9f78be2d0d4dda6f7b82a1fdca5ebe3acba",
+  ]);
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const { stdout } = await execFileAsync("docker", [
+      "inspect",
+      "--format",
+      "{{.State.Health.Status}}",
+      postgresName,
+    ]);
+    if (stdout.trim() === "healthy") break;
+    if (attempt === 59) throw new Error("Timed out waiting for LiteLLM PostgreSQL");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
   await writeFile(
     configPath,
     `model_list:
@@ -127,6 +166,8 @@ router_settings:
       "--rm",
       "--name",
       containerName,
+      "--network",
+      networkName,
       "--user",
       "10001:10001",
       "--read-only",
@@ -137,7 +178,7 @@ router_settings:
       "--tmpfs",
       "/tmp:rw,noexec,nosuid,nodev,size=64m",
       "--memory",
-      "768m",
+      "1536m",
       "--cpus",
       "1.0",
       "--pids-limit",
@@ -152,6 +193,14 @@ router_settings:
       "TEST_OPENAI_API_KEY=loopback-provider-key",
       "-e",
       "LITELLM_MASTER_KEY=litellm-live-master-key",
+      "-e",
+      "LITELLM_SALT_KEY=litellm-live-salt-key-32-bytes-minimum",
+      "-e",
+      `DATABASE_URL=postgresql://postgres:litellm-live-postgres-password@${postgresName}:5432/litellm`,
+      "-e",
+      "STORE_MODEL_IN_DB=True",
+      "-e",
+      "LITELLM_LOCAL_MODEL_COST_MAP=True",
       IMAGE,
       "--config",
       "/app/config.yaml",
@@ -174,6 +223,26 @@ router_settings:
     }),
   });
   await waitForReady(gateway, Date.now() + 90_000);
+  const projectedAlias = `route-${routeId}`;
+  const reconciler = new LiteLlmProjectionReconciler({
+    baseUrl: `http://127.0.0.1:${proxyPort}`,
+    credentialProvider: async () => "litellm-live-master-key",
+  });
+  await reconciler.reconcile({
+    modelRouteId: routeId,
+    modelAlias: projectedAlias,
+    providerModel: "openai/local-test",
+    apiBase: `http://host.docker.internal:${upstreamPort}/v1`,
+    credential: "loopback-provider-key",
+  });
+  const projectedGateway = new LiteLlmModelGateway({
+    baseUrl: `http://127.0.0.1:${proxyPort}`,
+    credentialProvider: async () => "litellm-live-master-key",
+    routeResolver: async (requestedRouteId) => ({
+      modelRouteId: requestedRouteId,
+      modelAlias: projectedAlias,
+    }),
+  });
   const request = {
     schemaVersion: 1,
     runId: "run_11111111-1111-1111-1111-111111111111",
@@ -184,13 +253,13 @@ router_settings:
     timeoutMs: 30_000,
     idempotencyKey: "litellm-live-contract-1",
   };
-  const result = await gateway.complete(request);
+  const result = await projectedGateway.complete(request);
   assert.equal(result.content, "live gateway reply");
   assert.equal(result.upstreamRequestId, "chatcmpl-live-contract");
   assert.deepEqual(result.usage, { inputTokens: 5, outputTokens: 4, totalTokens: 9 });
 
   upstreamMode = "rate-limited";
-  const failure = await gateway.complete(request).catch((error) => error);
+  const failure = await projectedGateway.complete(request).catch((error) => error);
   assert(failure instanceof ModelGatewayFailure);
   assert.equal(failure.code, "RATE_LIMITED");
   assert.equal(failure.retryable, true);
@@ -201,7 +270,7 @@ router_settings:
   assert.equal(inspection.Config.User, "10001:10001");
   assert.equal(inspection.HostConfig.ReadonlyRootfs, true);
   assert.deepEqual(inspection.HostConfig.CapDrop, ["ALL"]);
-  assert.equal(inspection.HostConfig.Memory, 805_306_368);
+  assert.equal(inspection.HostConfig.Memory, 1_610_612_736);
   assert.equal(inspection.HostConfig.PidsLimit, 256);
   console.log(
     JSON.stringify({
@@ -209,6 +278,7 @@ router_settings:
       image: IMAGE,
       release: "v1.96.2",
       completion: true,
+      projectionReconciliation: true,
       rateLimitNormalization: true,
       upstreamRequests,
       user: inspection.Config.User,
@@ -217,6 +287,8 @@ router_settings:
   );
 } finally {
   await execFileAsync("docker", ["rm", "-f", containerName]).catch(() => undefined);
+  await execFileAsync("docker", ["rm", "-f", postgresName]).catch(() => undefined);
+  await execFileAsync("docker", ["network", "rm", networkName]).catch(() => undefined);
   if (container && container.exitCode === null) container.kill();
   await close(upstream).catch(() => undefined);
   await rm(tempDirectory, { recursive: true, force: true });

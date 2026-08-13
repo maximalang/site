@@ -16,6 +16,16 @@ function poolWith(row: Record<string, unknown> | undefined): TransactionPool {
   };
 }
 
+function listPool(ids: string[]): TransactionPool {
+  const client: TransactionClient = {
+    async query<Row>() {
+      return { rows: ids.map((id) => ({ id })) as Row[] };
+    },
+    release() {},
+  };
+  return { connect: async () => client };
+}
+
 const apiRoute = {
   model_route_id: routeId,
   remote_model_id: "gpt-5-mini",
@@ -97,5 +107,12 @@ describe("PostgresModelRouteResolver", () => {
         poolWith({ ...apiRoute, surface: "LOCAL", provider_category: "LLM_API" }),
       ).resolve(routeId),
     ).rejects.toMatchObject({ code: "INELIGIBLE_ROUTE" });
+  });
+
+  it("lists bounded deterministic candidate identities for reconciliation", async () => {
+    const other = "model_route_11111111-1111-1111-1111-111111111111";
+    await expect(
+      new PostgresModelRouteResolver(listPool([other, routeId])).listCandidateRouteIds(),
+    ).resolves.toEqual([other, routeId]);
   });
 });

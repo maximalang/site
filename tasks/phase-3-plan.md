@@ -73,7 +73,7 @@ deterministic LiteLLM projection and select only policy-eligible routes.
 - [x] Disabled, unavailable, mismatched and unconfigured routes fail closed.
 - [x] Canonical Model cards remain unique while several ModelRoutes may target
       the same physical model.
-- [ ] Reconciliation is deterministic and does not make LiteLLM authoritative.
+- [x] Reconciliation is deterministic and does not make LiteLLM authoritative.
 - [x] Local routes require explicit allowlisted private endpoints and cannot be
       used as arbitrary SSRF targets.
 
@@ -88,7 +88,7 @@ hardened Compose core with the private, bounded gateway service.
 - [ ] A real API or local-model run shows Account/API/Model/Mode provenance.
 - [x] LiteLLM has no host port, runs with bounded resources and participates in
       readiness without weakening the existing web/PostgreSQL gates.
-- [ ] Backup/restore and restart preserve authoritative routes and secret
+- [x] Backup/restore and restart preserve authoritative routes and secret
       ciphertext, and reconciliation restores the gateway projection.
 
 ## Verification gate

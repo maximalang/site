@@ -184,4 +184,20 @@ export class PostgresModelRouteResolver {
     }
     throw new RouteResolutionError("INELIGIBLE_ROUTE");
   }
+
+  async listCandidateRouteIds(): Promise<ResolvedModelRoute["modelRouteId"][]> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<{ id: string }>(
+        `SELECT id
+           FROM agent_world.model_routes
+          WHERE is_enabled = true AND availability = 'AVAILABLE'
+          ORDER BY id
+          LIMIT 5000`,
+      );
+      return result.rows.map(({ id }) => ModelRouteIdSchema.parse(id));
+    } finally {
+      client.release();
+    }
+  }
 }

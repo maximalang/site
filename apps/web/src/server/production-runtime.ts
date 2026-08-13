@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
-import { LiteLlmModelGateway } from "@agent-world/model-gateway";
+import { LiteLlmModelGateway, LiteLlmProjectionReconciler } from "@agent-world/model-gateway";
 import {
   type OpenClawCredential,
   OpenClawReadAdapter,
@@ -23,6 +23,8 @@ import {
   PostgresRunDispatchStore,
   PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
+  RouteResolutionError,
+  SecretStoreError,
 } from "@agent-world/postgres-store";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
@@ -200,6 +202,34 @@ export async function createProductionRuntime(
           },
         })
       : undefined;
+    const projectionReconciler = liteLlmConfig
+      ? new LiteLlmProjectionReconciler({
+          baseUrl: liteLlmConfig.baseUrl,
+          credentialProvider: async () => liteLlmConfig.masterKey,
+        })
+      : undefined;
+    const reconcileModelRoutes = async () => {
+      if (!projectionReconciler) return;
+      for (const modelRouteId of await routeResolver.listCandidateRouteIds()) {
+        try {
+          const route = await routeResolver.resolve(modelRouteId);
+          const credential = route.credentialRef
+            ? await secretStore.read(route.credentialRef, "PROVIDER_API_KEY")
+            : undefined;
+          await projectionReconciler.reconcile({
+            modelRouteId: route.modelRouteId,
+            modelAlias: route.modelAlias,
+            providerModel: route.providerModel,
+            ...(route.apiBase === undefined ? {} : { apiBase: route.apiBase }),
+            ...(credential === undefined ? {} : { credential }),
+          });
+        } catch (error) {
+          if (error instanceof RouteResolutionError || error instanceof SecretStoreError) continue;
+          throw error;
+        }
+      }
+    };
+    await reconcileModelRoutes();
     const executionPreferenceStore = new PostgresExecutionPreferenceStore(pool);
     const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
       messageId: () => `message_${randomUUID()}`,
@@ -330,7 +360,11 @@ export async function createProductionRuntime(
         }
       },
       executeHubCommand: (command) => hubCommandStore.execute(command),
-      writeProviderCredential: (input) => secretStore.writeProviderCredential(input),
+      writeProviderCredential: async (input) => {
+        const receipt = await secretStore.writeProviderCredential(input);
+        await reconcileModelRoutes();
+        return receipt;
+      },
       readExecutionPreferences: (selection) => executionPreferenceStore.read(selection),
       writeExecutionPreferences: (layer, updatedAt) =>
         executionPreferenceStore.writeLayer(layer, updatedAt),
