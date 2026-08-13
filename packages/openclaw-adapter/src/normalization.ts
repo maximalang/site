@@ -68,7 +68,7 @@ export type OpenClawSessionsListResult = z.infer<typeof OpenClawSessionsListResu
 const OpenClawPresenceEntrySchema = z.object({
   mode: z.string().trim().min(1).max(64).optional(),
   reason: z.string().trim().min(1).max(128).optional(),
-  text: z.string().max(2_048),
+  text: z.string().max(2_048).optional(),
   ts: EpochMsSchema,
   deviceId: OpaqueExternalIdSchema.optional(),
   instanceId: OpaqueExternalIdSchema.optional(),
@@ -114,6 +114,35 @@ export type OpenClawRuntimeSnapshot = {
   presence: OpenClawGatewayPresence[];
   ignoredUnboundAgentCount: number;
 };
+
+export function createOfflineOpenClawSnapshot(
+  bindingsInput: unknown,
+  receivedAtInput: unknown,
+): OpenClawRuntimeSnapshot {
+  const bindings = z.array(OpenClawBoundAgentSchema).max(MAX_RUNTIME_ROWS).parse(bindingsInput);
+  const receivedAt = TimestampSchema.parse(receivedAtInput);
+  assertUniqueBindings(bindings);
+
+  return {
+    schemaVersion: 1,
+    adapterKind: "OPENCLAW",
+    protocolVersion: PROTOCOL_VERSION,
+    receivedAt,
+    agents: bindings
+      .map((binding) => ({
+        ...binding,
+        isRuntimeConfigured: false,
+        sessionCount: 0,
+        latestActivityAt: null,
+        activeRunIds: [],
+        status: AgentStatusSchema.parse("OFFLINE"),
+      }))
+      .sort((left, right) => left.externalAgentId.localeCompare(right.externalAgentId)),
+    sessions: [],
+    presence: [],
+    ignoredUnboundAgentCount: 0,
+  };
+}
 
 type NormalizeOpenClawSnapshotInput = {
   bindings: unknown;

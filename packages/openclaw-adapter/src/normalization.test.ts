@@ -188,4 +188,40 @@ describe("pinned OpenClaw response contracts", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts presence rows without optional display text and strips sensitive metadata", () => {
+    const snapshot = normalizeOpenClawSnapshot({
+      bindings: [bindings[0]],
+      receivedAt: "2026-08-13T06:00:00.000Z",
+      agents: {
+        defaultId: "researcher",
+        mainKey: "agent:researcher:main",
+        scope: "global",
+        agents: [{ id: "researcher", kind: "agent" }],
+      },
+      sessions: { ts: 1, path: "/ignored", count: 0, defaults: {}, sessions: [] },
+      presence: [
+        {
+          mode: "gateway",
+          reason: "self",
+          ts: 1_786_597_200_000,
+          deviceId: "device-1",
+          host: "private-host",
+          ip: "10.0.0.7",
+          user: { email: "private@example.test" },
+        },
+      ],
+    });
+
+    expect(snapshot.presence).toEqual([
+      {
+        externalPresenceId: "device-1",
+        mode: "gateway",
+        reason: "self",
+        observedAt: 1_786_597_200_000,
+      },
+    ]);
+    expect(JSON.stringify(snapshot)).not.toContain("private-host");
+    expect(JSON.stringify(snapshot)).not.toContain("private@example.test");
+  });
 });
