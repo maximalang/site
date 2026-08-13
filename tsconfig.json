@@ -2,6 +2,9 @@
   "files": [],
   "references": [
     {
+      "path": "./packages/conversation-service"
+    },
+    {
       "path": "./packages/domain"
     },
     {
