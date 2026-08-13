@@ -26,7 +26,7 @@ Evidence:
 
 ## Slice 2: OpenClaw read-only adapter
 
-Status: next.
+Status: complete on `codex/phase-1-contracts`.
 
 Use only public gateway packages. Connect with least-privilege read scope,
 normalize agent/session/presence events, preserve sequence/state version and
@@ -35,7 +35,22 @@ emit reconnect/resync telemetry. No task execution yet.
 Verification: pinned protocol contract tests, malformed/unordered/duplicate
 event tests, disconnect/reconnect replay and credential-redaction tests.
 
+Evidence:
+
+- [x] Exact official client/protocol prerelease dependencies with protocol v4.
+- [x] Exact `operator.read` authority and four-method read-only interface.
+- [x] Canonical binding-first Agent/session/presence normalization.
+- [x] Duplicate, stale and forward-gap handling with authoritative reload.
+- [x] Reconnect epoch/sequence reset and late-response suppression.
+- [x] Loopback/WSS, credential and no-secret telemetry boundaries.
+- [x] Test, typecheck, lint, build, package-content and dependency-integrity
+  gates pass.
+- [x] Production maturity limitation recorded: no live Gateway proof in Slice 2
+  and the package-bearing OpenClaw release is currently prerelease.
+
 ## Slice 3: One API, two projections
+
+Status: next.
 
 Expose one backend event/read-model API. Build the minimal Command agent list
 and the primary World canvas from the same `WorldReadModel`. World has no direct

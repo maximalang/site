@@ -4,8 +4,9 @@ Personal, self-hosted AI World and control center in which World and Command are
 two projections of one canonical domain and event stream.
 
 The repository is under incremental construction. Phase 0 reuse/licensing audit
-is complete; Phase 1 currently provides the first versioned domain contracts.
-It is not yet a deployable product.
+is complete; Phase 1 currently provides versioned domain contracts and a
+server-side read-only OpenClaw projection adapter. It is not yet a deployable
+product.
 
 ## Quick start
 
@@ -37,6 +38,9 @@ file does not require install-time scripts for the supported toolchain.
 
 - [`@agent-world/domain`](packages/domain/README.md) owns versioned wire schemas
   and branded identifiers shared by every future service and UI.
+- [`@agent-world/openclaw-adapter`](packages/openclaw-adapter/README.md) uses the
+  official Gateway client to produce a least-privilege, binding-first runtime
+  projection. It does not execute tasks.
 - PostgreSQL will be the canonical source of truth. Runtime systems receive
   projections and return validated events.
 - OpenClaw is the primary general runtime; Codex and other execution surfaces
@@ -48,14 +52,18 @@ Key evidence and decisions:
 - [Phase 0 reuse matrix](docs/audits/phase-0/reuse-matrix.md)
 - [Initial composition](docs/decisions/0003-initial-system-composition.md)
 - [Canonical contract decision](docs/decisions/0004-canonical-domain-contracts.md)
+- [OpenClaw read-adapter decision](docs/decisions/0005-openclaw-read-adapter-boundary.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
 
 ## Security baseline
 
-- External data is parsed through strict schemas; unknown fields fail closed.
+- Canonical domain input is strict. The upstream adapter allowlist-projects
+  additive fields away and fails closed on malformed required fields.
 - Canonical IDs are runtime-prefixed and compile-time branded, preventing
   Agent/Account/Session substitution.
 - World events require runtime or canonical-domain provenance. There is no
   simulation/decorative event source.
 - Credentials do not belong in domain or event contracts.
+- OpenClaw credentials stay server-side; endpoint URLs cannot carry secrets and
+  remote plaintext WebSockets are rejected.
 - Secrets, local environment files and build outputs are ignored by Git.
