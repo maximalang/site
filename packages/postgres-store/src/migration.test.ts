@@ -14,9 +14,11 @@ describe("discoverMigrations", () => {
 
     expect(migrations.map(({ name, version }) => ({ name, version }))).toEqual([
       { version: 1, name: "0001_canonical_core.sql" },
+      { version: 2, name: "0002_owner_auth.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
+    expect(migrations[1]?.sql).toContain("CREATE TABLE agent_world.owner_sessions");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {

@@ -13,6 +13,7 @@ import {
   discoverMigrations,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresOwnerSessionStore,
 } from "../dist/index.js";
 
 const IMAGE =
@@ -130,7 +131,11 @@ try {
   const ledger = await pool.query(
     "SELECT version, name, checksum FROM agent_world.schema_migrations ORDER BY version",
   );
-  if (ledger.rowCount !== migrations.length || ledger.rows[0]?.version !== 1) {
+  if (
+    ledger.rowCount !== migrations.length ||
+    ledger.rows[0]?.version !== 1 ||
+    ledger.rows.at(-1)?.version !== 2
+  ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
   const tables = await pool.query(
@@ -145,12 +150,60 @@ try {
     "conversations",
     "conversation_sessions",
     "conversation_messages",
+    "owner_auth_throttle",
+    "owner_sessions",
     "runtime_bindings",
     "schema_migrations",
   ]) {
     if (!names.includes(required)) {
       throw new Error(`Canonical table is missing after migration: ${required}`);
     }
+  }
+
+  const ownerSessions = new PostgresOwnerSessionStore(pool);
+  const sessionTokenHash = "a".repeat(64);
+  await ownerSessions.createSession({
+    tokenHash: sessionTokenHash,
+    createdAt: "2026-08-13T08:00:00.000Z",
+    expiresAt: "2026-08-13T20:00:00.000Z",
+  });
+  const activeOwnerSession = await ownerSessions.resolveSession({
+    tokenHash: sessionTokenHash,
+    now: "2026-08-13T10:00:00.000Z",
+  });
+  if (activeOwnerSession?.expiresAt !== "2026-08-13T20:00:00.000Z") {
+    throw new Error("PostgreSQL owner session store did not resolve an active session");
+  }
+  await ownerSessions.revokeSession(sessionTokenHash, "2026-08-13T10:01:00.000Z");
+  if (
+    (await ownerSessions.resolveSession({
+      tokenHash: sessionTokenHash,
+      now: "2026-08-13T10:02:00.000Z",
+    })) !== undefined
+  ) {
+    throw new Error("PostgreSQL owner session store resolved a revoked session");
+  }
+  await ownerSessions.createSession({
+    tokenHash: "b".repeat(64),
+    createdAt: "2026-08-13T08:00:00.000Z",
+    expiresAt: "2026-08-13T09:00:00.000Z",
+  });
+  if ((await ownerSessions.pruneExpiredSessions("2026-08-13T10:03:00.000Z")) !== 1) {
+    throw new Error("PostgreSQL owner session store did not prune exactly the expired session");
+  }
+  await ownerSessions.resetLoginThrottle("2026-08-13T11:00:00.000Z");
+  const concurrentLoginClaims = await Promise.all(
+    Array.from({ length: 6 }, () => ownerSessions.claimLoginAttempt("2026-08-13T11:00:01.000Z")),
+  );
+  if (
+    concurrentLoginClaims.filter((result) => result === "ALLOWED").length !== 5 ||
+    concurrentLoginClaims.filter((result) => result === "BLOCKED").length !== 1
+  ) {
+    throw new Error("PostgreSQL owner login throttle did not atomically enforce its attempt limit");
+  }
+  await ownerSessions.resetLoginThrottle("2026-08-13T11:01:00.000Z");
+  if ((await ownerSessions.claimLoginAttempt("2026-08-13T11:01:01.000Z")) !== "ALLOWED") {
+    throw new Error("PostgreSQL owner login throttle did not reset after successful authorization");
   }
 
   const ids = {
@@ -370,7 +423,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, storeScenarios: 11, readerScenarios: 1 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 1, ownerAuthScenarios: 6 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

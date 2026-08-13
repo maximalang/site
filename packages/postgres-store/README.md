@@ -45,6 +45,19 @@ call.
 external Agent IDs and Agent instructions are validated server-side but omitted
 from the returned projection.
 
+## Owner session semantics
+
+`PostgresOwnerSessionStore` persists only SHA-256 digests of random opaque
+session tokens. It resolves unexpired, unrevoked sessions; records immediate
+revocation; and prunes expired or long-revoked rows. Raw cookies, passwords and
+CSRF secrets are not database fields.
+
+The single-owner login throttle is one PostgreSQL-serialized row. At most five
+attempts enter a 15-minute window, including under concurrent requests. A
+successful login explicitly resets the window. This is application-layer
+defense in depth; private binding and reverse-proxy rate limits remain required
+deployment controls.
+
 ## Isolated verification
 
 The verifier refuses arbitrary database URLs. It requires an explicit isolated
@@ -58,9 +71,10 @@ npm run test:db
 
 It pins the official `postgres:18.3-bookworm` linux/amd64 manifest digest
 `sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7`,
-applies the migration set twice, exercises eleven store scenarios plus a
-runtime-locator-redaction reader scenario, checks the ledger/tables, and removes only its
-strictly named container plus attached anonymous volumes in `finally`.
+applies the migration set twice, exercises eleven conversation-store scenarios,
+one runtime-locator-redaction reader scenario and six owner-auth scenarios,
+checks the ledger/tables, and removes only its strictly named container plus
+attached anonymous volumes in `finally`.
 
 This proves migration compatibility on an isolated database. It does not prove
 backup/restore, production credentials, production deployment, or upgrade from
