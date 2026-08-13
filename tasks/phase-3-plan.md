@@ -32,11 +32,11 @@ and typed failures. Add an adapter-neutral interface and contract tests that
 prove strict parsing, route identity, token bounds, timeout/cancellation and
 secret-free errors.
 
-- [ ] Contract has no LiteLLM-specific or provider-specific public fields.
-- [ ] One request selects exactly one ModelRoute.
-- [ ] Usage retains input, output, cached and reasoning token provenance.
-- [ ] Tool calls are typed and bounded; unsupported multimodal inputs reject.
-- [ ] Timeout, upstream auth, rate-limit and unavailable failures normalize
+- [x] Contract has no LiteLLM-specific or provider-specific public fields.
+- [x] One request selects exactly one ModelRoute.
+- [x] Usage retains input, output, cached and reasoning token provenance.
+- [x] Tool calls are typed and bounded; unsupported multimodal inputs reject.
+- [x] Timeout, upstream auth, rate-limit and unavailable failures normalize
       without leaking response bodies or credentials.
 
 ## Slice 2: LiteLLM adapter and live contract
@@ -46,11 +46,11 @@ Implement the contract over the documented OpenAI-compatible
 deterministic loopback OpenAI-compatible provider and verify authentication,
 model projection, content, usage, correlation and failure normalization.
 
-- [ ] Exact LiteLLM release and image digest are recorded and verified.
-- [ ] Gateway URL is private/internal and credentials are injected, not stored
+- [x] Exact LiteLLM release and image digest are recorded and verified.
+- [x] Gateway URL is private/internal and credentials are injected, not stored
       in checked-in configuration.
-- [ ] Live verifier exercises the real image, not a mocked LiteLLM client.
-- [ ] Health/readiness is proven independently of one provider completion.
+- [x] Live verifier exercises the real image, not a mocked LiteLLM client.
+- [x] Health/readiness is proven independently of one provider completion.
 
 ## Slice 3: SecretStore and provider-key command
 
@@ -103,4 +103,3 @@ hardened Compose core with the private, bounded gateway service.
 - Compose verification proves private networking, non-root/read-only operation
   where supported by the pinned image, bounded resources, readiness degradation
   and recovery.
-

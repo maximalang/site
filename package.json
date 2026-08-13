@@ -21,6 +21,7 @@
     "test": "vitest run",
     "test:db": "tsc -b && npm run test:isolated --workspace @agent-world/postgres-store",
     "test:e2e": "tsc -b && npm run test:e2e --workspace @agent-world/web && npm run test:e2e:production --workspace @agent-world/web",
+    "test:litellm-live": "tsc -b && npm run test:live --workspace @agent-world/model-gateway",
     "test:runtime": "npm run build && npm run test:runtime:isolated --workspace @agent-world/web",
     "test:openclaw-live": "tsc -b && npm run test:live --workspace @agent-world/openclaw-adapter",
     "test:compose": "node ops/verify-core.mjs",

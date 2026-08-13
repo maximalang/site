@@ -27,7 +27,7 @@ audit instead of silently moving the evidence anchor.
 | `daggerhashimoto/openclaw-nerve` | `master` | `312e27333e14f841b95bf4f2b205a856b4a4c370` | `v1.5.3` | MIT |
 | `openagents-org/openagents` | `develop` | `4e94efe4391166c5ce9a38c5eb9d7cda2aad3306` | `launcher-v0.9.7` | Apache-2.0 |
 | `iOfficeAI/AionUi` | `main` | `0864694ef3bd8a280a1885a132bf65b8a68bf014` | `v2.1.54` | Apache-2.0 |
-| `BerriAI/litellm` | `litellm_internal_staging` | `d86336a7c6f5c97b5fb46413a8a1c9d77f426220` | `v1.96.2` | unrecognized |
+| `BerriAI/litellm` | `v1.96.2` | `83d6d84bfb7abbbff70d456bc89028d426db8c33` | `v1.96.2` | `ghcr.io/berriai/litellm@sha256:154e23bb5f31b1f10e16392a8ef299bd2cde08de3a64a6849002cfcc25ce3c63` |
 | `maximhq/bifrost` | `dev` | `c556c60c582e3d4d32a53b206d129648f076e628` | `ent-v1.5.10-base` | Apache-2.0 |
 | `langchain-ai/langgraph` | `main` | `644815f9e5bc52ad8f7a5227a456227e9c3e639b` | `1.2.11` | MIT |
 | `getzep/graphiti` | `main` | `d40da88f202c0eba5b2c4164d1c912bd663a0159` | `v0.29.3` | Apache-2.0 |
