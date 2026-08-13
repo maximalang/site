@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@agent-world/domain": "0.0.0",
+    "@openai/codex-sdk": "0.147.0",
     "zod": "4.4.3"
   }
 }

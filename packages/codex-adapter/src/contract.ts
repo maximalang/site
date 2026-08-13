@@ -87,14 +87,23 @@ const RunStartedEventSchema = z.strictObject({
   ...EventEnvelope,
   eventType: z.literal("RUN_STARTED"),
   threadId: OpaqueExternalIdSchema,
-  turnId: OpaqueExternalIdSchema,
+  upstreamTurnId: OpaqueExternalIdSchema.optional(),
 });
 
 const ItemCompletedEventSchema = z.strictObject({
   ...EventEnvelope,
   eventType: z.literal("ITEM_COMPLETED"),
   itemId: OpaqueExternalIdSchema,
-  itemType: z.enum(["MESSAGE", "COMMAND", "FILE_CHANGE", "MCP_CALL", "WEB_SEARCH", "REASONING"]),
+  itemType: z.enum([
+    "MESSAGE",
+    "COMMAND",
+    "FILE_CHANGE",
+    "MCP_CALL",
+    "WEB_SEARCH",
+    "REASONING",
+    "TODO",
+    "ERROR",
+  ]),
   summary: BoundedTextSchema(20_000).optional(),
 });
 

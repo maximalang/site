@@ -55,7 +55,6 @@ describe("Codex execution contract", () => {
         eventType: "RUN_STARTED",
         occurredAt: "2026-08-13T12:00:00.000Z",
         threadId: "thread-opaque-1",
-        turnId: "turn-opaque-1",
       },
       {
         schemaVersion: 1,
