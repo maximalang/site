@@ -575,7 +575,8 @@ tbody tr:last-child > * {
 }
 
 .text-button,
-.primary-button {
+.primary-button,
+.secondary-button {
   min-height: 2.75rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -597,6 +598,22 @@ tbody tr:last-child > * {
   border: 0;
   background: var(--accent);
   color: var(--accent-ink);
+}
+
+.secondary-button {
+  padding-inline: var(--space-5);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.secondary-button:hover {
+  background: var(--surface-muted);
+}
+
+.command-row-actions {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .center-state {
@@ -730,6 +747,10 @@ tbody tr:last-child > * {
   box-shadow: -1.5rem 0 5rem rgba(0, 0, 0, 0.4);
 }
 
+.task-drawer {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .drawer-header,
 .drawer-actions,
 .message-meta,
@@ -848,6 +869,30 @@ tbody tr:last-child > * {
   padding: var(--space-3);
 }
 
+.task-form {
+  align-content: start;
+  overflow-y: auto;
+  border-top: 0;
+}
+
+.task-form input,
+.task-form select {
+  min-height: 2.75rem;
+  padding-inline: var(--space-3);
+}
+
+.task-policy-note,
+.task-success {
+  margin: var(--space-2) 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.task-success {
+  color: var(--success);
+}
+
 .composer-footer {
   justify-content: space-between;
   gap: var(--space-4);
@@ -957,6 +1002,58 @@ button:disabled {
 
   .command-heading > p {
     display: none;
+  }
+
+  .command-panel table {
+    min-width: 0;
+  }
+
+  .command-panel thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .command-panel tbody,
+  .command-panel tr {
+    display: grid;
+  }
+
+  .command-panel tbody {
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .command-panel tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    background: var(--surface);
+  }
+
+  .command-panel tr > * {
+    min-width: 0;
+    border-bottom: 0;
+  }
+
+  .command-panel tr > :nth-child(2),
+  .command-panel tr > :nth-child(4) {
+    justify-self: end;
+  }
+
+  .command-panel tr > :nth-child(3) {
+    overflow-wrap: anywhere;
+  }
+
+  .command-row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .command-row-actions .text-button {
+    min-height: 2.5rem;
   }
 
   th,

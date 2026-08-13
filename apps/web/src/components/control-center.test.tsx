@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { AgentConversationListSchema, TaskAssignmentResponseSchema } from "@agent-world/read-model";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildContractFixture } from "../test-fixtures";
@@ -77,5 +78,73 @@ describe("ControlCenter", () => {
     await user.click(screen.getByRole("button", { name: "Выйти" }));
     expect(await screen.findByRole("alert")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Выйти" })).not.toBeNull();
+  });
+
+  it("assigns a separate approval-gated Task through a canonical conversation", async () => {
+    const user = userEvent.setup();
+    const loadReadModel = vi.fn(async () => buildContractFixture());
+    const assign = vi.fn(
+      async (input: { taskId: string; agentId: string; title: string; description?: string }) =>
+        TaskAssignmentResponseSchema.parse({
+          schemaVersion: 1 as const,
+          outcome: "CREATED" as const,
+          task: {
+            schemaVersion: 1 as const,
+            id: input.taskId,
+            projectId: "project_33333333-3333-3333-3333-333333333333",
+            assigneeAgentId: input.agentId,
+            title: input.title,
+            ...(input.description === undefined ? {} : { description: input.description }),
+            approvalRequirement: "REQUIRED" as const,
+            idempotencyKey: `task:${input.taskId.slice("task_".length)}`,
+            createdAt: "2026-08-13T12:00:00.000Z",
+          },
+        }),
+    );
+    render(
+      <ControlCenter
+        csrfToken="csrf"
+        loadReadModel={loadReadModel}
+        taskClient={{
+          loadIndex: async () =>
+            AgentConversationListSchema.parse({
+              schemaVersion: 1,
+              generatedAt: "2026-08-13T11:00:00.000Z",
+              agent: {
+                agentId: "agent_11111111-1111-1111-1111-111111111111",
+                displayName: "Research Lead",
+              },
+              conversations: [
+                {
+                  conversationId: "conversation_55555555-5555-5555-5555-555555555555",
+                  projectId: "project_33333333-3333-3333-3333-333333333333",
+                  title: "Protocol review",
+                  createdAt: "2026-08-13T10:00:00.000Z",
+                  taskAssignmentAvailable: true,
+                },
+              ],
+            }),
+          assign,
+        }}
+      />,
+    );
+    await screen.findByRole("heading", { level: 1, name: "AI World" });
+    await user.click(screen.getByRole("button", { name: /Research Lead.*Выполняет/i }));
+    await user.click(screen.getByRole("button", { name: "Назначить задачу" }));
+    expect(await screen.findByRole("heading", { name: "Задача для Research Lead" })).not.toBeNull();
+    const dialog = screen.getByRole("dialog", { name: "Задача для Research Lead" });
+    await user.type(screen.getByLabelText("Название"), "Проверить новый контракт");
+    await user.type(screen.getByLabelText("Описание"), "Сохранить ссылки на источники.");
+    await user.click(within(dialog).getByRole("button", { name: "Назначить задачу" }));
+    expect(assign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "conversation_55555555-5555-5555-5555-555555555555",
+        agentId: "agent_11111111-1111-1111-1111-111111111111",
+        title: "Проверить новый контракт",
+        csrfToken: "csrf",
+      }),
+    );
+    expect(await within(dialog).findByText(/требует подтверждения/i)).not.toBeNull();
+    await waitFor(() => expect(loadReadModel).toHaveBeenCalledTimes(2));
   });
 });

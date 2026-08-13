@@ -5,11 +5,13 @@ two projections of one canonical domain and event stream.
 
 The repository is under incremental construction. Phase 0 reuse/licensing audit
 is complete; Phase 1 currently provides versioned domain contracts, separated
-read/write OpenClaw adapters, canonical PostgreSQL conversations, secure owner
-sessions, a pre-request Node runtime composition root, and one browser
-application with World and Command projections over the same strict read
-model. It is not yet a deployable product: login/chat UI, task assignment, live
-OpenClaw proof, persisted World replay and deployment hardening remain open.
+read/write OpenClaw adapters, canonical PostgreSQL conversations and inbound
+runtime messages, secure owner sessions, restart-safe World replay, and one
+browser application with World and Command projections over the same strict
+read model. Owner chat and approval-gated task assignment are available through
+authenticated APIs and accessible drawers. It is not yet a deployable product:
+explicit approval/execution, live OpenClaw proof, HTTPS packaging and
+backup/restore hardening remain open.
 
 ## Quick start
 
@@ -68,10 +70,10 @@ browser once with `npm exec --workspace @agent-world/web -- playwright install c
   events into one bounded, versioned World/Command read boundary.
 - [`@agent-world/postgres-store`](packages/postgres-store/README.md) owns the
   checksum-locked canonical PostgreSQL schema and durable store adapters.
-- [`@agent-world/web`](apps/web) exposes owner-authenticated World and
-  conversation APIs and derives both the primary Canvas World and the Command
-  agent table from one validated response. The browser has no direct runtime
-  connection or gateway credential.
+- [`@agent-world/web`](apps/web) exposes owner-authenticated World,
+  conversation and approval-gated task-assignment APIs and derives both the
+  primary Canvas World and the Command agent table from one validated response.
+  The browser has no direct runtime connection or gateway credential.
 - PostgreSQL will be the canonical source of truth. Runtime systems receive
   projections and return validated events.
 - OpenClaw is the primary general runtime; Codex and other execution surfaces
@@ -88,6 +90,7 @@ Key evidence and decisions:
 - [Canonical PostgreSQL decision](docs/decisions/0007-canonical-postgresql-boundary.md)
 - [Single-owner session decision](docs/decisions/0008-single-owner-session-boundary.md)
 - [Node runtime composition decision](docs/decisions/0009-node-runtime-composition.md)
+- [Approval-gated task assignment decision](docs/decisions/0010-approval-gated-task-assignment.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
 
 ## Security baseline

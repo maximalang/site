@@ -211,7 +211,7 @@ export function ConversationDrawer({
         onKeyDown={handleKeys}
         role="dialog"
       >
-        <header className="drawer-header">
+        <div className="drawer-header">
           <div>
             <p className="eyebrow">Conversation</p>
             <h2 id="conversation-title">{agent.displayName}</h2>
@@ -235,7 +235,7 @@ export function ConversationDrawer({
               ×
             </button>
           </div>
-        </header>
+        </div>
 
         {index && index.conversations.length > 1 ? (
           <label className="conversation-picker">

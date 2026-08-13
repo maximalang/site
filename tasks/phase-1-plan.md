@@ -79,7 +79,7 @@ Evidence:
 
 ## Slice 4: Safe selection and chat
 
-Status: server boundary complete; browser interaction and live-provider proof pending.
+Status: implementation complete; live-provider proof pending.
 
 Selecting an Agent in World or Command opens the same conversation projection.
 Sending a message creates a canonical intent and dispatches through an explicit
@@ -95,11 +95,14 @@ Server evidence:
 - [x] Exact `operator.write` OpenClaw transport and READY-only resolution.
 - [x] Opaque PostgreSQL owner sessions, CSRF and authenticated API routes.
 - [x] Pre-request startup, standalone migration packaging and restart revocation.
-- [ ] Login and conversation UI from both World and Command.
+- [x] Login and conversation UI from both World and Command.
+- [x] Authoritative inbound Agent messages persisted with exact Session/binding provenance.
 - [ ] Live pinned OpenClaw read/write handshake and real message round trip.
-- [ ] Restart-safe persisted World event cursor/replay.
+- [x] Restart-safe persisted World event cursor/replay.
 
 ## Slice 5: Policy-aware task assignment
+
+Status: canonical assignment complete; approval and execution pending.
 
 Create a task intent, evaluate approval policy, and only then call the
 side-effecting OpenClaw method with an idempotency key. Persist observable
@@ -107,6 +110,19 @@ accepted/running/completed/failed transitions before projecting animation.
 
 Verification: deny-by-default policy, approval grant/revoke, duplicate request,
 adapter timeout, late event, restart and replay scenarios.
+
+Assignment evidence:
+
+- [x] Owner-authenticated same-origin assignment API with CSRF protection.
+- [x] Project and approval policy derived server-side from one active canonical
+  Conversation Session; runtime locators never enter the browser contract.
+- [x] Task and `TASK_ASSIGNED` event persist atomically with a gapless World
+  cursor and exact idempotent replay.
+- [x] Every assignment is `REQUIRED` and does not call the runtime or claim
+  execution before a separate approval decision.
+- [x] World and Command expose the same assigned Task after restart.
+- [ ] Persist approval grant/revoke and dispatch an approved Task through the
+  side-effecting adapter with Run transitions.
 
 ## Slice 6: Working-shell hardening
 

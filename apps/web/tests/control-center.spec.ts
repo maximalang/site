@@ -18,6 +18,7 @@ test("World and Command expose one canonical agent projection", async ({ page },
   const conversationId = "conversation_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const projectId = "project_33333333-3333-3333-3333-333333333333";
   const csrfToken = "a".repeat(43);
+  let assignedTaskId: string | undefined;
 
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -46,6 +47,7 @@ test("World and Command expose one canonical agent projection", async ({ page },
             projectId,
             title: "Protocol review",
             createdAt: "2026-08-13T06:00:00.000Z",
+            taskAssignmentAvailable: true,
           },
         ],
       }),
@@ -95,6 +97,45 @@ test("World and Command expose one canonical agent projection", async ({ page },
       }),
       contentType: "application/json",
       status: 200,
+    });
+  });
+  await page.route("**/api/tasks", async (route) => {
+    const assignment = route.request().postDataJSON() as {
+      schemaVersion: number;
+      taskId: string;
+      conversationId: string;
+      agentId: string;
+      title: string;
+      description?: string;
+    };
+    expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
+    expect(assignment).toEqual({
+      schemaVersion: 1,
+      taskId: expect.stringMatching(/^task_[0-9a-f-]{36}$/),
+      conversationId,
+      agentId,
+      title: "Проверить новый контракт",
+      description: "Сохранить ссылки на источники.",
+    });
+    assignedTaskId = assignment.taskId;
+    await route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        outcome: "CREATED",
+        task: {
+          schemaVersion: 1,
+          id: assignment.taskId,
+          projectId,
+          assigneeAgentId: agentId,
+          title: assignment.title,
+          description: assignment.description,
+          approvalRequirement: "REQUIRED",
+          idempotencyKey: `task:${assignment.taskId.slice("task_".length)}`,
+          createdAt: "2026-08-13T06:03:00.000Z",
+        },
+      }),
+      contentType: "application/json",
+      status: 201,
     });
   });
 
@@ -159,6 +200,25 @@ test("World and Command expose one canonical agent projection", async ({ page },
   await expect(conversationDialog.locator('.message[data-author="AGENT"]')).toHaveCount(0);
   await conversationDialog.getByRole("button", { name: "Закрыть диалог" }).click();
   await expect(worldAgent).toBeFocused();
+
+  await inspector.getByRole("button", { name: "Назначить задачу" }).click();
+  const taskDialog = page.getByRole("dialog", { name: `Задача для ${fixtureAgent}` });
+  await expect(taskDialog).toBeVisible();
+  await expect(taskDialog.getByRole("button", { name: "Закрыть назначение задачи" })).toBeFocused();
+  await taskDialog.getByLabel("Название").fill("Проверить новый контракт");
+  await taskDialog.getByLabel("Описание").fill("Сохранить ссылки на источники.");
+  await taskDialog.getByRole("button", { name: "Назначить задачу" }).click();
+  await expect(taskDialog.getByText(/требует подтверждения/i)).toBeVisible();
+  expect(assignedTaskId).toMatch(/^task_[0-9a-f-]{36}$/);
+  const taskAccessibility = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+  expect(taskAccessibility.violations).toEqual([]);
+  await page.screenshot({
+    animations: "disabled",
+    fullPage: false,
+    path: testInfo.outputPath(`${testInfo.project.name}-task.png`),
+  });
+  await taskDialog.getByRole("button", { name: "Закрыть назначение задачи" }).click();
+  await expect(inspector.getByRole("button", { name: "Назначить задачу" })).toBeFocused();
 
   const worldAccessibility = await new AxeBuilder({ page }).analyze();
   expect(worldAccessibility.violations).toEqual([]);

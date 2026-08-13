@@ -17,6 +17,7 @@ import {
 } from "react";
 import { loadWorldReadModel } from "../client/world-api";
 import { type ConversationClient, ConversationDrawer } from "./conversation-drawer";
+import { type TaskClient, TaskDrawer } from "./task-drawer";
 import { WorldCanvas } from "./world-canvas";
 
 type Mode = "WORLD" | "COMMAND";
@@ -46,9 +47,11 @@ function StatusBadge({ status }: { status: AgentProjectionCore["status"] }) {
 function AgentInspector({
   agent,
   onOpenConversation,
+  onAssignTask,
 }: {
   agent: AgentProjectionCore | undefined;
   onOpenConversation: (agentId: AgentId) => void;
+  onAssignTask: (agentId: AgentId) => void;
 }) {
   if (!agent) {
     return (
@@ -93,6 +96,13 @@ function AgentInspector({
         type="button"
       >
         Открыть диалог
+      </button>
+      <button
+        className="secondary-button inspector-chat-button"
+        onClick={() => onAssignTask(agent.agentId)}
+        type="button"
+      >
+        Назначить задачу
       </button>
     </section>
   );
@@ -146,11 +156,13 @@ function CommandTable({
   selectedAgentId,
   onSelect,
   onOpenConversation,
+  onAssignTask,
 }: {
   agents: AgentProjectionCore[];
   selectedAgentId: AgentId | undefined;
   onSelect: (agentId: AgentId) => void;
   onOpenConversation: (agentId: AgentId) => void;
+  onAssignTask: (agentId: AgentId) => void;
 }) {
   return (
     <section className="command-panel" aria-labelledby="command-agents-title">
@@ -183,16 +195,28 @@ function CommandTable({
                 </td>
                 <td>{agent.currentTask?.title ?? "—"}</td>
                 <td>
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      onSelect(agent.agentId);
-                      onOpenConversation(agent.agentId);
-                    }}
-                    type="button"
-                  >
-                    Открыть
-                  </button>
+                  <div className="command-row-actions">
+                    <button
+                      className="text-button"
+                      onClick={() => {
+                        onSelect(agent.agentId);
+                        onOpenConversation(agent.agentId);
+                      }}
+                      type="button"
+                    >
+                      Диалог
+                    </button>
+                    <button
+                      className="text-button"
+                      onClick={() => {
+                        onSelect(agent.agentId);
+                        onAssignTask(agent.agentId);
+                      }}
+                      type="button"
+                    >
+                      Задача
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -207,11 +231,13 @@ export function ControlCenter({
   csrfToken,
   loadReadModel = defaultLoadReadModel,
   conversationClient,
+  taskClient,
   onLogout,
 }: {
   csrfToken: string;
   loadReadModel?: LoadReadModel;
   conversationClient?: ConversationClient;
+  taskClient?: TaskClient;
   onLogout?: () => Promise<void> | void;
 }) {
   const [mode, setMode] = useState<Mode>("WORLD");
@@ -220,6 +246,7 @@ export function ControlCenter({
   const [reloadNonce, setReloadNonce] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<AgentId>();
   const [conversationAgentId, setConversationAgentId] = useState<AgentId>();
+  const [taskAgentId, setTaskAgentId] = useState<AgentId>();
   const [logoutState, setLogoutState] = useState<"IDLE" | "PENDING" | "ERROR">("IDLE");
   const worldTabId = useId();
   const commandTabId = useId();
@@ -267,7 +294,20 @@ export function ControlCenter({
     window.requestAnimationFrame(() => returnFocusRef.current?.focus());
   }, []);
 
+  const openTask = useCallback((agentId: AgentId) => {
+    setSelectedAgentId(agentId);
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    setTaskAgentId(agentId);
+  }, []);
+
+  const closeTask = useCallback(() => {
+    setTaskAgentId(undefined);
+    window.requestAnimationFrame(() => returnFocusRef.current?.focus());
+  }, []);
+
   const conversationAgent = agents.find((agent) => agent.agentId === conversationAgentId);
+  const taskAgent = agents.find((agent) => agent.agentId === taskAgentId);
 
   const logout = async () => {
     if (!onLogout || logoutState === "PENDING") return;
@@ -461,6 +501,7 @@ export function ControlCenter({
                 </div>
                 <CommandTable
                   agents={agents}
+                  onAssignTask={openTask}
                   onOpenConversation={openConversation}
                   onSelect={selectAgent}
                   selectedAgentId={selectedAgentId}
@@ -468,7 +509,11 @@ export function ControlCenter({
               </section>
             )}
 
-            <AgentInspector agent={selectedAgent} onOpenConversation={openConversation} />
+            <AgentInspector
+              agent={selectedAgent}
+              onAssignTask={openTask}
+              onOpenConversation={openConversation}
+            />
           </div>
         ) : null}
       </main>
@@ -478,6 +523,15 @@ export function ControlCenter({
           {...(conversationClient ? { client: conversationClient } : {})}
           csrfToken={csrfToken}
           onClose={closeConversation}
+        />
+      ) : null}
+      {taskAgent ? (
+        <TaskDrawer
+          agent={taskAgent}
+          {...(taskClient ? { client: taskClient } : {})}
+          csrfToken={csrfToken}
+          onAssigned={() => setReloadNonce((value) => value + 1)}
+          onClose={closeTask}
         />
       ) : null}
     </div>

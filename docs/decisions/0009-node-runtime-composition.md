@@ -43,7 +43,8 @@ restart and isolation from an invalid optional OpenClaw adapter.
 
 ## Evidence boundary
 
-This composition does not yet prove a live OpenClaw handshake. The current LIVE
-World cursor is process-local and therefore is not restart/replay evidence.
-Canonical persisted runtime events, task assignment, the login/chat UI, HTTPS
-reverse proxy and production backup/restore remain required Phase 1 gates.
+This composition does not yet prove a live OpenClaw handshake. Subsequent
+increments added canonical persisted runtime events, restart-safe World replay,
+the login/chat UI, inbound Agent messages and approval-gated task assignment.
+Explicit approval/execution, an isolated live OpenClaw round trip, HTTPS reverse
+proxy and production backup/restore remain required Phase 1 gates.
