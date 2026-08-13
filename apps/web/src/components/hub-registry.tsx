@@ -176,6 +176,15 @@ export function HubRegistry({
         </section>
       </section>
       <section className="hub-secondary-grid" aria-label="Реестры Hub">
+        <RegistrySection
+          empty="Transport capabilities are unavailable"
+          title="Transport status"
+          values={model.transportCapabilities.map((capability) => ({
+            id: capability.mode,
+            primary: capability.mode,
+            secondary: `${capability.support} · ${capability.selectable ? "selectable" : "not selectable"}`,
+          }))}
+        />
         {registry.map(([title, empty, values]) => (
           <RegistrySection empty={empty} key={title} title={title} values={values} />
         ))}

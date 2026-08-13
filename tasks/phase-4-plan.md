@@ -107,7 +107,7 @@ Codex without third-party dashboards or unsupported automation.
 - [x] Owner can associate a ChatGPT-interactive Account with a Codex route once.
 - [x] Task routing to Codex requires an eligible Account, route and worker.
 - [x] Command shows real Run status and Codex provenance without raw credentials.
-- [ ] Chat and Work show accurate official/experimental/unsupported/disabled
+- [x] Chat and Work show accurate official/experimental/unsupported/disabled
       status and cannot be selected when unsupported.
 
 ## Verification gate

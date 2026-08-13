@@ -115,6 +115,18 @@ export const HubExecutionRouteSummarySchema = z.strictObject({
   isEnabled: ExecutionRouteSchema.shape.isEnabled,
 });
 
+export const HubTransportCapabilitySchema = z
+  .strictObject({
+    mode: z.enum(["CHAT", "WORK", "CODEX"]),
+    support: z.enum(["OFFICIAL", "EXPERIMENTAL", "UNSUPPORTED", "DISABLED"]),
+    selectable: z.boolean(),
+    detail: z.string().trim().min(1).max(240),
+  })
+  .refine((capability) => capability.support !== "UNSUPPORTED" || !capability.selectable, {
+    message: "Unsupported transports cannot be selected",
+    path: ["selectable"],
+  });
+
 const HubAgentSkillAssignmentSchema = z.strictObject({
   skillId: AgentSkillAssignmentSchema.shape.skillId,
   priority: AgentSkillAssignmentSchema.shape.priority,
@@ -210,6 +222,33 @@ export const HubReadModelSchema = z.strictObject({
       (routes) => strictlyOrderedBy(routes, "routeId"),
       "ExecutionRoutes must be uniquely ordered",
     ),
+  transportCapabilities: z
+    .array(HubTransportCapabilitySchema)
+    .length(3)
+    .refine(
+      (capabilities) => capabilities.map(({ mode }) => mode).join(",") === "CHAT,WORK,CODEX",
+      "Transport capabilities must contain Chat, Work and Codex exactly once",
+    )
+    .default([
+      {
+        mode: "CHAT",
+        support: "UNSUPPORTED",
+        selectable: false,
+        detail: "No supported consumer Chat transport is available.",
+      },
+      {
+        mode: "WORK",
+        support: "UNSUPPORTED",
+        selectable: false,
+        detail: "No supported consumer Work transport is available.",
+      },
+      {
+        mode: "CODEX",
+        support: "OFFICIAL",
+        selectable: true,
+        detail: "Official Codex SDK and CLI transport; route readiness is enforced separately.",
+      },
+    ]),
   agents: z
     .array(HubAgentSummarySchema)
     .max(HUB_READ_LIMITS.agents)

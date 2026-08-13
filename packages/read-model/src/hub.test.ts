@@ -130,6 +130,23 @@ describe("HubReadModelSchema", () => {
     expect(parsed.models[0]?.routes).toHaveLength(1);
     expect(parsed.models[0]).not.toHaveProperty("providerId");
     expect(parsed.models[0]).not.toHaveProperty("accountId");
+    expect(parsed.transportCapabilities).toEqual([
+      expect.objectContaining({ mode: "CHAT", support: "UNSUPPORTED", selectable: false }),
+      expect.objectContaining({ mode: "WORK", support: "UNSUPPORTED", selectable: false }),
+      expect.objectContaining({ mode: "CODEX", support: "OFFICIAL", selectable: true }),
+    ]);
+  });
+
+  it("rejects selectable unsupported native transports", () => {
+    const parsed = HubReadModelSchema.parse(fixture);
+    expect(
+      HubReadModelSchema.safeParse({
+        ...parsed,
+        transportCapabilities: parsed.transportCapabilities.map((capability) =>
+          capability.mode === "CHAT" ? { ...capability, selectable: true } : capability,
+        ),
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects secrets, runtime locators, Agent instructions and source/config references", () => {
