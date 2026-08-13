@@ -92,8 +92,8 @@ OpenAI-compatible test endpoint for protocol/stream proof, then separately run
 an authenticated ChatGPT Codex turn using Codex-owned credentials without ever
 reading them.
 
-- [ ] Pinned SDK launches its pinned official CLI and emits real JSONL events.
-- [ ] Deterministic live proof covers progress, final output, usage and failure.
+- [x] Pinned SDK launches its pinned official CLI and emits real JSONL events.
+- [x] Deterministic live proof covers progress, final output, usage and failure.
 - [ ] `codex login status` proves the configured method without exposing tokens.
 - [ ] A real ChatGPT-authenticated Codex run records Account/Mode/thread/turn,
       sandbox, model and usage provenance in PostgreSQL.

@@ -185,6 +185,7 @@ export class OpenAiCodexSdkRunner implements CodexExecutionRunner {
     const thread = client.resumeThread(request.codexThreadId, sdkThreadOptions(request));
     let sequence = 0;
     let finalOutput: string | undefined;
+    let started = false;
     let terminal = false;
     let failureEmitted = false;
     const publish = async (event: CodexExecutionEventDraft) => {
@@ -222,6 +223,8 @@ export class OpenAiCodexSdkRunner implements CodexExecutionRunner {
           continue;
         }
         if (event.type === "turn.started") {
+          if (started) await fail("MALFORMED_EVENT");
+          started = true;
           await publish({
             schemaVersion: 1,
             eventType: "RUN_STARTED",
@@ -229,6 +232,7 @@ export class OpenAiCodexSdkRunner implements CodexExecutionRunner {
           });
           continue;
         }
+        if (!started && event.type === "item.completed") continue;
         if (event.type === "item.started" || event.type === "item.updated") continue;
         if (event.type === "item.completed") {
           if (event.item.type === "agent_message") finalOutput = event.item.text;
@@ -244,7 +248,7 @@ export class OpenAiCodexSdkRunner implements CodexExecutionRunner {
           await fail("EXECUTION_FAILED");
           continue;
         }
-        if (!finalOutput) {
+        if (!started || !finalOutput) {
           await fail("MALFORMED_EVENT");
           continue;
         }

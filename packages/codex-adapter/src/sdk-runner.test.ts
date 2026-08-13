@@ -188,4 +188,41 @@ describe("OpenAiCodexSdkRunner", () => {
     );
     expect(emit).toHaveBeenCalledTimes(1);
   });
+
+  it("ignores resumed thread history before the new turn starts", async () => {
+    const emitted: unknown[] = [];
+    const runner = new OpenAiCodexSdkRunner({
+      createClient: () => ({
+        resumeThread: () => ({
+          runStreamed: async () => ({
+            events: eventStream([
+              {
+                type: "item.completed",
+                item: { id: "history-message", type: "agent_message", text: "Old response." },
+              },
+              { type: "turn.started" },
+              {
+                type: "item.completed",
+                item: { id: "new-message", type: "agent_message", text: "New response." },
+              },
+              {
+                type: "turn.completed",
+                usage: { input_tokens: 24, cached_input_tokens: 4, output_tokens: 20 },
+              },
+            ]),
+          }),
+        }),
+      }),
+      environment: {},
+      now: () => "2026-08-13T12:00:00.000Z",
+    });
+
+    await runner.run(request, async (event) => emitted.push(event));
+
+    expect(emitted).toHaveLength(5);
+    expect(JSON.stringify(emitted)).not.toContain("Old response.");
+    expect(emitted).toContainEqual(
+      expect.objectContaining({ eventType: "FINAL_OUTPUT", content: "New response." }),
+    );
+  });
 });

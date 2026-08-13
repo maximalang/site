@@ -25,6 +25,7 @@
     "test:runtime": "npm run build && npm run test:runtime:isolated --workspace @agent-world/web",
     "test:openclaw-live": "tsc -b && npm run test:live --workspace @agent-world/openclaw-adapter",
     "test:compose": "node ops/verify-core.mjs",
+    "test:codex-live": "tsc -b && npm run test:live --workspace @agent-world/codex-adapter",
     "typecheck": "tsc -p tsconfig.check.json --noEmit && npm run typecheck --workspace @agent-world/web"
   },
   "devDependencies": {

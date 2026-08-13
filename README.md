@@ -47,6 +47,7 @@ file does not require install-time scripts for the supported toolchain.
 | `npm run test:e2e` | Run five responsive Chromium projects plus standalone production smoke |
 | `npm run test:runtime` | Build and verify standalone auth/API/restart against disposable PostgreSQL |
 | `npm run test:openclaw-live` | Verify the pinned real OpenClaw Gateway and transcript round trip (explicit isolated ACK required) |
+| `npm run test:codex-live` | Launch the pinned official Codex SDK/CLI against an isolated deterministic Responses endpoint (explicit ACK required) |
 | `npm run test:compose` | Destructively verify an isolated HTTPS core stack, degradation and backup/restore (explicit ACK required) |
 | `npm run clean` | Remove TypeScript project-reference outputs |
 
