@@ -35,6 +35,12 @@ export const applicationTaskDependencies = {
     runtime().assignTask(input),
 };
 
+export const applicationHubCommandDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  execute: (command: Parameters<ReturnType<typeof runtime>["executeHubCommand"]>[0]) =>
+    runtime().executeHubCommand(command),
+};
+
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {
   try {
     return runtime().auth.authorize(request);

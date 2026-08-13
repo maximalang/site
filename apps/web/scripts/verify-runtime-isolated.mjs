@@ -196,6 +196,25 @@ try {
   if (anonymousHub.status !== 401) {
     throw new Error(`Anonymous Hub request returned ${anonymousHub.status}`);
   }
+  const hubCommandBody = {
+    schemaVersion: 1,
+    commandId: "hub_command_55555555-5555-5555-5555-555555555555",
+    kind: "PROVIDER_CREATE",
+    providerId: "provider_66666666-6666-6666-6666-666666666666",
+    slug: "local-models",
+    displayName: "Local models",
+    providerKind: "OLLAMA",
+    category: "LOCAL_MODEL",
+    baseUrl: "http://127.0.0.1:11434",
+  };
+  const anonymousHubCommand = await fetch(`${baseUrl}/api/hub/commands`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: JSON.stringify(hubCommandBody),
+  });
+  if (anonymousHubCommand.status !== 401) {
+    throw new Error(`Anonymous Hub command returned ${anonymousHubCommand.status}`);
+  }
 
   const login = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
@@ -231,6 +250,49 @@ try {
   }
   if (/credential|configurationRef|sourceRef|instructions|binding_|session_/.test(serializedHub)) {
     throw new Error("Authorized Hub leaked a private or runtime locator");
+  }
+  const hubCommandHeaders = {
+    cookie,
+    "content-type": "application/json",
+    origin: baseUrl,
+    "x-agent-world-csrf": loginBody.csrfToken,
+  };
+  const createProvider = await fetch(`${baseUrl}/api/hub/commands`, {
+    method: "POST",
+    headers: hubCommandHeaders,
+    body: JSON.stringify(hubCommandBody),
+  });
+  const createProviderBody = await createProvider.json();
+  if (createProvider.status !== 201 || createProviderBody.outcome !== "CREATED") {
+    throw new Error("Authorized Hub command did not create a canonical Provider");
+  }
+  const replayProvider = await fetch(`${baseUrl}/api/hub/commands`, {
+    method: "POST",
+    headers: hubCommandHeaders,
+    body: JSON.stringify(hubCommandBody),
+  });
+  if (replayProvider.status !== 200 || (await replayProvider.json()).outcome !== "REPLAY") {
+    throw new Error("Authorized Hub command did not replay the committed Provider command");
+  }
+  const conflictingProvider = await fetch(`${baseUrl}/api/hub/commands`, {
+    method: "POST",
+    headers: hubCommandHeaders,
+    body: JSON.stringify({ ...hubCommandBody, displayName: "Conflicting Provider" }),
+  });
+  if (
+    conflictingProvider.status !== 409 ||
+    (await conflictingProvider.json()).error?.code !== "IDEMPOTENCY_CONFLICT"
+  ) {
+    throw new Error("Hub command endpoint accepted conflicting immutable input");
+  }
+  const updatedHub = await fetch(`${baseUrl}/api/hub`, { headers: { cookie } });
+  const updatedHubBody = await updatedHub.json();
+  if (
+    updatedHub.status !== 200 ||
+    updatedHubBody.providers?.filter(({ providerId }) => providerId === hubCommandBody.providerId)
+      .length !== 1
+  ) {
+    throw new Error("Hub read model did not expose exactly one command-created Provider");
   }
   const conversationId = "conversation_11111111-1111-1111-1111-111111111111";
   const agentId = "agent_33333333-3333-3333-3333-333333333333";
@@ -334,7 +396,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 7, authLifecycle: true, worldAuth: true, hubAuth: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 7, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

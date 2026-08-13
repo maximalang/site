@@ -22,6 +22,17 @@ export class HubCommandStoreError extends Error {
   }
 }
 
+export function isHubCommandStoreError(error: unknown): error is HubCommandStoreError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "HubCommandStoreError" &&
+    "code" in error &&
+    HUB_COMMAND_STORE_ERROR_CODES.includes(error.code as HubCommandStoreErrorCode)
+  );
+}
+
 type ReceiptRow = QueryResultRow & {
   request_sha256: string;
   response: unknown;

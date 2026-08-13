@@ -1,7 +1,12 @@
 import type { ConversationSendResult } from "@agent-world/conversation-service";
 import type { AgentId, SendMessageIntent } from "@agent-world/domain";
 import type { AssignTaskInput, ConversationReadInput } from "@agent-world/postgres-store";
-import type { HubReadModel, WorldReadModel } from "@agent-world/read-model";
+import type {
+  HubCommandRequest,
+  HubCommandResponse,
+  HubReadModel,
+  WorldReadModel,
+} from "@agent-world/read-model";
 import type { OwnerSessionManager } from "./owner-session";
 
 export type ApplicationRuntime = {
@@ -10,6 +15,7 @@ export type ApplicationRuntime = {
   readConversation(input: ConversationReadInput): Promise<unknown | undefined>;
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;
   assignTask(input: AssignTaskInput): Promise<unknown>;
+  executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
   readHub(): Promise<HubReadModel>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
