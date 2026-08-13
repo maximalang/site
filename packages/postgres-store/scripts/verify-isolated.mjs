@@ -17,6 +17,7 @@ import {
   PostgresApprovalRunStore,
   PostgresCodexBindingResolver,
   PostgresCodexExecutionStore,
+  PostgresCodexWorkerReadinessStore,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresEncryptedSecretStore,
@@ -207,7 +208,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 13
+    ledger.rows.at(-1)?.version !== 14
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -258,6 +259,7 @@ try {
     "codex_execution_events",
     "codex_execution_jobs",
     "codex_execution_policies",
+    "codex_worker_readiness",
     "hub_command_receipts",
     "execution_preference_overrides",
     "encrypted_secrets",
@@ -1096,6 +1098,12 @@ try {
       "2026-08-13T11:54:00.000Z",
     ],
   );
+  await new PostgresCodexWorkerReadinessStore(pool).report({
+    workerId: "codex-worker-isolated",
+    accountId: codex.account,
+    authentication: "CHATGPT",
+    checkedAt: new Date().toISOString(),
+  });
   const codexResolution = await new PostgresCodexBindingResolver(pool).resolve({
     runId: codex.run,
     bindingId: codex.binding,
@@ -1110,6 +1118,23 @@ try {
   ) {
     throw new Error("Codex binding resolver did not restore exact safe route provenance");
   }
+  await pool.query(
+    "UPDATE agent_world.codex_worker_readiness SET checked_at = clock_timestamp() - interval '2 minutes', authenticated_at = clock_timestamp() - interval '2 minutes', updated_at = clock_timestamp() - interval '2 minutes' WHERE account_id = $1",
+    [codex.account],
+  );
+  await expectRejected(
+    new PostgresCodexBindingResolver(pool).resolve({
+      runId: codex.run,
+      bindingId: codex.binding,
+      agentId: ids.agent,
+      externalAgentId: "codex:researcher",
+    }),
+    "Codex binding resolver accepted a stale worker heartbeat",
+  );
+  await pool.query(
+    "UPDATE agent_world.codex_worker_readiness SET checked_at = clock_timestamp(), authenticated_at = clock_timestamp(), updated_at = clock_timestamp() WHERE account_id = $1",
+    [codex.account],
+  );
   const codexProvenance = await new PostgresRunProvenanceReader(pool).read(codex.run);
   if (
     codexProvenance.routeId !== codex.route ||
@@ -1621,7 +1646,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 15 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

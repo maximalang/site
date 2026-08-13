@@ -81,7 +81,7 @@ location; keep the web and database private-network posture intact.
 - [x] Worker runs non-root with no host port and a read-only root filesystem.
 - [x] Repository paths resolve inside explicit allowlisted roots and reject
       traversal, symlink escape and non-Git roots.
-- [ ] Default execution is workspace-write, approval on request, network off;
+- [x] Default execution is workspace-write, approval on request, network off;
       broader permissions require an approved canonical policy decision.
 - [x] Health distinguishes worker availability from authentication readiness.
 
@@ -104,9 +104,9 @@ Expose Codex route readiness and execution provenance through the existing Hub,
 Task and Command surfaces. Add transport capability records for Chat, Work and
 Codex without third-party dashboards or unsupported automation.
 
-- [ ] Owner can associate a ChatGPT-interactive Account with a Codex route once.
-- [ ] Task routing to Codex requires an eligible Account, route and worker.
-- [ ] Command shows real Run status and Codex provenance without raw credentials.
+- [x] Owner can associate a ChatGPT-interactive Account with a Codex route once.
+- [x] Task routing to Codex requires an eligible Account, route and worker.
+- [x] Command shows real Run status and Codex provenance without raw credentials.
 - [ ] Chat and Work show accurate official/experimental/unsupported/disabled
       status and cannot be selected when unsupported.
 

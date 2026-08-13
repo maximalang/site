@@ -62,6 +62,13 @@ process/database availability separate from `CHATGPT` authentication readiness
 and it will not claim work while auth is unavailable. Authenticate the pinned
 official CLI into its dedicated Compose volume without copying credential files:
 
+Before starting Compose, set `AGENT_WORLD_CODEX_ACCOUNT_ID` to the canonical
+`CHATGPT_INTERACTIVE` Account created through the owner-only Hub command API.
+Create its `CODEX_ROUTE_CREATE` route from an enabled CODEX ModelRoute; the
+server fixes workspace-write, approval-on-request, network-off and a bounded
+timeout. The worker then records fresh authentication readiness for that exact
+Account in PostgreSQL. Stale or missing readiness fails routing closed.
+
 ```sh
 docker compose run --rm codex-worker codex login --device-auth
 docker compose run --rm codex-worker codex login status

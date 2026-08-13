@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
 import { OpenAiCodexSdkRunner } from "@agent-world/codex-adapter";
-import { PostgresCodexExecutionStore } from "@agent-world/postgres-store";
+import {
+  PostgresCodexExecutionStore,
+  PostgresCodexWorkerReadinessStore,
+} from "@agent-world/postgres-store";
 import { Pool } from "pg";
 import * as z from "zod";
 import { checkCodexAuthentication } from "./auth-readiness.js";
@@ -18,6 +21,9 @@ const EnvironmentSchema = z.object({
     .max(4_096)
     .default("/app/node_modules/.bin/codex"),
   AGENT_WORLD_CODEX_WORKER_ID: z.string().min(1).max(128).default("codex-worker-1"),
+  AGENT_WORLD_CODEX_ACCOUNT_ID: z
+    .string()
+    .regex(/^account_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
   AGENT_WORLD_CODEX_LEASE_MS: z.coerce.number().int().min(10_000).max(300_000).default(60_000),
   AGENT_WORLD_CODEX_POLL_MS: z.coerce.number().int().min(250).max(60_000).default(2_000),
   AGENT_WORLD_CODEX_HEALTH_PORT: z.coerce.number().int().min(1_024).max(65_535).default(3_100),
@@ -50,6 +56,7 @@ const store = new PostgresCodexExecutionStore(pool, {
     throw new Error("WORKER_DOES_NOT_DISPATCH");
   },
 });
+const readinessStore = new PostgresCodexWorkerReadinessStore(pool);
 const worker = new CodexWorker({
   store,
   runner: new OpenAiCodexSdkRunner(),
@@ -99,6 +106,17 @@ while (!stopping) {
   if (databaseReady) {
     if (Date.now() >= nextAuthenticationCheckAt) {
       authentication = await checkCodexAuthentication(environment.AGENT_WORLD_CODEX_EXECUTABLE);
+      try {
+        await readinessStore.report({
+          workerId: environment.AGENT_WORLD_CODEX_WORKER_ID,
+          accountId: environment.AGENT_WORLD_CODEX_ACCOUNT_ID,
+          authentication,
+          checkedAt: new Date().toISOString(),
+        });
+      } catch {
+        authentication = "UNAVAILABLE";
+        boundedLog("codex_worker_readiness", "UNAVAILABLE");
+      }
       nextAuthenticationCheckAt = Date.now() + 30_000;
     }
     if (authentication === "CHATGPT") {

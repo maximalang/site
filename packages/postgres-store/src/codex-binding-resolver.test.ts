@@ -57,6 +57,8 @@ describe("PostgresCodexBindingResolver", () => {
     ]);
     expect(fixture.queries[0]?.text).toContain("a.auth_mechanism = 'CHATGPT_INTERACTIVE'");
     expect(fixture.queries[0]?.text).toContain("a.health = 'ACTIVE'");
+    expect(fixture.queries[0]?.text).toContain("worker.authentication = 'CHATGPT'");
+    expect(fixture.queries[0]?.text).toContain("interval '90 seconds'");
     expect(fixture.queries[0]?.text).toContain("r.adapter_kind = 'CODEX'");
   });
 

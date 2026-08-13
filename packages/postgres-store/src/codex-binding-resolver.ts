@@ -77,6 +77,13 @@ export class PostgresCodexBindingResolver {
             AND r.mode = 'CODEX'
             AND a.auth_mechanism = 'CHATGPT_INTERACTIVE'
             AND a.health = 'ACTIVE'
+            AND EXISTS (
+              SELECT 1
+                FROM agent_world.codex_worker_readiness worker
+               WHERE worker.account_id = a.id
+                 AND worker.authentication = 'CHATGPT'
+                 AND worker.checked_at >= clock_timestamp() - interval '90 seconds'
+            )
             AND run.status IN ('DISPATCH_PENDING', 'DISPATCHING', 'RUNNING')
             AND b.is_enabled = true
             AND r.is_enabled = true
