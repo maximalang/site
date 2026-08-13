@@ -79,12 +79,25 @@ Evidence:
 
 ## Slice 4: Safe selection and chat
 
+Status: server boundary complete; browser interaction and live-provider proof pending.
+
 Selecting an Agent in World or Command opens the same conversation projection.
 Sending a message creates a canonical intent and dispatches through an explicit
 runtime binding; runtime session IDs remain external references.
 
 Verification: idempotent send, retry without duplicate messages, cross-view
 continuity, and authorization/policy failures rendered consistently.
+
+Server evidence:
+
+- [x] Canonical Conversation remains independent from replaceable Sessions.
+- [x] PostgreSQL idempotency, retry, redaction and bounded pagination.
+- [x] Exact `operator.write` OpenClaw transport and READY-only resolution.
+- [x] Opaque PostgreSQL owner sessions, CSRF and authenticated API routes.
+- [x] Pre-request startup, standalone migration packaging and restart revocation.
+- [ ] Login and conversation UI from both World and Command.
+- [ ] Live pinned OpenClaw read/write handshake and real message round trip.
+- [ ] Restart-safe persisted World event cursor/replay.
 
 ## Slice 5: Policy-aware task assignment
 

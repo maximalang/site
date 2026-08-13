@@ -4,10 +4,12 @@ Personal, self-hosted AI World and control center in which World and Command are
 two projections of one canonical domain and event stream.
 
 The repository is under incremental construction. Phase 0 reuse/licensing audit
-is complete; Phase 1 currently provides versioned domain contracts, a
-server-side read-only OpenClaw projection adapter, and one browser application
-with World and Command projections over the same strict read model. It is not
-yet a deployable product.
+is complete; Phase 1 currently provides versioned domain contracts, separated
+read/write OpenClaw adapters, canonical PostgreSQL conversations, secure owner
+sessions, a pre-request Node runtime composition root, and one browser
+application with World and Command projections over the same strict read
+model. It is not yet a deployable product: login/chat UI, task assignment, live
+OpenClaw proof, persisted World replay and deployment hardening remain open.
 
 ## Quick start
 
@@ -36,10 +38,16 @@ file does not require install-time scripts for the supported toolchain.
 | `npm run build` | Build TypeScript project references in dependency order |
 | `npm run dev:web` | Build the shared read model and start the Next.js app |
 | `npm run test:e2e` | Run five responsive Chromium projects plus standalone production smoke |
+| `npm run test:runtime` | Build and verify standalone auth/API/restart against disposable PostgreSQL |
 | `npm run clean` | Remove TypeScript project-reference outputs |
 
-The web app fails closed to an unavailable state until a live server provider
-is wired. For local contract-fixture inspection only:
+Copy `.env.example` into an ignored local environment file and replace every
+placeholder before starting the composed server. PostgreSQL TLS policy is
+explicit; plaintext is accepted only on loopback or with the exact private
+network acknowledgement. OpenClaw is optional at startup and remains visibly
+unavailable until configured and authority-verified.
+
+For local contract-fixture inspection only:
 
 ```powershell
 $env:AGENT_WORLD_DATA_SOURCE='contract-fixture'
@@ -60,9 +68,10 @@ browser once with `npm exec --workspace @agent-world/web -- playwright install c
   events into one bounded, versioned World/Command read boundary.
 - [`@agent-world/postgres-store`](packages/postgres-store/README.md) owns the
   checksum-locked canonical PostgreSQL schema and durable store adapters.
-- [`@agent-world/web`](apps/web) exposes one `/api/world` endpoint and derives
-  both the primary Canvas World and the Command agent table from its validated
-  response. The browser has no direct runtime connection.
+- [`@agent-world/web`](apps/web) exposes owner-authenticated World and
+  conversation APIs and derives both the primary Canvas World and the Command
+  agent table from one validated response. The browser has no direct runtime
+  connection or gateway credential.
 - PostgreSQL will be the canonical source of truth. Runtime systems receive
   projections and return validated events.
 - OpenClaw is the primary general runtime; Codex and other execution surfaces
@@ -77,6 +86,8 @@ Key evidence and decisions:
 - [OpenClaw read-adapter decision](docs/decisions/0005-openclaw-read-adapter-boundary.md)
 - [World/Command read-surface decision](docs/decisions/0006-shared-world-command-read-surface.md)
 - [Canonical PostgreSQL decision](docs/decisions/0007-canonical-postgresql-boundary.md)
+- [Single-owner session decision](docs/decisions/0008-single-owner-session-boundary.md)
+- [Node runtime composition decision](docs/decisions/0009-node-runtime-composition.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
 
 ## Security baseline

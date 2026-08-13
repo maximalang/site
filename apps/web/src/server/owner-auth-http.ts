@@ -1,4 +1,5 @@
 import type { OwnerLoginResult, OwnerSessionManager, OwnerSessionResult } from "./owner-session";
+import { hasSameOriginHost } from "./request-security";
 
 const MAX_LOGIN_BODY_BYTES = 2_048;
 const MAX_PASSWORD_BYTES = 1_024;
@@ -30,14 +31,6 @@ function errorResponse(
   return Response.json(
     { error: { code } },
     { status, headers: { ...RESPONSE_HEADERS, ...headers } },
-  );
-}
-
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  const fetchSite = request.headers.get("sec-fetch-site");
-  return (
-    origin === new URL(request.url).origin && (fetchSite === null || fetchSite === "same-origin")
   );
 }
 
@@ -112,7 +105,7 @@ function sessionResponse(result: OwnerSessionResult): Response {
 export function createOwnerAuthHttpHandlers(auth: OwnerAuthPort): OwnerAuthHttpHandlers {
   return {
     async login(request) {
-      if (!sameOrigin(request)) {
+      if (!hasSameOriginHost(request)) {
         return errorResponse("INVALID_REQUEST", 400);
       }
       let password: string;

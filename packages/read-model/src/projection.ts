@@ -127,6 +127,18 @@ type BuildWorldReadModelInput = {
   events: unknown;
 };
 
+const LiveRuntimeAgentStatusSchema = z.strictObject({
+  agentId: AgentSchema.shape.id,
+  status: AgentStatusSchema,
+});
+
+export type BuildLiveRuntimeWorldReadModelInput = {
+  generatedAt: unknown;
+  cursor: unknown;
+  agents: unknown;
+  runtimeStatuses: unknown;
+};
+
 function assertUnique<T>(values: T[], identity: (value: T) => string, label: string): void {
   const seen = new Set<string>();
   for (const value of values) {
@@ -305,6 +317,58 @@ export function buildUnavailableWorldReadModel(generatedAtInput: unknown): World
     generatedAt: TimestampSchema.parse(generatedAtInput),
     cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
     agents: [],
+    tasks: [],
+  });
+}
+
+export function buildLiveRuntimeWorldReadModel(
+  input: BuildLiveRuntimeWorldReadModelInput,
+): WorldReadModel {
+  const generatedAt = TimestampSchema.parse(input.generatedAt);
+  const cursor = ProjectionCursorSchema.parse(input.cursor);
+  const agents = z.array(AgentSchema).max(MAX_AGENTS).parse(input.agents);
+  const runtimeStatuses = z
+    .array(LiveRuntimeAgentStatusSchema)
+    .max(MAX_AGENTS)
+    .parse(input.runtimeStatuses);
+  assertUnique(agents, ({ id }) => id, "Agent");
+  assertUnique(runtimeStatuses, ({ agentId }) => agentId, "runtime Agent status");
+  const canonicalIds = new Set(agents.map(({ id }) => id));
+  for (const status of runtimeStatuses) {
+    if (!canonicalIds.has(status.agentId)) {
+      throw new Error(`Runtime status references unknown Agent: ${status.agentId}`);
+    }
+  }
+  const statuses = new Map(
+    runtimeStatuses.map(({ agentId, status }) => [agentId, status] as const),
+  );
+  const zoneCounts = new Map<WorldZone, number>();
+  const readAgents = [...agents]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((agent): WorldReadModelAgent => {
+      const status = statuses.get(agent.id) ?? AgentStatusSchema.parse("OFFLINE");
+      const zone = zoneForStatus(status);
+      const zoneIndex = zoneCounts.get(zone) ?? 0;
+      zoneCounts.set(zone, zoneIndex + 1);
+      return {
+        agentId: agent.id,
+        displayName: agent.displayName,
+        role: agent.role,
+        isEnabled: agent.isEnabled,
+        status,
+        world: {
+          zone,
+          slot: { column: zoneIndex % 4, row: Math.floor(zoneIndex / 4) },
+        },
+      };
+    });
+
+  return WorldReadModelSchema.parse({
+    schemaVersion: 1,
+    source: "LIVE",
+    generatedAt,
+    cursor,
+    agents: readAgents,
     tasks: [],
   });
 }

@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { PostgresOwnerSessionStore } from "@agent-world/postgres-store";
 import { verifyOwnerPassword } from "./owner-password";
+import { hasSameOriginHost } from "./request-security";
 
 const PRODUCTION_COOKIE_NAME = "__Host-agent_world_session";
 const DEVELOPMENT_COOKIE_NAME = "agent_world_session";
@@ -74,14 +75,6 @@ function parseSessionCookie(request: Request, name: string): string | undefined 
     return undefined;
   }
   return values[0];
-}
-
-function safeMutationOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  const fetchSite = request.headers.get("sec-fetch-site");
-  return (
-    origin === new URL(request.url).origin && (fetchSite === null || fetchSite === "same-origin")
-  );
 }
 
 export class OwnerSessionManager {
@@ -166,7 +159,7 @@ export class OwnerSessionManager {
     }
     const supplied = request.headers.get(CSRF_HEADER);
     return (
-      safeMutationOrigin(request) &&
+      hasSameOriginHost(request) &&
       supplied !== null &&
       TOKEN_PATTERN.test(supplied) &&
       constantTimeEqual(supplied, resolved.csrfToken)

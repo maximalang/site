@@ -21,6 +21,7 @@
     "test": "vitest run",
     "test:db": "npm run build --workspace @agent-world/postgres-store && npm run test:isolated --workspace @agent-world/postgres-store",
     "test:e2e": "npm run build --workspace @agent-world/read-model && npm run test:e2e --workspace @agent-world/web && npm run test:e2e:production --workspace @agent-world/web",
+    "test:runtime": "npm run build && npm run test:runtime:isolated --workspace @agent-world/web",
     "typecheck": "tsc -p tsconfig.check.json --noEmit && npm run typecheck --workspace @agent-world/web"
   },
   "devDependencies": {

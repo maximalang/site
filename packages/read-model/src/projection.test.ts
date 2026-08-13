@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLiveRuntimeWorldReadModel,
   buildUnavailableWorldReadModel,
   buildWorldReadModel,
   projectCommandView,
@@ -179,6 +180,61 @@ describe("buildWorldReadModel", () => {
               agentId: "agent_99999999-9999-9999-9999-999999999999",
             },
           },
+        ],
+      }),
+    ).toThrow("unknown Agent");
+  });
+
+  it("projects live runtime statuses onto canonical Agents without runtime identities", () => {
+    const model = buildLiveRuntimeWorldReadModel({
+      generatedAt: "2026-08-13T10:00:00.000Z",
+      cursor: {
+        schemaVersion: 1,
+        stream: "WORLD",
+        lastSequence: 1,
+        lastEventId: "event_99999999-9999-9999-9999-999999999999",
+      },
+      agents,
+      runtimeStatuses: [
+        { agentId: ids.researcher, status: "RUNNING" },
+        { agentId: ids.reviewer, status: "FAILED" },
+      ],
+    });
+
+    expect(model.source).toBe("LIVE");
+    expect(
+      model.agents.map(({ agentId, status, world }) => ({
+        agentId,
+        status,
+        zone: world.zone,
+      })),
+    ).toEqual([
+      { agentId: ids.researcher, status: "RUNNING", zone: "WORK_ROOM" },
+      { agentId: ids.reviewer, status: "FAILED", zone: "CONTROL_TOWER" },
+    ]);
+    expect(JSON.stringify(model)).not.toMatch(/binding_|session_|external/);
+  });
+
+  it("rejects duplicate or unknown runtime Agent status identities", () => {
+    const base = {
+      generatedAt: "2026-08-13T10:00:00.000Z",
+      cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
+      agents,
+    };
+    expect(() =>
+      buildLiveRuntimeWorldReadModel({
+        ...base,
+        runtimeStatuses: [
+          { agentId: ids.researcher, status: "IDLE" },
+          { agentId: ids.researcher, status: "RUNNING" },
+        ],
+      }),
+    ).toThrow("Duplicate runtime Agent status");
+    expect(() =>
+      buildLiveRuntimeWorldReadModel({
+        ...base,
+        runtimeStatuses: [
+          { agentId: "agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", status: "IDLE" },
         ],
       }),
     ).toThrow("unknown Agent");

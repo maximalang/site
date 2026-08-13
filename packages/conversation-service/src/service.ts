@@ -120,6 +120,31 @@ export class ConversationSendError extends Error {
   }
 }
 
+const CONVERSATION_SEND_ERROR_CODES = new Set<ConversationSendErrorCode>([
+  "INVALID_INTENT",
+  "CONVERSATION_NOT_FOUND",
+  "AGENT_MISMATCH",
+  "NO_ACTIVE_SESSION",
+  "IDEMPOTENCY_CONFLICT",
+  "PERSISTENCE_FAILED",
+  "DELIVERY_UNAVAILABLE",
+  "DELIVERY_FAILED",
+]);
+
+export function isConversationSendError(
+  input: unknown,
+): input is { name: "ConversationSendError"; code: ConversationSendErrorCode } {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+  const candidate = input as { name?: unknown; code?: unknown };
+  return (
+    candidate.name === "ConversationSendError" &&
+    typeof candidate.code === "string" &&
+    CONVERSATION_SEND_ERROR_CODES.has(candidate.code as ConversationSendErrorCode)
+  );
+}
+
 export type ConversationSendResult = {
   outcome: "DISPATCHED" | "REPLAYED";
   message: OwnerConversationMessage;

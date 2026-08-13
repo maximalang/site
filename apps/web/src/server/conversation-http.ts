@@ -1,6 +1,6 @@
 import {
-  ConversationSendError,
   type ConversationSendResult,
+  isConversationSendError,
 } from "@agent-world/conversation-service";
 import { ConversationIdSchema, type SendMessageIntent, TimestampSchema } from "@agent-world/domain";
 import {
@@ -11,6 +11,7 @@ import {
   MAX_CONVERSATION_PAGE_MESSAGES,
   projectConversationMessage,
 } from "@agent-world/read-model";
+import { hasSameOriginHost } from "./request-security";
 
 const MAX_REQUEST_BYTES = 40_000;
 const RESPONSE_HEADERS = {
@@ -60,14 +61,6 @@ async function isAuthorized(
   } catch {
     return false;
   }
-}
-
-function hasSafeMutationOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  const fetchSite = request.headers.get("sec-fetch-site");
-  return (
-    origin === new URL(request.url).origin && (fetchSite === null || fetchSite === "same-origin")
-  );
 }
 
 function parseReadInput(request: Request, conversationIdInput: string): ConversationReadInput {
@@ -126,7 +119,7 @@ async function readJsonBody(request: Request): Promise<unknown> {
 }
 
 function sendErrorResponse(error: unknown): Response {
-  if (!(error instanceof ConversationSendError)) {
+  if (!isConversationSendError(error)) {
     return errorResponse("CONVERSATION_SEND_UNAVAILABLE", 503);
   }
   switch (error.code) {
@@ -180,7 +173,7 @@ export function createConversationRouteHandlers(
       if (!(await isAuthorized(dependencies.authorize, request))) {
         return errorResponse("UNAUTHORIZED", 401);
       }
-      if (!hasSafeMutationOrigin(request)) {
+      if (!hasSameOriginHost(request)) {
         return errorResponse("INVALID_REQUEST", 400);
       }
       let intent: SendMessageIntent;

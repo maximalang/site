@@ -13,6 +13,7 @@ import {
   type ConversationDeliveryAdapter,
   ConversationSendError,
   ConversationSendService,
+  isConversationSendError,
   type PrepareSendResult,
 } from "./index.js";
 
@@ -100,6 +101,19 @@ function setup(prepareResult: PrepareSendResult) {
 }
 
 describe("ConversationSendService", () => {
+  it("recognizes bounded send errors across a production bundle boundary", () => {
+    expect(
+      isConversationSendError({
+        name: "ConversationSendError",
+        code: "CONVERSATION_NOT_FOUND",
+        message: "must-not-be-reflected",
+      }),
+    ).toBe(true);
+    expect(
+      isConversationSendError({ name: "ConversationSendError", code: "DATABASE_SECRET" }),
+    ).toBe(false);
+    expect(isConversationSendError(new Error("provider-secret"))).toBe(false);
+  });
   it("persists a stable session before delivering the bounded intent", async () => {
     const accepted = ownerMessage("ACCEPTED");
     const { adapter, service, store } = setup({
