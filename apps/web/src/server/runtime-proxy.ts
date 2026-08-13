@@ -46,3 +46,7 @@ export function authorizeApplicationRequest(request: Request): Promise<boolean> 
 export function readApplicationWorld() {
   return runtime().readWorld();
 }
+
+export function readApplicationHub() {
+  return runtime().readHub();
+}

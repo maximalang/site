@@ -9,9 +9,11 @@ read/write OpenClaw adapters, canonical PostgreSQL conversations and inbound
 runtime messages, secure owner sessions, restart-safe World replay, and one
 browser application with World and Command projections over the same strict
 read model. Owner chat and approval-gated task assignment are available through
-authenticated APIs and accessible drawers. It is not yet a deployable product:
-explicit approval/execution, live OpenClaw proof, HTTPS packaging and
-backup/restore hardening remain open.
+authenticated APIs and accessible drawers. Phase 2 now also has canonical Hub
+identities and one bounded, owner-only Hub API; its control commands and Lobby
+UI remain open. It is not yet a deployable product: explicit
+approval/execution, live OpenClaw proof, HTTPS packaging and backup/restore
+hardening remain open.
 
 ## Quick start
 
@@ -67,7 +69,8 @@ browser once with `npm exec --workspace @agent-world/web -- playwright install c
   official Gateway client to produce a least-privilege, binding-first runtime
   projection. It does not execute tasks.
 - [`@agent-world/read-model`](packages/read-model/README.md) replays canonical
-  events into one bounded, versioned World/Command read boundary.
+  events into one bounded, versioned World/Command read boundary and defines
+  the safe canonical Hub projection.
 - [`@agent-world/postgres-store`](packages/postgres-store/README.md) owns the
   checksum-locked canonical PostgreSQL schema and durable store adapters.
 - [`@agent-world/web`](apps/web) exposes owner-authenticated World,
@@ -92,6 +95,7 @@ Key evidence and decisions:
 - [Node runtime composition decision](docs/decisions/0009-node-runtime-composition.md)
 - [Approval-gated task assignment decision](docs/decisions/0010-approval-gated-task-assignment.md)
 - [Canonical Hub identity decision](docs/decisions/0011-canonical-hub-identities.md)
+- [Safe Hub read-model decision](docs/decisions/0012-safe-hub-read-model.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
 - [Phase 2 canonical Hub plan](tasks/phase-2-plan.md)
 

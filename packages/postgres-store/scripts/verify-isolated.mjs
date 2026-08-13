@@ -15,6 +15,7 @@ import {
   PostgresAgentConversationReader,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresHubReader,
   PostgresOwnerSessionStore,
   PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
@@ -517,6 +518,26 @@ try {
   ) {
     throw new Error("Canonical Hub identities, route reuse, or secret boundaries drifted");
   }
+  const hubProjection = await new PostgresHubReader(
+    pool,
+    () => new Date("2026-08-13T12:00:00.000Z"),
+  ).read();
+  const serializedHub = JSON.stringify(hubProjection);
+  if (
+    hubProjection.models.length !== 1 ||
+    hubProjection.models[0]?.routes.length !== 2 ||
+    hubProjection.accounts.length !== 4 ||
+    !hubProjection.agents.some(({ agentId }) => agentId === hub.secondaryAgent)
+  ) {
+    throw new Error("PostgreSQL Hub reader did not preserve canonical nested identities");
+  }
+  if (
+    /credentialRef|configurationRef|sourceRef|instructions|binding_|session_|secret-store|vault:/.test(
+      serializedHub,
+    )
+  ) {
+    throw new Error("PostgreSQL Hub reader leaked a private or runtime locator");
+  }
   await pool.query(
     `INSERT INTO agent_world.execution_routes
        (id, label, mode, adapter_kind, account_id)
@@ -886,7 +907,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 7, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 9, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

@@ -8,6 +8,8 @@ arrays and Electron/Rust persistence outside the product domain.
 
 ## Slice 1: Hub identities and persistence
 
+Status: complete on `codex/phase-1-contracts` (`e93255f`).
+
 Add strict contracts and an additive migration for Provider, enriched Account,
 CanonicalModel, ModelRoute, versioned Skill, Tool and Project membership.
 Preserve existing Account, Agent, ExecutionRoute and Project rows through a
@@ -34,6 +36,8 @@ disposable PostgreSQL upgrade evidence.
 
 ## Slice 2: One safe Hub read model
 
+Status: implementation complete; UI consumption begins in Slice 4.
+
 Build one bounded owner-only Hub read API for Accounts, Providers, canonical
 models with nested ModelRoutes, Routes, Agents, Skills, Tools and Projects.
 Credential references, runtime locators and Agent instructions stay outside the
@@ -42,6 +46,16 @@ list projection.
 Verification: deterministic ordering, no duplicate CanonicalModel cards,
 bounded cardinality, strict output parsing, auth/no-store behavior and
 standalone production-route coverage.
+
+Evidence:
+
+- [x] Strict, bounded and deterministically ordered Hub wire schema.
+- [x] One CanonicalModel projection with nested ModelRoutes.
+- [x] Read-only repeatable-read PostgreSQL snapshot over allowlisted columns.
+- [x] Credential references, Tool configuration references, Skill source
+  references, Agent instructions and runtime locators excluded by construction.
+- [x] Owner-authenticated `/api/hub` with `no-store` and fail-closed errors.
+- [x] Disposable PostgreSQL and standalone production-bundle verification.
 
 ## Slice 3: Idempotent control-plane commands
 

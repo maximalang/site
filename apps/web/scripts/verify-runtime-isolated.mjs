@@ -192,6 +192,10 @@ try {
   if (anonymousWorld.status !== 401) {
     throw new Error(`Anonymous World request returned ${anonymousWorld.status}`);
   }
+  const anonymousHub = await fetch(`${baseUrl}/api/hub`);
+  if (anonymousHub.status !== 401) {
+    throw new Error(`Anonymous Hub request returned ${anonymousHub.status}`);
+  }
 
   const login = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
@@ -213,6 +217,20 @@ try {
   const worldBody = await world.json();
   if (world.status !== 200 || worldBody.source !== "UNAVAILABLE") {
     throw new Error("Authorized World did not return the bounded no-runtime projection");
+  }
+  const hub = await fetch(`${baseUrl}/api/hub`, { headers: { cookie } });
+  const hubBody = await hub.json();
+  const serializedHub = JSON.stringify(hubBody);
+  if (
+    hub.status !== 200 ||
+    hubBody.providers?.length !== 1 ||
+    hubBody.accounts?.length !== 0 ||
+    hubBody.models?.length !== 0
+  ) {
+    throw new Error("Authorized Hub did not return the canonical empty-install projection");
+  }
+  if (/credential|configurationRef|sourceRef|instructions|binding_|session_/.test(serializedHub)) {
+    throw new Error("Authorized Hub leaked a private or runtime locator");
   }
   const conversationId = "conversation_11111111-1111-1111-1111-111111111111";
   const agentId = "agent_33333333-3333-3333-3333-333333333333";
@@ -316,7 +334,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 6, authLifecycle: true, worldAuth: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 6, authLifecycle: true, worldAuth: true, hubAuth: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);
