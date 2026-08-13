@@ -15,6 +15,7 @@ const task = {
 } as const;
 
 const binding = {
+  routeId: "route_77777777-7777-7777-7777-777777777777",
   accountId: "account_66666666-6666-6666-6666-666666666666",
   policy: {
     workingDirectory: "C:/workspace/project",
@@ -56,6 +57,8 @@ describe("CodexTaskExecutionAdapter", () => {
       runId: task.runId,
       taskId: task.taskId,
       agentId: task.agentId,
+      bindingId: task.bindingId,
+      routeId: binding.routeId,
       accountId: binding.accountId,
       sessionId: task.sessionId,
       codexThreadId: task.externalSessionRef,

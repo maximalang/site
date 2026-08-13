@@ -5,6 +5,7 @@ import {
   BindingIdSchema,
   IdempotencyKeySchema,
   OpaqueExternalIdSchema,
+  RouteIdSchema,
   RunIdSchema,
   SessionIdSchema,
   TaskIdSchema,
@@ -33,6 +34,7 @@ const TaskExecutionInputSchema = z.strictObject({
 });
 
 const BindingResolutionSchema = z.strictObject({
+  routeId: RouteIdSchema,
   accountId: AccountIdSchema,
   policy: CodexExecutionPolicySchema,
 });
@@ -55,6 +57,7 @@ const ObservationSchema = z.discriminatedUnion("status", [
 const ObservationTimeoutSchema = z.number().int().min(0).max(30_000);
 
 export type CodexBindingResolution = {
+  routeId: z.infer<typeof RouteIdSchema>;
   accountId: z.infer<typeof AccountIdSchema>;
   policy: CodexExecutionPolicy;
 };
@@ -105,6 +108,8 @@ export class CodexTaskExecutionAdapter implements TaskExecutionAdapter {
       runId: input.runId,
       taskId: input.taskId,
       agentId: input.agentId,
+      bindingId: input.bindingId,
+      routeId: resolution.data.routeId,
       accountId: resolution.data.accountId,
       sessionId: input.sessionId,
       codexThreadId: input.externalSessionRef,

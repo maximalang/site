@@ -1,8 +1,10 @@
 import {
   AccountIdSchema,
   AgentIdSchema,
+  BindingIdSchema,
   IdempotencyKeySchema,
   OpaqueExternalIdSchema,
+  RouteIdSchema,
   RunIdSchema,
   SessionIdSchema,
   TaskIdSchema,
@@ -52,6 +54,8 @@ export const CodexExecutionRequestSchema = z
     runId: RunIdSchema,
     taskId: TaskIdSchema,
     agentId: AgentIdSchema,
+    bindingId: BindingIdSchema,
+    routeId: RouteIdSchema,
     accountId: AccountIdSchema,
     sessionId: SessionIdSchema,
     codexThreadId: OpaqueExternalIdSchema,
@@ -64,6 +68,8 @@ export const CodexExecutionRequestSchema = z
       request.runId,
       request.taskId,
       request.agentId,
+      request.bindingId,
+      request.routeId,
       request.accountId,
       request.sessionId,
     ]);
