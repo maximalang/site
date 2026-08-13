@@ -1,6 +1,26 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@agent-world/conversation-service": fileURLToPath(
+        new URL("./packages/conversation-service/src/index.ts", import.meta.url),
+      ),
+      "@agent-world/domain": fileURLToPath(
+        new URL("./packages/domain/src/index.ts", import.meta.url),
+      ),
+      "@agent-world/openclaw-adapter": fileURLToPath(
+        new URL("./packages/openclaw-adapter/src/index.ts", import.meta.url),
+      ),
+      "@agent-world/postgres-store": fileURLToPath(
+        new URL("./packages/postgres-store/src/index.ts", import.meta.url),
+      ),
+      "@agent-world/read-model": fileURLToPath(
+        new URL("./packages/read-model/src/index.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     environment: "node",
     globals: false,

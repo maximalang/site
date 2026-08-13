@@ -10,7 +10,7 @@
     "start": "node .next/standalone/apps/web/server.js",
     "test:e2e": "playwright test",
     "test:e2e:production": "playwright test --config playwright.production.config.ts",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc -p tsconfig.typecheck.json --noEmit"
   },
   "dependencies": {
     "@agent-world/read-model": "0.0.0",

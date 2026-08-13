@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "paths": {
+      "@agent-world/domain": ["../../packages/domain/src/index.ts"],
+      "@agent-world/read-model": ["../../packages/read-model/src/index.ts"]
+    }
+  }
+}
