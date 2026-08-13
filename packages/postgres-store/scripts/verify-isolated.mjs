@@ -8,7 +8,7 @@ import {
   MessageIdSchema,
   SendMessageIntentSchema,
 } from "@agent-world/domain";
-import { HubCommandRequestSchema } from "@agent-world/read-model";
+import { ExecutionPreferenceLayerSchema, HubCommandRequestSchema } from "@agent-world/read-model";
 import { Pool } from "pg";
 import {
   applyMigrations,
@@ -16,6 +16,7 @@ import {
   PostgresAgentConversationReader,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
   PostgresOwnerSessionStore,
@@ -184,7 +185,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 7
+    ledger.rows.at(-1)?.version !== 8
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -233,6 +234,7 @@ try {
     "conversation_sessions",
     "conversation_messages",
     "hub_command_receipts",
+    "execution_preference_overrides",
     "model_routes",
     "model_route_modalities",
     "model_route_reasoning_efforts",
@@ -782,6 +784,65 @@ try {
   ) {
     throw new Error("Restarted World projection did not restore the canonical Task assignment");
   }
+  const preferenceStore = new PostgresExecutionPreferenceStore(pool);
+  await preferenceStore.writeLayer(
+    ExecutionPreferenceLayerSchema.parse({
+      schemaVersion: 1,
+      scope: { kind: "PROJECT", projectId: ids.project },
+      overrides: { context: "LEAN", budget: "ECONOMY" },
+    }),
+    "2026-08-13T09:42:00.000Z",
+  );
+  await preferenceStore.writeLayer(
+    ExecutionPreferenceLayerSchema.parse({
+      schemaVersion: 1,
+      scope: { kind: "AGENT", agentId: ids.agent },
+      overrides: { mode: "CODEX" },
+    }),
+    "2026-08-13T09:42:01.000Z",
+  );
+  await preferenceStore.writeLayer(
+    ExecutionPreferenceLayerSchema.parse({
+      schemaVersion: 1,
+      scope: { kind: "TASK", taskId: taskAssignment.taskId },
+      overrides: { budget: "QUALITY" },
+    }),
+    "2026-08-13T09:42:02.000Z",
+  );
+  const resolvedPreferences = await preferenceStore.resolve({
+    projectId: ids.project,
+    agentId: ids.agent,
+    taskId: taskAssignment.taskId,
+  });
+  if (
+    resolvedPreferences.mode.value !== "CODEX" ||
+    resolvedPreferences.mode.source.kind !== "AGENT" ||
+    resolvedPreferences.context.value !== "LEAN" ||
+    resolvedPreferences.context.source.kind !== "PROJECT" ||
+    resolvedPreferences.budget.value !== "QUALITY" ||
+    resolvedPreferences.budget.source.kind !== "TASK"
+  ) {
+    throw new Error("Sparse execution preferences did not preserve winning scope provenance");
+  }
+  await preferenceStore.writeLayer(
+    ExecutionPreferenceLayerSchema.parse({
+      schemaVersion: 1,
+      scope: { kind: "TASK", taskId: taskAssignment.taskId },
+      overrides: {},
+    }),
+    "2026-08-13T09:42:03.000Z",
+  );
+  const resetPreferences = await preferenceStore.resolve({
+    projectId: ids.project,
+    agentId: ids.agent,
+    taskId: taskAssignment.taskId,
+  });
+  if (
+    resetPreferences.budget.value !== "ECONOMY" ||
+    resetPreferences.budget.source.kind !== "PROJECT"
+  ) {
+    throw new Error("Execution preference reset did not reveal the inherited Project value");
+  }
   const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
     messageId: () => "message_0a0a0a0a-0a0a-0a0a-0a0a-0a0a0a0a0a0a",
   });
@@ -996,7 +1057,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 5, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
