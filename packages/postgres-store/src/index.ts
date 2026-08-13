@@ -1,6 +1,7 @@
 export * from "./agent-conversation-reader.js";
 export * from "./conversation-reader.js";
 export * from "./conversation-store.js";
+export * from "./hub-command-store.js";
 export * from "./hub-reader.js";
 export * from "./migration.js";
 export * from "./openclaw-configuration-reader.js";

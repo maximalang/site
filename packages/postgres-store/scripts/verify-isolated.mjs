@@ -8,6 +8,7 @@ import {
   MessageIdSchema,
   SendMessageIntentSchema,
 } from "@agent-world/domain";
+import { HubCommandRequestSchema } from "@agent-world/read-model";
 import { Pool } from "pg";
 import {
   applyMigrations,
@@ -15,6 +16,7 @@ import {
   PostgresAgentConversationReader,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresHubCommandStore,
   PostgresHubReader,
   PostgresOwnerSessionStore,
   PostgresRuntimeMessageStore,
@@ -182,7 +184,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 6
+    ledger.rows.at(-1)?.version !== 7
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -230,6 +232,7 @@ try {
     "conversations",
     "conversation_sessions",
     "conversation_messages",
+    "hub_command_receipts",
     "model_routes",
     "model_route_modalities",
     "model_route_reasoning_efforts",
@@ -537,6 +540,92 @@ try {
     )
   ) {
     throw new Error("PostgreSQL Hub reader leaked a private or runtime locator");
+  }
+  const hubCommandStore = new PostgresHubCommandStore(
+    pool,
+    () => new Date("2026-08-13T12:01:00.000Z"),
+  );
+  const providerCreate = HubCommandRequestSchema.parse({
+    schemaVersion: 1,
+    commandId: "hub_command_b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1",
+    kind: "PROVIDER_CREATE",
+    providerId: "provider_b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2",
+    slug: "local-models",
+    displayName: "Local models",
+    providerKind: "OLLAMA",
+    category: "LOCAL_MODEL",
+    baseUrl: "http://127.0.0.1:11434",
+  });
+  if ((await hubCommandStore.execute(providerCreate)).outcome !== "CREATED") {
+    throw new Error("Hub command did not create the canonical Provider");
+  }
+  if ((await hubCommandStore.execute(providerCreate)).outcome !== "REPLAY") {
+    throw new Error("Hub command did not replay the exact committed request");
+  }
+  await expectRejected(
+    hubCommandStore.execute({ ...providerCreate, displayName: "Conflicting Provider" }),
+    "Hub command accepted conflicting immutable input for one command identity",
+  );
+  await expectRejected(
+    hubCommandStore.execute(
+      HubCommandRequestSchema.parse({
+        schemaVersion: 1,
+        commandId: "hub_command_b3b3b3b3-b3b3-b3b3-b3b3-b3b3b3b3b3b3",
+        kind: "MODEL_ROUTE_CREATE",
+        modelRouteId: "model_route_b4b4b4b4-b4b4-b4b4-b4b4-b4b4b4b4b4b4",
+        canonicalModelId: hub.model,
+        providerId: openClawProviderId,
+        accountId: hub.primaryAccount,
+        surface: "API",
+        remoteModelId: "cross-provider-command",
+        availability: "UNKNOWN",
+        contextWindowTokens: 200000,
+        reasoningEfforts: [],
+        supportedModalities: ["TEXT"],
+        supportedToolIds: [],
+      }),
+    ),
+    "Hub command accepted a ModelRoute under the wrong Account Provider",
+  );
+  await expectRejected(
+    hubCommandStore.execute(
+      HubCommandRequestSchema.parse({
+        schemaVersion: 1,
+        commandId: "hub_command_b5b5b5b5-b5b5-b5b5-b5b5-b5b5b5b5b5b5",
+        kind: "MODEL_ROUTE_CREATE",
+        modelRouteId: "model_route_b6b6b6b6-b6b6-b6b6-b6b6-b6b6b6b6b6b6",
+        canonicalModelId: hub.model,
+        providerId: hub.provider,
+        accountId: hub.primaryAccount,
+        surface: "API",
+        remoteModelId: "gpt-x-2026-08-01",
+        availability: "UNKNOWN",
+        contextWindowTokens: 200000,
+        reasoningEfforts: [],
+        supportedModalities: ["TEXT"],
+        supportedToolIds: [],
+      }),
+    ),
+    "Hub command accepted duplicate remote Model discovery",
+  );
+  const commandEvidence = await pool.query(
+    `SELECT
+       (SELECT count(*)::integer FROM agent_world.providers WHERE id = $1) AS providers,
+       (SELECT count(*)::integer FROM agent_world.hub_command_receipts) AS receipts,
+       (SELECT count(*)::integer FROM agent_world.model_routes
+         WHERE id IN ($2, $3)) AS rejected_routes`,
+    [
+      providerCreate.providerId,
+      "model_route_b4b4b4b4-b4b4-b4b4-b4b4-b4b4b4b4b4b4",
+      "model_route_b6b6b6b6-b6b6-b6b6-b6b6-b6b6b6b6b6b6",
+    ],
+  );
+  if (
+    commandEvidence.rows[0]?.providers !== 1 ||
+    commandEvidence.rows[0]?.receipts !== 1 ||
+    commandEvidence.rows[0]?.rejected_routes !== 0
+  ) {
+    throw new Error("Hub command transaction or receipt authority drifted");
   }
   await pool.query(
     `INSERT INTO agent_world.execution_routes
@@ -907,7 +996,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 9, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
