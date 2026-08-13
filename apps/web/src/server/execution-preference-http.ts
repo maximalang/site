@@ -60,32 +60,47 @@ export function createExecutionPreferenceRouteHandler(
       return error("UNAUTHORIZED", 401);
     }
     if (request.method === "GET") {
+      let input: ExecutionPreferenceSelection;
       try {
-        const model = ExecutionPreferenceReadModelSchema.parse(
-          await dependencies.read(selection(request)),
-        );
+        input = selection(request);
+      } catch {
+        return error("INVALID_REQUEST", 400);
+      }
+      try {
+        const model = ExecutionPreferenceReadModelSchema.parse(await dependencies.read(input));
         return Response.json(model, { headers: RESPONSE_HEADERS });
       } catch (cause) {
         if (cause instanceof Error && cause.message === "INVALID_SCOPE_CHAIN") {
           return error("INVALID_SCOPE_CHAIN", 422);
         }
-        return error("INVALID_REQUEST", 400);
+        return error("EXECUTION_PREFERENCES_UNAVAILABLE", 503);
       }
     }
     if (request.method !== "PUT" || !hasSameOriginHost(request)) {
       return error("INVALID_REQUEST", 400);
     }
+    let layer: ExecutionPreferenceLayer;
     try {
-      await dependencies.write(
-        await body(request),
-        (dependencies.now ?? (() => new Date()))().toISOString(),
-      );
+      layer = await body(request);
+    } catch {
+      return error("INVALID_REQUEST", 400);
+    }
+    try {
+      await dependencies.write(layer, (dependencies.now ?? (() => new Date()))().toISOString());
       return new Response(null, { headers: RESPONSE_HEADERS, status: 204 });
     } catch (cause) {
       if (cause instanceof Error && cause.message === "RUN_SCOPE_NOT_AVAILABLE") {
         return error("RUN_SCOPE_NOT_AVAILABLE", 409);
       }
-      return error("INVALID_REQUEST", 400);
+      if (
+        typeof cause === "object" &&
+        cause !== null &&
+        "code" in cause &&
+        cause.code === "23503"
+      ) {
+        return error("INVALID_REFERENCE", 422);
+      }
+      return error("EXECUTION_PREFERENCES_UNAVAILABLE", 503);
     }
   };
 }

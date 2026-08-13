@@ -96,4 +96,35 @@ describe("execution preference HTTP", () => {
     );
     expect(response.status).toBe(400);
   });
+
+  it("does not misreport dependency failures as caller errors", async () => {
+    const readFailure = dependencies();
+    readFailure.read.mockRejectedValue(new Error("database unavailable"));
+    expect(
+      (
+        await createExecutionPreferenceRouteHandler(readFailure)(
+          new Request("https://world.test/api/hub/preferences"),
+        )
+      ).status,
+    ).toBe(503);
+
+    const writeFailure = dependencies();
+    writeFailure.write.mockRejectedValue(new Error("database unavailable"));
+    const response = await createExecutionPreferenceRouteHandler(writeFailure)(
+      new Request("https://world.test/api/hub/preferences", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          host: "world.test",
+          origin: "https://world.test",
+          "sec-fetch-site": "same-origin",
+        },
+        body: JSON.stringify(system),
+      }),
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: { code: "EXECUTION_PREFERENCES_UNAVAILABLE" },
+    });
+  });
 });

@@ -4,6 +4,10 @@ import type { AgentId } from "@agent-world/domain";
 import type { HubReadModel } from "@agent-world/read-model";
 import { useEffect, useState } from "react";
 import { loadHubReadModel } from "../client/hub-api";
+import {
+  type ExecutionPreferenceClient,
+  ExecutionPreferencesPanel,
+} from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
 
 type LoadHub = (attempt: number) => Promise<HubReadModel>;
@@ -12,9 +16,13 @@ const defaultLoadHub: LoadHub = () => loadHubReadModel();
 export function HubPanel({
   load = defaultLoadHub,
   onSelectAgent,
+  csrfToken = "",
+  preferenceClient,
 }: {
   load?: LoadHub;
   onSelectAgent: (agentId: AgentId) => void;
+  csrfToken?: string;
+  preferenceClient?: ExecutionPreferenceClient;
 }) {
   const [model, setModel] = useState<HubReadModel>();
   const [error, setError] = useState(false);
@@ -72,6 +80,11 @@ export function HubPanel({
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <ExecutionPreferencesPanel
+        {...(preferenceClient ? { client: preferenceClient } : {})}
+        csrfToken={csrfToken}
+        hub={model}
+      />
     </div>
   );
 }

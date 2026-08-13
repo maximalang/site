@@ -1,4 +1,9 @@
-import { HubReadModelSchema } from "@agent-world/read-model";
+import {
+  ExecutionPreferenceLayerSchema,
+  ExecutionPreferenceReadModelSchema,
+  HubReadModelSchema,
+  resolveExecutionPreferences,
+} from "@agent-world/read-model";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { buildContractFixture } from "../src/test-fixtures";
@@ -65,6 +70,23 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     tools: [],
     projects: [],
   });
+  const systemPreferences = ExecutionPreferenceLayerSchema.parse({
+    schemaVersion: 1,
+    scope: { kind: "SYSTEM" },
+    overrides: {
+      model: { kind: "AUTO" },
+      account: { kind: "AUTO" },
+      mode: "AUTO",
+      context: "BALANCED",
+      budget: "BALANCED",
+    },
+  });
+  const preferenceFixture = ExecutionPreferenceReadModelSchema.parse({
+    schemaVersion: 1,
+    selection: {},
+    local: systemPreferences,
+    resolved: resolveExecutionPreferences([systemPreferences]),
+  });
   let assignedTaskId: string | undefined;
 
   await page.route("**/api/auth/session", (route) =>
@@ -85,6 +107,13 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await page.route("**/api/hub", (route) =>
     route.fulfill({
       body: JSON.stringify(hubFixture),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/hub/preferences", (route) =>
+    route.fulfill({
+      body: JSON.stringify(preferenceFixture),
       contentType: "application/json",
       status: 200,
     }),
@@ -311,6 +340,10 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.getByRole("heading", { level: 1, name: "Canonical Hub" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Execution preferences" }),
+  ).toBeVisible();
+  await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
 
   const hubAccessibility = await new AxeBuilder({ page }).analyze();
   expect(hubAccessibility.violations).toEqual([]);

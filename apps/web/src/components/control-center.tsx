@@ -453,6 +453,7 @@ export function ControlCenter({
             role="tabpanel"
           >
             <HubPanel
+              csrfToken={csrfToken}
               {...(loadHubReadModel ? { load: loadHubReadModel } : {})}
               onSelectAgent={selectAgent}
             />

@@ -106,6 +106,8 @@ Evidence:
 
 ## Slice 5: Inherited execution preferences
 
+Status: complete on `codex/phase-1-contracts`.
+
 Store only sparse overrides in one policy table and resolve:
 
 `System Defaults -> Project -> Agent -> Task -> Run`
@@ -116,6 +118,21 @@ independent copies of the same effective setting are written at each level.
 
 Verification: inheritance, local override, reset, disabled route, same Account
 used by multiple Agents and deterministic fallback inputs.
+
+Evidence:
+
+- [x] One sparse PostgreSQL override table resolves System → Project → Agent →
+  Task; Run is rejected until the Run aggregate exists.
+- [x] Every effective Model, Account, Mode, Context and Budget value carries its
+  winning canonical scope, while reset deletes the local value.
+- [x] Deterministic eligibility excludes disabled/unavailable Provider,
+  Account, CanonicalModel and ModelRoute inputs before fallback ordering.
+- [x] Owner-only bounded API enforces auth, CSRF, same-origin writes and strict
+  failure classification without returning credential or infrastructure data.
+- [x] Lobby UI exposes System/Project/Agent editing, inherited provenance,
+  local overrides and per-field reset without materializing inherited copies.
+- [x] Unit, disposable PostgreSQL, standalone production runtime, Axe and all
+  five required responsive browser viewports pass.
 
 ## Stop conditions
 
