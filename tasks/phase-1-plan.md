@@ -79,7 +79,7 @@ Evidence:
 
 ## Slice 4: Safe selection and chat
 
-Status: implementation complete; live-provider proof pending.
+Status: complete on `codex/phase-1-contracts`.
 
 Selecting an Agent in World or Command opens the same conversation projection.
 Sending a message creates a canonical intent and dispatches through an explicit
@@ -97,12 +97,14 @@ Server evidence:
 - [x] Pre-request startup, standalone migration packaging and restart revocation.
 - [x] Login and conversation UI from both World and Command.
 - [x] Authoritative inbound Agent messages persisted with exact Session/binding provenance.
-- [ ] Live pinned OpenClaw read/write handshake and real message round trip.
+- [x] Live pinned OpenClaw protocol-v4 read/write handshake, real `agent` /
+  `agent.wait` turn and canonical transcript round trip against a disposable
+  loopback model provider.
 - [x] Restart-safe persisted World event cursor/replay.
 
 ## Slice 5: Policy-aware task assignment
 
-Status: canonical assignment complete; approval and execution pending.
+Status: complete on `codex/phase-1-contracts`.
 
 Create a task intent, evaluate approval policy, and only then call the
 side-effecting OpenClaw method with an idempotency key. Persist observable
@@ -121,8 +123,14 @@ Assignment evidence:
 - [x] Every assignment is `REQUIRED` and does not call the runtime or claim
   execution before a separate approval decision.
 - [x] World and Command expose the same assigned Task after restart.
-- [ ] Persist approval grant/revoke and dispatch an approved Task through the
-  side-effecting adapter with Run transitions.
+- [x] Persist approval grant/deny/revoke, create one canonical Run and dispatch
+  only an approved Task through the side-effecting adapter.
+- [x] Persist `DISPATCH_PENDING`, `RUNNING`, `COMPLETED`, `FAILED` and
+  pre-dispatch `CANCELLED` transitions with exact upstream receipt provenance.
+- [x] Recover pending/running Runs through a bounded non-overlapping supervisor;
+  retry the unchanged dispatch idempotency key after ambiguous failures.
+- [x] Project approval and Run status through the same gapless World event
+  stream used by World and Command.
 
 ## Slice 6: Working-shell hardening
 

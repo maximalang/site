@@ -38,6 +38,15 @@ function pool(rows: unknown[][]) {
 }
 
 describe("PostgresRunDispatchStore", () => {
+  it("lists a bounded oldest-first recovery batch", async () => {
+    const fake = pool([[{ id: pending.id }, { id: "run_77777777-7777-7777-7777-777777777777" }]]);
+    await expect(new PostgresRunDispatchStore(fake.value).listActive(4)).resolves.toEqual([
+      pending.id,
+      "run_77777777-7777-7777-7777-777777777777",
+    ]);
+    expect(fake.query).toHaveBeenCalledWith(expect.stringContaining("LIMIT $1"), [4]);
+  });
+
   it("loads only exact enabled Session and Binding provenance for pending dispatch", async () => {
     const fake = pool([[pending]]);
     const result = await new PostgresRunDispatchStore(fake.value).prepare(
@@ -104,5 +113,45 @@ describe("PostgresRunDispatchStore", () => {
         startedAt: "2026-08-13T10:00:06.000Z",
       }),
     ).rejects.toEqual(new RunDispatchStoreError("RECEIPT_CONFLICT"));
+  });
+
+  it.each([
+    { status: "COMPLETED" as const, projected: "IDLE", failureCode: undefined },
+    { status: "FAILED" as const, projected: "FAILED", failureCode: "UPSTREAM_RUN_ERROR" },
+  ])("persists $status as a terminal Run and World event", async (terminal) => {
+    const running = {
+      ...pending,
+      status: "RUNNING",
+      attempt: 1,
+      external_run_id: "openclaw-run-42",
+      started_at: "2026-08-13T10:00:05.000Z",
+    };
+    const fake = pool([[], [], [running], [], [{ last_sequence: "11" }], [], [], []]);
+    const store = new PostgresRunDispatchStore(fake.value, {
+      eventId: () => "event_66666666-6666-6666-6666-666666666666",
+    });
+    const result =
+      terminal.status === "COMPLETED"
+        ? await store.markTerminal({
+            runId: pending.id,
+            status: "COMPLETED",
+            completedAt: "2026-08-13T10:01:00.000Z",
+          })
+        : await store.markTerminal({
+            runId: pending.id,
+            status: "FAILED",
+            failureCode: terminal.failureCode,
+            completedAt: "2026-08-13T10:01:00.000Z",
+          });
+    expect(result).toMatchObject({
+      outcome: "UPDATED",
+      run: { status: terminal.status, completedAt: "2026-08-13T10:01:00.000Z" },
+    });
+    expect(fake.query.mock.calls.map(([sql]) => String(sql))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("completed_at"),
+        expect.stringContaining(`'${terminal.projected}'`),
+      ]),
+    );
   });
 });

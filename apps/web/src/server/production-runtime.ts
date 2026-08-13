@@ -24,6 +24,7 @@ import {
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
 import { OwnerSessionManager } from "./owner-session";
+import { TaskRunSupervisor } from "./task-run-supervisor";
 
 type RuntimeEnvironment = Record<string, string | undefined>;
 
@@ -123,6 +124,7 @@ export async function createProductionRuntime(
   pool.on("error", () => record("postgres", { event: "unexpected_idle_client_error" }));
   let readAdapter: OpenClawReadAdapter | undefined;
   let writeAdapter: OpenClawWriteAdapter | undefined;
+  let taskRunSupervisor: TaskRunSupervisor | undefined;
   try {
     const migrationClient = await pool.connect();
     try {
@@ -242,6 +244,12 @@ export async function createProductionRuntime(
           kind === "OPENCLAW" && writeAdapter?.state === "READY" ? writeAdapter : undefined,
       },
     });
+    taskRunSupervisor = new TaskRunSupervisor({
+      source: runDispatchStore,
+      observer: taskDispatcher,
+      telemetry: { record: (event) => record("task-run-supervisor", event) },
+    });
+    taskRunSupervisor.start();
 
     return {
       auth,
@@ -269,11 +277,13 @@ export async function createProductionRuntime(
       readHub: () => hubReader.read(),
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
+        await taskRunSupervisor?.stop();
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
         await pool.end();
       },
     };
   } catch (error) {
+    await taskRunSupervisor?.stop();
     await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
     await pool.end().catch(() => undefined);
     throw error;

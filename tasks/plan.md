@@ -47,9 +47,9 @@ Phase 0 reuse and license audit
 
 ### Phase 1: Working shell
 
-- [ ] Deliver one web app with World/Command switching over one API.
-- [ ] Connect real OpenClaw agents, sessions and typed status events.
-- [ ] Deliver click/chat and policy-aware task assignment.
+- [x] Deliver one web app with World/Command switching over one API.
+- [x] Connect real OpenClaw agents, sessions and typed status events.
+- [x] Deliver click/chat and policy-aware task assignment.
 
 ### Phase 2: Canonical Hub
 
@@ -90,9 +90,9 @@ Phase 0 reuse and license audit
 
 ### Working-shell gate
 
-- [ ] Real OpenClaw events drive both World and Command.
-- [ ] Restart/reconnect replay restores the same visible state.
-- [ ] World interactions do not create unsafe actions without approval.
+- [x] Real OpenClaw events drive both World and Command.
+- [x] Restart/reconnect replay restores the same visible state.
+- [x] World interactions do not create unsafe actions without approval.
 
 ### Production gate
 

@@ -1,5 +1,9 @@
 import { GatewayClient, type GatewayClientOptions } from "@openclaw/gateway-client";
-import { validateAgentParams, validateChatSendParams } from "@openclaw/gateway-protocol";
+import {
+  validateAgentParams,
+  validateAgentWaitParams,
+  validateChatSendParams,
+} from "@openclaw/gateway-protocol";
 import {
   GATEWAY_CLIENT_CAPS,
   GATEWAY_CLIENT_IDS,
@@ -50,6 +54,7 @@ export interface OpenClawWriteGateway {
   stopAndWait(): Promise<void>;
   sendChat(params: OpenClawChatSendParams): Promise<unknown>;
   runAgent(params: OpenClawAgentRunParams): Promise<unknown>;
+  waitAgent(params: { runId: string; timeoutMs: number }): Promise<unknown>;
 }
 
 export type OpenClawWriteGatewayFactoryInput = {
@@ -135,6 +140,12 @@ export const createOfficialOpenClawWriteGateway: OpenClawWriteGatewayFactory = (
         throw new Error("OpenClaw agent parameters violate the pinned protocol contract");
       }
       return client.request("agent", params);
+    },
+    waitAgent: (params) => {
+      if (!validateAgentWaitParams(params)) {
+        throw new Error("OpenClaw agent.wait parameters violate the pinned protocol contract");
+      }
+      return client.request("agent.wait", params);
     },
   };
 };

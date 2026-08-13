@@ -821,8 +821,16 @@ try {
   ) {
     throw new Error("Canonical Run persistence claimed unsupported dispatch evidence");
   }
+  const runEventIds = [
+    "event_21212121-2121-2121-2121-212121212121",
+    "event_22222222-2222-2222-2222-222222222222",
+  ];
   const runDispatchStore = new PostgresRunDispatchStore(pool, {
-    eventId: () => "event_21212121-2121-2121-2121-212121212121",
+    eventId: () => {
+      const eventId = runEventIds.shift();
+      if (!eventId) throw new Error("Isolated Run event identities were exhausted");
+      return eventId;
+    },
   });
   const preparedDispatch = await runDispatchStore.prepare(approvalDecision.run.id);
   if (
@@ -843,6 +851,14 @@ try {
     markedRunning.run.attempt !== 1
   ) {
     throw new Error("Accepted upstream Run receipt was not persisted exactly once");
+  }
+  const markedCompleted = await runDispatchStore.markTerminal({
+    runId: approvalDecision.run.id,
+    status: "COMPLETED",
+    completedAt: "2026-08-13T09:46:00.000Z",
+  });
+  if (markedCompleted.outcome !== "UPDATED" || markedCompleted.run.status !== "COMPLETED") {
+    throw new Error("Observed upstream terminal evidence did not complete the canonical Run");
   }
   const unrelatedProject = "project_18181818-1818-1818-1818-181818181818";
   await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
@@ -870,9 +886,9 @@ try {
   );
   const taskWorld = await new PostgresWorldProjectionStore(pool).readWorld([worldAgent]);
   if (
-    taskWorld.cursor.lastSequence !== 7 ||
+    taskWorld.cursor.lastSequence !== 8 ||
     taskWorld.tasks[0]?.approval !== "APPROVED" ||
-    taskWorld.agents[0]?.status !== "RUNNING" ||
+    taskWorld.agents[0]?.status !== "IDLE" ||
     taskWorld.agents[0]?.currentTask?.taskId !== taskAssignment.taskId
   ) {
     throw new Error("Restarted World projection did not restore the canonical Task assignment");

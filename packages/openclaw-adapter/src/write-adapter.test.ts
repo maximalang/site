@@ -52,6 +52,7 @@ function setup() {
     stopAndWait: vi.fn(async () => undefined),
     sendChat: vi.fn(async () => ({ runId: "run-1", status: "started" })),
     runAgent: vi.fn(async () => ({ runId: "openclaw-task-run-1" })),
+    waitAgent: vi.fn(async () => ({ status: "ok", startedAt: 1, endedAt: 2 })),
   };
   const telemetry = { record: vi.fn() };
   const adapter = new OpenClawWriteAdapter({
@@ -125,6 +126,32 @@ describe("OpenClawWriteAdapter", () => {
       },
     });
     expect(gateway.sendChat).not.toHaveBeenCalled();
+  });
+
+  it("observes terminal Task state through the official agent.wait RPC", async () => {
+    const { adapter, callbacks, gateway } = setup();
+    await adapter.start();
+    await callbacks()?.onHello(validHello);
+
+    await expect(adapter.waitForTask("openclaw-task-run-1", 1_000)).resolves.toEqual({
+      status: "COMPLETED",
+      observedAt: "2026-08-13T10:00:01.000Z",
+    });
+    expect(gateway.waitAgent).toHaveBeenCalledWith({
+      runId: "openclaw-task-run-1",
+      timeoutMs: 1_000,
+    });
+    vi.mocked(gateway.waitAgent).mockResolvedValueOnce({ status: "error", error: "private" });
+    await expect(adapter.waitForTask("openclaw-task-run-1", 1_000)).resolves.toEqual({
+      status: "FAILED",
+      failureCode: "UPSTREAM_RUN_ERROR",
+      observedAt: "2026-08-13T10:00:01.000Z",
+    });
+    vi.mocked(gateway.waitAgent).mockResolvedValueOnce({ status: "timeout" });
+    await expect(adapter.waitForTask("openclaw-task-run-1", 1_000)).resolves.toEqual({
+      status: "RUNNING",
+      observedAt: "2026-08-13T10:00:01.000Z",
+    });
   });
 
   it.each([

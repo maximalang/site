@@ -22,11 +22,13 @@
     "test:db": "npm run build --workspace @agent-world/postgres-store && npm run test:isolated --workspace @agent-world/postgres-store",
     "test:e2e": "npm run build --workspace @agent-world/read-model && npm run test:e2e --workspace @agent-world/web && npm run test:e2e:production --workspace @agent-world/web",
     "test:runtime": "npm run build && npm run test:runtime:isolated --workspace @agent-world/web",
+    "test:openclaw-live": "npm run build --workspace @agent-world/openclaw-adapter && npm run test:live --workspace @agent-world/openclaw-adapter",
     "typecheck": "tsc -p tsconfig.check.json --noEmit && npm run typecheck --workspace @agent-world/web"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",
     "@types/node": "24.13.3",
+    "openclaw": "2026.8.1-beta.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   }

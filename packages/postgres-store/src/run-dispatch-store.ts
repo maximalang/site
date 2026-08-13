@@ -20,6 +20,19 @@ const MarkRunningSchema = z.strictObject({
   externalRunId: OpaqueExternalIdSchema,
   startedAt: TimestampSchema,
 });
+const MarkTerminalSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    runId: RunIdSchema,
+    status: z.literal("COMPLETED"),
+    completedAt: TimestampSchema,
+  }),
+  z.strictObject({
+    runId: RunIdSchema,
+    status: z.literal("FAILED"),
+    failureCode: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/),
+    completedAt: TimestampSchema,
+  }),
+]);
 
 type DispatchRow = QueryResultRow & {
   id: string;
@@ -46,11 +59,13 @@ type DispatchRow = QueryResultRow & {
 };
 
 type SequenceRow = QueryResultRow & { last_sequence: string | number };
+type RunIdRow = QueryResultRow & { id: string };
 
 export type RunDispatchStoreErrorCode =
   | "RUN_NOT_FOUND"
   | "ROUTE_UNAVAILABLE"
   | "RUN_NOT_PENDING"
+  | "RUN_NOT_RUNNING"
   | "RECEIPT_CONFLICT";
 
 export class RunDispatchStoreError extends Error {
@@ -118,6 +133,24 @@ export class PostgresRunDispatchStore {
       (() => {
         throw new Error("A production World event identity generator is required");
       });
+  }
+
+  async listActive(limitInput: unknown): Promise<z.infer<typeof RunIdSchema>[]> {
+    const limit = z.number().int().min(1).max(20).parse(limitInput);
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<RunIdRow>(
+        `SELECT id
+           FROM agent_world.runs
+          WHERE status IN ('DISPATCH_PENDING', 'RUNNING')
+          ORDER BY created_at, id
+          LIMIT $1`,
+        [limit],
+      );
+      return result.rows.map((row) => RunIdSchema.parse(row.id));
+    } finally {
+      client.release();
+    }
   }
 
   async prepare(runIdInput: unknown) {
@@ -255,6 +288,116 @@ export class PostgresRunDispatchStore {
         await client.query("ROLLBACK");
       } catch {
         // Preserve the Run transition failure.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async markTerminal(input: z.input<typeof MarkTerminalSchema>) {
+    const terminal = MarkTerminalSchema.parse(input);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        "agent_world:world_projection",
+      ]);
+      const result = await client.query<DispatchRow>(`${SELECT_RUN} FOR UPDATE OF r`, [
+        terminal.runId,
+      ]);
+      if (result.rows.length === 0) throw new RunDispatchStoreError("RUN_NOT_FOUND");
+      if (result.rows.length !== 1 || !result.rows[0]) {
+        throw new Error("Run dispatch cardinality is invalid");
+      }
+      const current = parseRun(result.rows[0]);
+      if (current.status === "COMPLETED" || current.status === "FAILED") {
+        if (
+          current.status !== terminal.status ||
+          (terminal.status === "FAILED" && current.failureCode !== terminal.failureCode)
+        ) {
+          throw new RunDispatchStoreError("RECEIPT_CONFLICT");
+        }
+        await client.query("COMMIT");
+        return { outcome: "REPLAY" as const, run: current };
+      }
+      if (current.status !== "RUNNING" || !current.startedAt || !current.externalRunId) {
+        throw new RunDispatchStoreError("RUN_NOT_RUNNING");
+      }
+      if (Date.parse(terminal.completedAt) < Date.parse(current.startedAt)) {
+        throw new RunDispatchStoreError("RECEIPT_CONFLICT");
+      }
+      const terminalRun = RunSchema.parse({
+        ...current,
+        status: terminal.status,
+        completedAt: terminal.completedAt,
+        ...(terminal.status === "FAILED" ? { failureCode: terminal.failureCode } : {}),
+      });
+      if (terminal.status === "COMPLETED") {
+        await client.query(
+          `UPDATE agent_world.runs
+              SET status = 'COMPLETED', completed_at = $2
+            WHERE id = $1`,
+          [terminal.runId, terminal.completedAt],
+        );
+      } else {
+        await client.query(
+          `UPDATE agent_world.runs
+              SET status = 'FAILED', completed_at = $2, failure_code = $3
+            WHERE id = $1`,
+          [terminal.runId, terminal.completedAt, terminal.failureCode],
+        );
+      }
+      const sequence = await client.query<SequenceRow>(
+        `UPDATE agent_world.world_event_stream
+            SET last_sequence = last_sequence + 1
+          WHERE singleton = true
+        RETURNING last_sequence`,
+      );
+      if (sequence.rows.length !== 1 || !sequence.rows[0]) {
+        throw new Error("World event stream counter is unavailable");
+      }
+      const eventId = EventIdSchema.parse(this.eventId());
+      const projectedStatus = terminal.status === "COMPLETED" ? "IDLE" : "FAILED";
+      await client.query(
+        terminal.status === "COMPLETED"
+          ? `INSERT INTO agent_world.world_events
+               (sequence, id, occurred_at, source_kind, source_actor, command_id,
+                event_type, agent_id, status, task_id, run_id)
+             VALUES ($1, $2, $3, 'DOMAIN', 'SYSTEM_POLICY', $4,
+                     'AGENT_STATUS_CHANGED', $5, 'IDLE', $6, $7)`
+          : `INSERT INTO agent_world.world_events
+               (sequence, id, occurred_at, source_kind, source_actor, command_id,
+                event_type, agent_id, status, task_id, run_id)
+             VALUES ($1, $2, $3, 'DOMAIN', 'SYSTEM_POLICY', $4,
+                     'AGENT_STATUS_CHANGED', $5, 'FAILED', $6, $7)`,
+        [
+          safeSequence(sequence.rows[0].last_sequence),
+          eventId,
+          terminal.completedAt,
+          current.dispatchIdempotencyKey,
+          current.agentId,
+          current.taskId,
+          current.id,
+        ],
+      );
+      await client.query(
+        `INSERT INTO agent_world.world_agent_status
+           (agent_id, status, last_event_id, updated_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (agent_id) DO UPDATE
+           SET status = EXCLUDED.status,
+               last_event_id = EXCLUDED.last_event_id,
+               updated_at = EXCLUDED.updated_at`,
+        [current.agentId, projectedStatus, eventId, terminal.completedAt],
+      );
+      await client.query("COMMIT");
+      return { outcome: "UPDATED" as const, run: terminalRun };
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Preserve the terminal Run transition failure.
       }
       throw error;
     } finally {

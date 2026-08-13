@@ -9,11 +9,12 @@ read/write OpenClaw adapters, canonical PostgreSQL conversations and inbound
 runtime messages, secure owner sessions, restart-safe World replay, and one
 browser application with World and Command projections over the same strict
 read model. Owner chat and approval-gated task assignment are available through
-authenticated APIs and accessible drawers. Phase 2 now also has canonical Hub
-identities and one bounded, owner-only Hub API; its control commands and Lobby
-UI remain open. It is not yet a deployable product: explicit
-approval/execution, live OpenClaw proof, HTTPS packaging and backup/restore
-hardening remain open.
+authenticated APIs and accessible drawers. Explicit approval now creates one
+durable canonical Run, dispatches through the official OpenClaw `agent` RPC,
+observes `agent.wait`, and recovers pending/running work after restart. Phase 2
+also has canonical Hub identities, owner-only control commands, inherited
+execution preferences and the Lobby UI. It is not yet a deployable product:
+HTTPS packaging and backup/restore hardening remain open.
 
 ## Quick start
 
@@ -43,6 +44,7 @@ file does not require install-time scripts for the supported toolchain.
 | `npm run dev:web` | Build the shared read model and start the Next.js app |
 | `npm run test:e2e` | Run five responsive Chromium projects plus standalone production smoke |
 | `npm run test:runtime` | Build and verify standalone auth/API/restart against disposable PostgreSQL |
+| `npm run test:openclaw-live` | Verify the pinned real OpenClaw Gateway and transcript round trip (explicit isolated ACK required) |
 | `npm run clean` | Remove TypeScript project-reference outputs |
 
 Copy `.env.example` into an ignored local environment file and replace every
@@ -67,7 +69,7 @@ browser once with `npm exec --workspace @agent-world/web -- playwright install c
   and branded identifiers shared by every future service and UI.
 - [`@agent-world/openclaw-adapter`](packages/openclaw-adapter/README.md) uses the
   official Gateway client to produce a least-privilege, binding-first runtime
-  projection. It does not execute tasks.
+  projection and execute only approval-backed canonical Runs.
 - [`@agent-world/read-model`](packages/read-model/README.md) replays canonical
   events into one bounded, versioned World/Command read boundary and defines
   the safe canonical Hub projection.

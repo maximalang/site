@@ -70,6 +70,8 @@ const TaskExecutionInputSchema = z.strictObject({
   idempotencyKey: IdempotencyKeySchema,
 });
 const AgentRunResultSchema = z.object({ runId: OpaqueExternalIdSchema });
+const AgentWaitResultSchema = z.object({ status: z.enum(["ok", "error", "timeout"]) });
+const AgentWaitTimeoutSchema = z.number().int().min(0).max(30_000);
 
 export type OpenClawTaskExecutionInput = z.infer<typeof TaskExecutionInputSchema>;
 export type OpenClawTaskExecutionReceipt = { acceptedAt: string; externalRunId: string };
@@ -105,6 +107,11 @@ export type OpenClawWriteTelemetryEvent = TelemetryBase &
     | {
         event: "openclaw_task_dispatch_completed";
         outcome: "ACCEPTED" | "REJECTED" | "INVALID_RESPONSE";
+        durationMs: number;
+      }
+    | {
+        event: "openclaw_task_wait_completed";
+        outcome: "COMPLETED" | "FAILED" | "RUNNING" | "REJECTED" | "INVALID_RESPONSE";
         durationMs: number;
       }
   );
@@ -290,6 +297,48 @@ export class OpenClawWriteAdapter implements ConversationDeliveryAdapter {
     return { acceptedAt: this.now().toISOString(), externalRunId: result.data.runId };
   }
 
+  async waitForTask(externalRunIdInput: unknown, timeoutMsInput: unknown) {
+    const externalRunId = OpaqueExternalIdSchema.safeParse(externalRunIdInput);
+    const timeoutMs = AgentWaitTimeoutSchema.safeParse(timeoutMsInput);
+    if (!externalRunId.success || !timeoutMs.success) {
+      throw new Error("OpenClaw Task wait input is invalid");
+    }
+    const gateway = this.gateway;
+    if (this.adapterState !== "READY" || !gateway) {
+      throw new Error("OpenClaw write adapter is not ready");
+    }
+    const startedAt = Date.now();
+    const deliveryEpoch = this.readinessEpoch;
+    let response: unknown;
+    try {
+      response = await gateway.waitAgent({ runId: externalRunId.data, timeoutMs: timeoutMs.data });
+    } catch {
+      this.recordTaskWait("REJECTED", startedAt);
+      throw new Error("OpenClaw rejected the Task wait request");
+    }
+    const result = AgentWaitResultSchema.safeParse(response);
+    if (
+      !result.success ||
+      deliveryEpoch !== this.readinessEpoch ||
+      this.adapterState !== "READY" ||
+      gateway !== this.gateway
+    ) {
+      this.recordTaskWait("INVALID_RESPONSE", startedAt);
+      throw new Error("OpenClaw returned an invalid or stale Task wait response");
+    }
+    const observedAt = this.now().toISOString();
+    if (result.data.status === "ok") {
+      this.recordTaskWait("COMPLETED", startedAt);
+      return { status: "COMPLETED" as const, observedAt };
+    }
+    if (result.data.status === "error") {
+      this.recordTaskWait("FAILED", startedAt);
+      return { status: "FAILED" as const, failureCode: "UPSTREAM_RUN_ERROR" as const, observedAt };
+    }
+    this.recordTaskWait("RUNNING", startedAt);
+    return { status: "RUNNING" as const, observedAt };
+  }
+
   private async handleHello(input: unknown, epoch: number): Promise<void> {
     if (epoch !== this.connectionEpoch || !this.gateway || this.adapterState === "STOPPED") {
       return;
@@ -362,6 +411,17 @@ export class OpenClawWriteAdapter implements ConversationDeliveryAdapter {
   ): void {
     this.record({
       event: "openclaw_task_dispatch_completed",
+      outcome,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    });
+  }
+
+  private recordTaskWait(
+    outcome: "COMPLETED" | "FAILED" | "RUNNING" | "REJECTED" | "INVALID_RESPONSE",
+    startedAt: number,
+  ): void {
+    this.record({
+      event: "openclaw_task_wait_completed",
       outcome,
       durationMs: Math.max(0, Date.now() - startedAt),
     });

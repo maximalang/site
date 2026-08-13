@@ -33,6 +33,16 @@ const ReceiptSchema = z.strictObject({
   acceptedAt: TimestampSchema,
   externalRunId: OpaqueExternalIdSchema,
 });
+const WaitTimeoutSchema = z.number().int().min(0).max(30_000);
+const WaitResultSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("RUNNING"), observedAt: TimestampSchema }),
+  z.strictObject({ status: z.literal("COMPLETED"), observedAt: TimestampSchema }),
+  z.strictObject({
+    status: z.literal("FAILED"),
+    failureCode: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/),
+    observedAt: TimestampSchema,
+  }),
+]);
 
 export type PreparedTaskDispatch = {
   kind: "READY";
@@ -53,6 +63,11 @@ export interface TaskDispatchStore {
     externalRunId: string;
     startedAt: string;
   }): Promise<unknown>;
+  markTerminal?(
+    input:
+      | { runId: Run["id"]; status: "COMPLETED"; completedAt: string }
+      | { runId: Run["id"]; status: "FAILED"; failureCode: string; completedAt: string },
+  ): Promise<unknown>;
 }
 
 export type TaskExecutionInput = {
@@ -71,6 +86,7 @@ export type TaskExecutionInput = {
 export interface TaskExecutionAdapter {
   readonly kind: ExecutionAdapterKind;
   executeTask(input: TaskExecutionInput): Promise<unknown>;
+  waitForTask?(externalRunId: string, timeoutMs: number): Promise<unknown>;
 }
 
 export interface TaskExecutionAdapterRegistry {
@@ -182,5 +198,87 @@ export class TaskDispatchService {
       throw new TaskDispatchError("PERSISTENCE_FAILED");
     }
     return { outcome: "DISPATCHED" as const, run: running.data };
+  }
+
+  async observe(
+    runIdInput: unknown,
+    timeoutMsInput: unknown,
+  ): Promise<{ outcome: "RUNNING" | "COMPLETED" | "FAILED"; run: Run }> {
+    const parsedRunId = RunIdSchema.safeParse(runIdInput);
+    const timeoutMs = WaitTimeoutSchema.safeParse(timeoutMsInput);
+    if (!parsedRunId.success || !timeoutMs.success) {
+      throw new TaskDispatchError("INVALID_RUN");
+    }
+    let prepared: PrepareTaskDispatchResult;
+    try {
+      prepared = await this.options.store.prepare(parsedRunId.data);
+    } catch {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    const current = RunSchema.safeParse(prepared.run);
+    if (!current.success || current.data.id !== parsedRunId.data) {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    if (current.data.status === "DISPATCH_PENDING") {
+      const dispatched = await this.dispatch(current.data.id);
+      return this.observe(dispatched.run.id, timeoutMs.data);
+    }
+    if (current.data.status === "COMPLETED" || current.data.status === "FAILED") {
+      return { outcome: current.data.status, run: current.data };
+    }
+    if (current.data.status !== "RUNNING" || !current.data.externalRunId) {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    let adapter: TaskExecutionAdapter | undefined;
+    try {
+      adapter = this.options.adapters.resolve(current.data.adapterKind);
+    } catch {
+      adapter = undefined;
+    }
+    if (!adapter || adapter.kind !== current.data.adapterKind || !adapter.waitForTask) {
+      throw new TaskDispatchError("DISPATCH_UNAVAILABLE");
+    }
+    let observation: z.infer<typeof WaitResultSchema>;
+    try {
+      observation = WaitResultSchema.parse(
+        await adapter.waitForTask(current.data.externalRunId, timeoutMs.data),
+      );
+    } catch {
+      throw new TaskDispatchError("DISPATCH_FAILED");
+    }
+    if (observation.status === "RUNNING") {
+      return { outcome: "RUNNING" as const, run: current.data };
+    }
+    if (!this.options.store.markTerminal) {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    let transitioned: unknown;
+    try {
+      transitioned = await this.options.store.markTerminal(
+        observation.status === "COMPLETED"
+          ? {
+              runId: current.data.id,
+              status: "COMPLETED",
+              completedAt: observation.observedAt,
+            }
+          : {
+              runId: current.data.id,
+              status: "FAILED",
+              failureCode: observation.failureCode,
+              completedAt: observation.observedAt,
+            },
+      );
+    } catch {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    const terminal = RunSchema.safeParse((transitioned as { run?: unknown })?.run);
+    if (
+      !terminal.success ||
+      terminal.data.id !== current.data.id ||
+      terminal.data.status !== observation.status
+    ) {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    return { outcome: observation.status, run: terminal.data };
   }
 }

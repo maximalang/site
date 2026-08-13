@@ -132,4 +132,42 @@ describe("TaskDispatchService", () => {
     await expect(service.dispatch(run.id)).resolves.toEqual({ outcome: "REPLAYED", run: running });
     expect(executeTask).not.toHaveBeenCalled();
   });
+
+  it("observes and persists a completed upstream Run without redispatch", async () => {
+    const running = RunSchema.parse({
+      ...run,
+      status: "RUNNING",
+      attempt: 1,
+      externalRunId: "openclaw-run-42",
+      startedAt: "2026-08-13T10:00:05.000Z",
+    });
+    const markTerminal = vi.fn(async (input) => ({
+      outcome: "UPDATED" as const,
+      run: { ...running, status: input.status, completedAt: input.completedAt },
+    }));
+    const waitForTask = vi.fn(async () => ({
+      status: "COMPLETED" as const,
+      observedAt: "2026-08-13T10:01:00.000Z",
+    }));
+    const service = new TaskDispatchService({
+      store: {
+        prepare: async () => ({ kind: "ALREADY_DISPATCHED" as const, run: running }),
+        markRunning: vi.fn(),
+        markTerminal,
+      },
+      adapters: {
+        resolve: () => ({ kind: "OPENCLAW", executeTask: vi.fn(), waitForTask }),
+      },
+    });
+    await expect(service.observe(run.id, 1_000)).resolves.toMatchObject({
+      outcome: "COMPLETED",
+      run: { status: "COMPLETED" },
+    });
+    expect(waitForTask).toHaveBeenCalledWith("openclaw-run-42", 1_000);
+    expect(markTerminal).toHaveBeenCalledWith({
+      runId: run.id,
+      status: "COMPLETED",
+      completedAt: "2026-08-13T10:01:00.000Z",
+    });
+  });
 });

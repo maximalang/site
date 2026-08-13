@@ -2,12 +2,12 @@
 
 Server-side OpenClaw Gateway integration for the Agent Operating Environment.
 It combines physically separate read-only lifecycle projection and narrowly
-scoped chat delivery without allowing OpenClaw Agent or Session identifiers to
+scoped chat/Task execution without allowing OpenClaw Agent or Session identifiers to
 become product identity.
 
 Its public surfaces expose no raw Gateway request method. The read adapter has
 no side-effecting operation; the write adapter exposes only canonical
-conversation delivery.
+conversation delivery, approved Task dispatch and terminal Run observation.
 
 ## Write boundary
 
@@ -15,7 +15,9 @@ conversation delivery.
 `operator` role with exactly `operator.write`. A handshake with missing,
 additional or incompatible authority is rejected. The client exposes only
 `chat.send` internally and every projected request is checked by the public,
-pinned `validateChatSendParams` protocol validator before transport.
+pinned protocol validators before transport. Approved Tasks use the distinct
+`agent` RPC and terminal observation uses `agent.wait`; the adapter exposes no
+generic request escape hatch.
 
 The domain idempotency key is forwarded unchanged, `suppressCommandInterpretation`
 is always true, and only the persistence-verified external Agent/session pair
@@ -105,15 +107,14 @@ late-response suppression, offline projection and telemetry redaction. The
 workspace also runs typecheck, lint, build, package-content, dependency audit,
 registry signature and attestation gates.
 
-There is no configured live OpenClaw instance in Slice 2. The official client
-and protocol packages used here are prerelease packages even though they expose
-the documented protocol-v4 public surface. Production release therefore stays
-blocked until either:
-
-1. an equivalent stable package-bearing OpenClaw release is pinned and the
-   complete contract suite is rerun; or
-2. prerelease risk is explicitly accepted and the isolated pinned live-Gateway
-   reconnect/replay verification required by Slice 6 passes.
+The official client, protocol and CLI packages remain prerelease packages; no
+equivalent `2026.8.1` stable artifacts exist in the registry as of the recorded
+Phase 1 verification. The exact `2026.8.1-beta.1` artifacts are lockfile-pinned.
+`npm run test:openclaw-live` now starts that real CLI against disposable
+loopback state and a deterministic model endpoint, proves separate read/write
+authority, executes `agent` + `agent.wait`, and reads the marker back through
+canonical transcript history. Running it requires
+`AGENT_WORLD_OPENCLAW_LIVE_TEST_ACK=isolated`.
 
 Relevant official contracts:
 
