@@ -1,5 +1,13 @@
+import {
+  AgentIdSchema,
+  BindingIdSchema,
+  ConversationIdSchema,
+  OpaqueExternalIdSchema,
+  SessionIdSchema,
+} from "@agent-world/domain";
 import { PROTOCOL_VERSION } from "@openclaw/gateway-protocol/version";
 import * as z from "zod";
+import { normalizeOpenClawChatHistory, type OpenClawReceivedMessage } from "./chat-history.js";
 import {
   createOfficialOpenClawReadGateway,
   type OpenClawCredential,
@@ -49,6 +57,23 @@ const EventSchema = z.object({
   seq: z.number().int().nonnegative().optional(),
   stateVersion: StateVersionSchema.optional(),
 });
+const MessageSessionSchema = z.strictObject({
+  conversationId: ConversationIdSchema,
+  sessionId: SessionIdSchema,
+  agentId: AgentIdSchema,
+  bindingId: BindingIdSchema,
+  externalAgentId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+  externalSessionKey: OpaqueExternalIdSchema,
+});
+export type OpenClawMessageSession = z.infer<typeof MessageSessionSchema>;
+export type OpenClawReceivedHistory = OpenClawMessageSession & {
+  messages: OpenClawReceivedMessage[];
+};
 
 export type OpenClawAdapterState =
   | "IDLE"
@@ -129,6 +154,8 @@ export type OpenClawReadAdapterOptions = {
   gatewayFactory?: OpenClawReadGatewayFactory;
   telemetry: { record: (event: OpenClawTelemetryEvent) => void };
   onSnapshot: (snapshot: OpenClawAdapterSnapshot) => void | Promise<void>;
+  messageSessions?: unknown;
+  onReceivedHistory?: (history: OpenClawReceivedHistory) => void | Promise<void>;
   now?: () => Date;
   correlationId: string;
 };
@@ -155,6 +182,8 @@ export class OpenClawReadAdapter {
   private readonly gatewayFactory: OpenClawReadGatewayFactory;
   private readonly telemetry: OpenClawReadAdapterOptions["telemetry"];
   private readonly onSnapshot: OpenClawReadAdapterOptions["onSnapshot"];
+  private readonly messageSessions: OpenClawMessageSession[];
+  private readonly onReceivedHistory: NonNullable<OpenClawReadAdapterOptions["onReceivedHistory"]>;
   private readonly now: () => Date;
   private readonly correlationId: string;
   private gateway: OpenClawReadGateway | undefined;
@@ -166,6 +195,7 @@ export class OpenClawReadAdapter {
   private syncPromise: Promise<void> | undefined;
   private pendingSync: PendingSync | undefined;
   private snapshotTail: Promise<void> = Promise.resolve();
+  private historyTail: Promise<void> = Promise.resolve();
 
   constructor(options: OpenClawReadAdapterOptions) {
     this.endpoint = parseOpenClawEndpoint(options.config.endpoint);
@@ -176,6 +206,14 @@ export class OpenClawReadAdapter {
     this.gatewayFactory = options.gatewayFactory ?? createOfficialOpenClawReadGateway;
     this.telemetry = options.telemetry;
     this.onSnapshot = options.onSnapshot;
+    this.messageSessions = z
+      .array(MessageSessionSchema)
+      .max(100)
+      .parse(options.messageSessions ?? []);
+    if (this.messageSessions.length > 0 && !options.onReceivedHistory) {
+      throw new Error("A runtime history receiver is required for configured message Sessions");
+    }
+    this.onReceivedHistory = options.onReceivedHistory ?? (async () => undefined);
     this.now = options.now ?? (() => new Date());
     this.correlationId = SafeLabelSchema.parse(options.correlationId);
   }
@@ -227,6 +265,7 @@ export class OpenClawReadAdapter {
     await gateway?.stopAndWait();
     await this.syncPromise;
     await this.snapshotTail;
+    await this.historyTail;
   }
 
   private async handleHello(input: unknown): Promise<void> {
@@ -271,13 +310,14 @@ export class OpenClawReadAdapter {
     }
 
     const event = parsed.data;
+    const historySession = this.messageSessionForEvent(event.event, event.payload);
     if (event.seq === undefined) {
       this.record({
         event: "openclaw_event_ignored",
         eventType: event.event,
         reason: "MISSING_SEQUENCE",
       });
-      if (INVALIDATING_EVENTS.has(event.event)) {
+      if (INVALIDATING_EVENTS.has(event.event) || historySession) {
         await this.scheduleSync({ trigger: "EVENT", resubscribe: false });
       }
       return;
@@ -304,7 +344,22 @@ export class OpenClawReadAdapter {
     if (event.stateVersion) {
       this.stateVersion = { ...event.stateVersion };
     }
+    if (historySession) {
+      const startedAt = Date.now();
+      try {
+        await this.reconcileHistory(historySession);
+      } catch {
+        this.setState("DEGRADED");
+        this.recordSync("EVENT", "READ_FAILED", startedAt);
+      }
+    }
     if (!INVALIDATING_EVENTS.has(event.event)) {
+      if (historySession) {
+        if (syncTrigger === "SEQUENCE_GAP") {
+          await this.scheduleSync({ trigger: syncTrigger, resubscribe: false });
+        }
+        return;
+      }
       this.record({
         event: "openclaw_event_ignored",
         eventType: event.event,
@@ -384,6 +439,12 @@ export class OpenClawReadAdapter {
     try {
       if (sync.resubscribe) {
         await gateway.subscribeSessions();
+        for (const session of this.messageSessions) {
+          await gateway.subscribeSessionMessages({
+            key: session.externalSessionKey,
+            agentId: session.externalAgentId,
+          });
+        }
       }
       const [agents, sessions, presence] = await Promise.all([
         gateway.listAgents(),
@@ -402,6 +463,9 @@ export class OpenClawReadAdapter {
         return;
       }
       await this.publishSnapshot({ runtime, sourceCursor: this.cursor() });
+      for (const session of this.messageSessions) {
+        await this.reconcileHistory(session);
+      }
       if (epoch !== this.connectionEpoch || !this.connectionActive || this.isStopped()) {
         this.recordSync(sync.trigger, "STALE_CONNECTION", startedAt);
         return;
@@ -422,6 +486,58 @@ export class OpenClawReadAdapter {
     const current = this.snapshotTail.then(() => this.onSnapshot(snapshot));
     this.snapshotTail = current.catch(() => undefined);
     return current;
+  }
+
+  private reconcileHistory(session: OpenClawMessageSession): Promise<void> {
+    const current = this.historyTail.then(async () => {
+      const gateway = this.gateway;
+      if (!gateway || !this.connectionActive || this.isStopped()) return;
+      const result = await gateway.readChatHistory({
+        sessionKey: session.externalSessionKey,
+        agentId: session.externalAgentId,
+        limit: 200,
+        maxChars: 32_000,
+      });
+      const messages = normalizeOpenClawChatHistory(result);
+      await this.onReceivedHistory({ ...session, messages });
+    });
+    this.historyTail = current.catch(() => undefined);
+    return current;
+  }
+
+  private messageSessionForEvent(
+    eventType: string,
+    payload: unknown,
+  ): OpenClawMessageSession | undefined {
+    if (eventType !== "chat" && eventType !== "session.message") return undefined;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined;
+    const record = payload as Record<string, unknown>;
+    if (eventType === "chat" && record.state !== "final") return undefined;
+    const scope =
+      record.scope && typeof record.scope === "object" && !Array.isArray(record.scope)
+        ? (record.scope as Record<string, unknown>)
+        : undefined;
+    const key =
+      typeof record.sessionKey === "string"
+        ? record.sessionKey
+        : typeof record.key === "string"
+          ? record.key
+          : typeof scope?.sessionKey === "string"
+            ? scope.sessionKey
+            : undefined;
+    const externalAgentId =
+      typeof record.agentId === "string"
+        ? record.agentId
+        : typeof scope?.agentId === "string"
+          ? scope.agentId
+          : undefined;
+    if (!key) return undefined;
+    const matches = this.messageSessions.filter(
+      (session) =>
+        session.externalSessionKey === key &&
+        (externalAgentId === undefined || session.externalAgentId === externalAgentId),
+    );
+    return matches.length === 1 ? matches[0] : undefined;
   }
 
   private cursor(): OpenClawAdapterSnapshot["sourceCursor"] {

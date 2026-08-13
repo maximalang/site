@@ -59,10 +59,24 @@ export type OpenClawSessionsListParams = {
   limit: 500;
 };
 
+export type OpenClawSessionMessageParams = {
+  key: string;
+  agentId: string;
+};
+
+export type OpenClawChatHistoryParams = {
+  sessionKey: string;
+  agentId: string;
+  limit: 200;
+  maxChars: 32_000;
+};
+
 export interface OpenClawReadGateway {
   start(): void;
   stopAndWait(): Promise<void>;
   subscribeSessions(): Promise<void>;
+  subscribeSessionMessages(params: OpenClawSessionMessageParams): Promise<void>;
+  readChatHistory(params: OpenClawChatHistoryParams): Promise<unknown>;
   listAgents(): Promise<unknown>;
   listSessions(params: OpenClawSessionsListParams): Promise<unknown>;
   listPresence(): Promise<unknown>;
@@ -173,6 +187,19 @@ export const createOfficialOpenClawReadGateway: OpenClawReadGatewayFactory = (in
     subscribeSessions: async () => {
       await client.request("sessions.subscribe", {});
     },
+    subscribeSessionMessages: async (params) => {
+      const response = await client.request("sessions.messages.subscribe", params);
+      if (
+        response &&
+        typeof response === "object" &&
+        "key" in response &&
+        typeof response.key === "string" &&
+        response.key !== params.key
+      ) {
+        throw new Error("OpenClaw canonicalized a configured Session to a different key");
+      }
+    },
+    readChatHistory: (params) => client.request("chat.history", params),
     listAgents: () => client.request("agents.list", {}),
     listSessions: (params) => client.request("sessions.list", params),
     listPresence: () => client.request("system-presence", {}),

@@ -20,6 +20,9 @@ function createHarness(overrides?: {
   sessions?: unknown;
   presence?: unknown;
   onSnapshot?: () => void | Promise<void>;
+  messageSessions?: unknown;
+  history?: unknown;
+  onReceivedHistory?: (history: unknown) => void | Promise<void>;
 }) {
   let callbacks: OpenClawReadGatewayCallbacks | undefined;
   const telemetry: OpenClawTelemetryEvent[] = [];
@@ -28,6 +31,8 @@ function createHarness(overrides?: {
     start: vi.fn(),
     stopAndWait: vi.fn(async () => undefined),
     subscribeSessions: vi.fn(async () => undefined),
+    subscribeSessionMessages: vi.fn(async () => undefined),
+    readChatHistory: vi.fn(async () => overrides?.history ?? { messages: [] }),
     listAgents: vi.fn(
       async () =>
         overrides?.agents ?? {
@@ -79,6 +84,12 @@ function createHarness(overrides?: {
       snapshots.push(snapshot);
       return overrides?.onSnapshot?.();
     },
+    ...(overrides?.messageSessions === undefined
+      ? {}
+      : { messageSessions: overrides.messageSessions }),
+    ...(overrides?.onReceivedHistory === undefined
+      ? {}
+      : { onReceivedHistory: overrides.onReceivedHistory }),
     now: () => new Date("2026-08-13T06:00:00.000Z"),
     correlationId: "corr-test",
   });
@@ -370,5 +381,147 @@ describe("OpenClawReadAdapter", () => {
     await Promise.all([hello, stop]);
     expect(stopped).toBe(true);
     expect(harness.adapter.state).toBe("STOPPED");
+  });
+
+  it("subscribes and reconciles only configured canonical message Sessions before readiness", async () => {
+    const received: unknown[] = [];
+    const messageSession = {
+      conversationId: "conversation_66666666-6666-6666-6666-666666666666",
+      sessionId: "session_77777777-7777-7777-7777-777777777777",
+      agentId: bindings[0].agentId,
+      bindingId: bindings[0].bindingId,
+      externalAgentId: bindings[0].externalAgentId,
+      externalSessionKey: "agent:researcher:main",
+    };
+    const harness = createHarness({
+      messageSessions: [messageSession],
+      history: {
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "Verified reply" }],
+            __openclaw: { id: "reply-1", recordTimestampMs: 1_786_597_200_000 },
+          },
+        ],
+      },
+      onReceivedHistory: async (history) => {
+        received.push(history);
+      },
+    });
+    await harness.adapter.start();
+    await harness.callbacks.onHello(readHello);
+    expect(harness.gateway.subscribeSessionMessages).toHaveBeenCalledWith({
+      key: messageSession.externalSessionKey,
+      agentId: messageSession.externalAgentId,
+    });
+    expect(harness.gateway.readChatHistory).toHaveBeenCalledWith({
+      sessionKey: messageSession.externalSessionKey,
+      agentId: messageSession.externalAgentId,
+      limit: 200,
+      maxChars: 32_000,
+    });
+    expect(received).toEqual([
+      {
+        ...messageSession,
+        messages: [
+          {
+            externalMessageId: "reply-1",
+            content: "Verified reply",
+            createdAt: "2026-08-13T05:00:00.000Z",
+          },
+        ],
+      },
+    ]);
+    expect(harness.adapter.state).toBe("READY");
+  });
+
+  it("reloads authoritative history for final and subscribed events but not opaque deltas", async () => {
+    const messageSession = {
+      conversationId: "conversation_66666666-6666-6666-6666-666666666666",
+      sessionId: "session_77777777-7777-7777-7777-777777777777",
+      agentId: bindings[0].agentId,
+      bindingId: bindings[0].bindingId,
+      externalAgentId: bindings[0].externalAgentId,
+      externalSessionKey: "agent:researcher:main",
+    };
+    const harness = createHarness({
+      messageSessions: [messageSession],
+      onReceivedHistory: async () => undefined,
+    });
+    await harness.adapter.start();
+    await harness.callbacks.onHello(readHello);
+    vi.mocked(harness.gateway.readChatHistory).mockClear();
+    await harness.callbacks.onEvent({
+      type: "event",
+      event: "chat",
+      seq: 1,
+      payload: {
+        sessionKey: messageSession.externalSessionKey,
+        agentId: messageSession.externalAgentId,
+        state: "delta",
+        message: { content: "must not persist" },
+      },
+    });
+    expect(harness.gateway.readChatHistory).not.toHaveBeenCalled();
+    await harness.callbacks.onEvent({
+      type: "event",
+      event: "chat",
+      seq: 2,
+      payload: {
+        sessionKey: messageSession.externalSessionKey,
+        agentId: messageSession.externalAgentId,
+        state: "final",
+        message: { content: "still opaque" },
+      },
+    });
+    expect(harness.gateway.readChatHistory).toHaveBeenCalledOnce();
+    await harness.callbacks.onEvent({
+      type: "event",
+      event: "session.message",
+      seq: 3,
+      payload: {
+        scope: {
+          sessionKey: messageSession.externalSessionKey,
+          agentId: messageSession.externalAgentId,
+        },
+        message: { content: "must still be reloaded from history" },
+      },
+    });
+    expect(harness.gateway.readChatHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it("performs a full reconciliation when a final message event has no sequence", async () => {
+    const messageSession = {
+      conversationId: "conversation_66666666-6666-6666-6666-666666666666",
+      sessionId: "session_77777777-7777-7777-7777-777777777777",
+      agentId: bindings[0].agentId,
+      bindingId: bindings[0].bindingId,
+      externalAgentId: bindings[0].externalAgentId,
+      externalSessionKey: "agent:researcher:main",
+    };
+    const harness = createHarness({
+      messageSessions: [messageSession],
+      onReceivedHistory: async () => undefined,
+    });
+    await harness.adapter.start();
+    await harness.callbacks.onHello(readHello);
+    vi.mocked(harness.gateway.listSessions).mockClear();
+    await harness.callbacks.onEvent({
+      type: "event",
+      event: "chat",
+      payload: {
+        sessionKey: messageSession.externalSessionKey,
+        agentId: messageSession.externalAgentId,
+        state: "final",
+      },
+    });
+    expect(harness.gateway.listSessions).toHaveBeenCalledOnce();
+    expect(harness.telemetry).toContainEqual(
+      expect.objectContaining({
+        event: "openclaw_event_ignored",
+        eventType: "chat",
+        reason: "MISSING_SEQUENCE",
+      }),
+    );
   });
 });

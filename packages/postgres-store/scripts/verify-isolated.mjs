@@ -16,6 +16,7 @@ import {
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresOwnerSessionStore,
+  PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
 } from "../dist/index.js";
 
@@ -147,7 +148,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 3
+    ledger.rows.at(-1)?.version !== 4
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -348,6 +349,48 @@ try {
       "2026-08-13T09:30:00.000Z",
     ],
   );
+  const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
+    messageId: () => "message_0a0a0a0a-0a0a-0a0a-0a0a-0a0a0a0a0a0a",
+  });
+  const inboundHistory = {
+    conversationId: ids.conversation,
+    sessionId: ids.session,
+    agentId: ids.agent,
+    bindingId: ids.binding,
+    externalSessionKey: "agent:researcher:protocol-review",
+    messages: [
+      {
+        externalMessageId: "openclaw-transcript-message-1",
+        content: "The protocol is verified.",
+        createdAt: "2026-08-13T09:45:00.000Z",
+      },
+    ],
+  };
+  if ((await runtimeMessageStore.receiveOpenClawHistory(inboundHistory)) !== 1) {
+    throw new Error("Runtime inbox did not persist the authoritative Agent message");
+  }
+  if ((await runtimeMessageStore.receiveOpenClawHistory(inboundHistory)) !== 0) {
+    throw new Error("Runtime inbox did not deduplicate the authoritative replay");
+  }
+  await expectRejected(
+    runtimeMessageStore.receiveOpenClawHistory({
+      ...inboundHistory,
+      messages: [{ ...inboundHistory.messages[0], content: "Conflicting replay" }],
+    }),
+    "Runtime inbox accepted conflicting content for one upstream identity",
+  );
+  const runtimeMessageEvidence = await pool.query(
+    `SELECT count(*)::integer AS message_count
+       FROM agent_world.conversation_messages
+      WHERE author = 'AGENT'
+        AND adapter_kind = 'OPENCLAW'
+        AND binding_id = $1
+        AND external_message_id = $2`,
+    [ids.binding, inboundHistory.messages[0].externalMessageId],
+  );
+  if (runtimeMessageEvidence.rows[0]?.message_count !== 1) {
+    throw new Error("Runtime inbox did not preserve one canonical Agent message");
+  }
 
   const store = new PostgresConversationStore(pool);
   const makeIntent = (
@@ -520,7 +563,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

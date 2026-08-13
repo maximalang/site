@@ -16,12 +16,21 @@ const binding = {
   external_agent_id: "researcher",
   display_name: agent.display_name,
 };
+const messageSession = {
+  id: "session_33333333-3333-3333-3333-333333333333",
+  conversation_id: "conversation_44444444-4444-4444-4444-444444444444",
+  agent_id: agent.id,
+  binding_id: binding.id,
+  external_agent_id: binding.external_agent_id,
+  external_session_ref: "agent:researcher:main",
+};
 
-function pool(agentRows = [agent], bindingRows = [binding]) {
+function pool(agentRows = [agent], bindingRows = [binding], messageSessionRows = [messageSession]) {
   const query = vi
     .fn()
     .mockResolvedValueOnce({ rows: agentRows })
-    .mockResolvedValueOnce({ rows: bindingRows });
+    .mockResolvedValueOnce({ rows: bindingRows })
+    .mockResolvedValueOnce({ rows: messageSessionRows });
   const release = vi.fn();
   return {
     query,
@@ -52,6 +61,16 @@ describe("PostgresOpenClawConfigurationReader", () => {
         bindingId: binding.id,
         externalAgentId: binding.external_agent_id,
         displayName: agent.display_name,
+      },
+    ]);
+    expect(configuration.messageSessions).toEqual([
+      {
+        conversationId: messageSession.conversation_id,
+        sessionId: messageSession.id,
+        agentId: agent.id,
+        bindingId: binding.id,
+        externalAgentId: binding.external_agent_id,
+        externalSessionKey: messageSession.external_session_ref,
       },
     ]);
     expect(configuration.agents[0]?.id).not.toBe(configuration.bindings[0]?.bindingId);

@@ -280,12 +280,12 @@ try {
        (SELECT count(*)::integer FROM agent_world.schema_migrations) AS migrations,
        (SELECT count(*)::integer FROM agent_world.owner_sessions WHERE revoked_at IS NOT NULL) AS revoked_sessions`,
   );
-  if (evidence.rows[0]?.migrations !== 3 || evidence.rows[0]?.revoked_sessions !== 1) {
+  if (evidence.rows[0]?.migrations !== 4 || evidence.rows[0]?.revoked_sessions !== 1) {
     throw new Error("Standalone runtime did not preserve migration or revocation evidence");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 3, authLifecycle: true, worldAuth: true, conversationAuth: true, agentConversationAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 4, authLifecycle: true, worldAuth: true, conversationAuth: true, agentConversationAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

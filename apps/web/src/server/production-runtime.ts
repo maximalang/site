@@ -13,6 +13,7 @@ import {
   PostgresConversationStore,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
+  PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
 } from "@agent-world/postgres-store";
 import { Pool, type PoolConfig } from "pg";
@@ -138,6 +139,9 @@ export async function createProductionRuntime(
     const agentConversationReader = new PostgresAgentConversationReader(pool);
     const conversationReader = new PostgresConversationReader(pool);
     const conversationStore = new PostgresConversationStore(pool);
+    const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
+      messageId: () => `message_${randomUUID()}`,
+    });
     const configuration = await new PostgresOpenClawConfigurationReader(pool).read();
     const runtimeObservationId = randomUUID();
     const worldStore = new PostgresWorldProjectionStore(pool, {
@@ -173,6 +177,7 @@ export async function createProductionRuntime(
             instanceId: `${openClawConfig.instanceId}.read`,
           },
           bindings: configuration.bindings,
+          messageSessions: configuration.messageSessions,
           credentialProvider,
           telemetry: { record: (event) => record("openclaw-read", event) },
           onSnapshot: (snapshot) =>
@@ -185,6 +190,9 @@ export async function createProductionRuntime(
                 status,
               })),
             }),
+          onReceivedHistory: async (history) => {
+            await runtimeMessageStore.receiveOpenClawHistory(history);
+          },
           correlationId: "openclaw-read-runtime",
         });
         writeAdapter = new OpenClawWriteAdapter({
