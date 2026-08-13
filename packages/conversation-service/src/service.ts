@@ -299,7 +299,6 @@ export class ConversationSendService {
       message.conversationId !== intent.conversationId ||
       message.agentId !== intent.agentId ||
       message.content !== intent.content ||
-      message.createdAt !== intent.createdAt ||
       message.source.commandId !== intent.idempotencyKey ||
       (delivery !== undefined && message.delivery !== delivery) ||
       (sessionId !== undefined && message.sessionId !== sessionId)

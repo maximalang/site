@@ -179,7 +179,6 @@ function isSameIntent(row: MessageRow, intent: SendMessageIntent): boolean {
     row.conversation_id === intent.conversationId &&
     row.agent_id === intent.agentId &&
     row.content === intent.content &&
-    Date.parse(iso(row.created_at)) === Date.parse(intent.createdAt) &&
     row.command_id === intent.idempotencyKey
   );
 }

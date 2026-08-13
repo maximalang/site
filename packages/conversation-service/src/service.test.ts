@@ -147,6 +147,16 @@ describe("ConversationSendService", () => {
     expect(store.markDispatched).not.toHaveBeenCalled();
   });
 
+  it("replays a later retry while preserving the first persisted timestamp", async () => {
+    const dispatched = ownerMessage("DISPATCHED");
+    const { adapter, service } = setup({ kind: "REPLAY", message: dispatched });
+
+    await expect(
+      service.send({ ...intent, createdAt: "2026-08-13T10:05:00.000Z" }),
+    ).resolves.toEqual({ outcome: "REPLAYED", message: dispatched });
+    expect(adapter.deliver).not.toHaveBeenCalled();
+  });
+
   it.each([
     "CONVERSATION_NOT_FOUND",
     "AGENT_MISMATCH",

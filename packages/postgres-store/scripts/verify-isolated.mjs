@@ -264,7 +264,10 @@ try {
     throw new Error("PostgreSQL store did not persist dispatch");
   }
   const replay = await store.prepareSend({
-    intent: firstIntent,
+    intent: SendMessageIntentSchema.parse({
+      ...firstIntent,
+      createdAt: "2026-08-13T10:05:00.000Z",
+    }),
     acceptedAt: "2026-08-13T10:00:05.000Z",
   });
   if (replay.kind !== "REPLAY") {

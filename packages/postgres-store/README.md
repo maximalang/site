@@ -27,6 +27,8 @@ persists one active Session plus enabled same-Agent Binding before any runtime
 call.
 
 - A completed exact duplicate is `REPLAY` and creates no runtime call.
+- A later retry preserves the first persisted message timestamp; retry arrival
+  time is not part of the immutable idempotency tuple.
 - An `ACCEPTED` or `FAILED` exact duplicate resumes through the same persisted
   Session and Binding.
 - A reused key or Message ID with different immutable input is
