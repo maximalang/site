@@ -18,7 +18,7 @@ CREATE TABLE agent_world.codex_execution_jobs (
   id text PRIMARY KEY CHECK (
     id ~ '^codex_execution_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
   ),
-  run_id text NOT NULL,
+  run_id text NOT NULL UNIQUE,
   task_id text NOT NULL,
   agent_id text NOT NULL,
   binding_id text NOT NULL,
@@ -128,6 +128,7 @@ CREATE TABLE agent_world.codex_execution_events (
     'RUN_COMPLETED', 'RUN_FAILED'
   )),
   occurred_at timestamptz NOT NULL,
+  event_sha256 text NOT NULL CHECK (event_sha256 ~ '^[a-f0-9]{64}$'),
   thread_id text CHECK (
     thread_id IS NULL OR (
       char_length(thread_id) BETWEEN 1 AND 512

@@ -11,6 +11,9 @@
   "exclude": ["src/**/*.test.ts"],
   "references": [
     {
+      "path": "../codex-adapter"
+    },
+    {
       "path": "../conversation-service"
     },
     {
