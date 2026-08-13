@@ -89,6 +89,35 @@ describe("PostgresExecutionPreferenceStore", () => {
     expect(resolved.budget).toEqual({ value: "QUALITY", source: { kind: "TASK", taskId } });
   });
 
+  it("returns the sparse local layer next to provenance-aware effective values", async () => {
+    const fake = pool([
+      [],
+      [{ valid: true }],
+      [
+        {
+          scope_kind: "SYSTEM",
+          project_id: null,
+          agent_id: null,
+          task_id: null,
+          model_selection: "AUTO",
+          model_id: null,
+          account_selection: "AUTO",
+          account_id: null,
+          mode: "AUTO",
+          context_policy: "AUTO",
+          budget_policy: "BALANCED",
+        },
+      ],
+    ]);
+    const model = await new PostgresExecutionPreferenceStore(fake.value).read({ agentId });
+    expect(model.local).toEqual({
+      schemaVersion: 1,
+      scope: { kind: "AGENT", agentId },
+      overrides: {},
+    });
+    expect(model.resolved.budget.source).toEqual({ kind: "SYSTEM" });
+  });
+
   it("upserts only explicit local overrides", async () => {
     const fake = pool([[], [], []]);
     await new PostgresExecutionPreferenceStore(fake.value).writeLayer(

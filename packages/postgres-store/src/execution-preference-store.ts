@@ -2,17 +2,24 @@ import type { AgentId, ProjectId, TaskId } from "@agent-world/domain";
 import {
   type ExecutionPreferenceLayer,
   ExecutionPreferenceLayerSchema,
+  type ExecutionPreferenceReadModel,
+  ExecutionPreferenceReadModelSchema,
+  type ExecutionPreferenceSelection,
+  ExecutionPreferenceSelectionSchema,
   type ResolvedExecutionPreferences,
   resolveExecutionPreferences,
 } from "@agent-world/read-model";
 import type { QueryResultRow } from "pg";
 import type { TransactionClient, TransactionPool } from "./conversation-store.js";
 
-export type ResolveExecutionPreferencesInput = {
-  projectId?: ProjectId;
-  agentId?: AgentId;
-  taskId?: TaskId;
-};
+export type ResolveExecutionPreferencesInput = ExecutionPreferenceSelection;
+
+function selectedScope(input: ExecutionPreferenceSelection): ExecutionPreferenceLayer["scope"] {
+  if (input.taskId) return { kind: "TASK", taskId: input.taskId };
+  if (input.agentId) return { kind: "AGENT", agentId: input.agentId };
+  if (input.projectId) return { kind: "PROJECT", projectId: input.projectId };
+  return { kind: "SYSTEM" };
+}
 
 type PreferenceRow = QueryResultRow & {
   scope_kind: "SYSTEM" | "PROJECT" | "AGENT" | "TASK";
@@ -81,21 +88,44 @@ export class PostgresExecutionPreferenceStore {
   constructor(private readonly pool: TransactionPool) {}
 
   async resolve(input: ResolveExecutionPreferencesInput): Promise<ResolvedExecutionPreferences> {
-    if (input.taskId && (!input.projectId || !input.agentId)) {
-      throw new Error("INVALID_SCOPE_CHAIN");
-    }
+    return (await this.read(input)).resolved;
+  }
+
+  async read(input: ResolveExecutionPreferencesInput): Promise<ExecutionPreferenceReadModel> {
+    const selection = ExecutionPreferenceSelectionSchema.parse(input);
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
       try {
-        if (input.taskId) {
+        if (selection.taskId) {
           const valid = (
             await client.query<{ valid: boolean }>(
               `SELECT EXISTS (
                  SELECT 1 FROM agent_world.tasks
                   WHERE id = $1 AND project_id = $2 AND assignee_agent_id = $3
                ) AS valid`,
-              [input.taskId, input.projectId, input.agentId],
+              [selection.taskId, selection.projectId, selection.agentId],
+            )
+          ).rows[0]?.valid;
+          if (valid !== true) throw new Error("INVALID_SCOPE_CHAIN");
+        } else if (selection.projectId && selection.agentId) {
+          const valid = (
+            await client.query<{ valid: boolean }>(
+              `SELECT EXISTS (
+                 SELECT 1 FROM agent_world.project_agents
+                  WHERE project_id = $1 AND agent_id = $2
+               ) AS valid`,
+              [selection.projectId, selection.agentId],
+            )
+          ).rows[0]?.valid;
+          if (valid !== true) throw new Error("INVALID_SCOPE_CHAIN");
+        } else if (selection.projectId || selection.agentId) {
+          const table = selection.projectId ? "projects" : "agents";
+          const id = selection.projectId ?? selection.agentId;
+          const valid = (
+            await client.query<{ valid: boolean }>(
+              `SELECT EXISTS (SELECT 1 FROM agent_world.${table} WHERE id = $1) AS valid`,
+              [id],
             )
           ).rows[0]?.valid;
           if (valid !== true) throw new Error("INVALID_SCOPE_CHAIN");
@@ -113,12 +143,26 @@ export class PostgresExecutionPreferenceStore {
               ORDER BY CASE scope_kind
                 WHEN 'SYSTEM' THEN 0 WHEN 'PROJECT' THEN 1
                 WHEN 'AGENT' THEN 2 WHEN 'TASK' THEN 3 END`,
-            [input.projectId ?? null, input.agentId ?? null, input.taskId ?? null],
+            [selection.projectId ?? null, selection.agentId ?? null, selection.taskId ?? null],
           )
         ).rows;
         const resolved = resolveExecutionPreferences(rows.map(layer));
+        const expectedScope = selectedScope(selection);
+        const local =
+          rows.map(layer).find((value) => value.scope.kind === expectedScope.kind) ??
+          ExecutionPreferenceLayerSchema.parse({
+            schemaVersion: 1,
+            scope: expectedScope,
+            overrides: {},
+          });
+        const model = ExecutionPreferenceReadModelSchema.parse({
+          schemaVersion: 1,
+          selection,
+          local,
+          resolved,
+        });
         await client.query("COMMIT");
-        return resolved;
+        return model;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

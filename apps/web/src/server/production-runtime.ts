@@ -11,6 +11,7 @@ import {
   PostgresAgentConversationReader,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
   PostgresOpenClawConfigurationReader,
@@ -143,6 +144,7 @@ export async function createProductionRuntime(
     const conversationStore = new PostgresConversationStore(pool);
     const hubReader = new PostgresHubReader(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
+    const executionPreferenceStore = new PostgresExecutionPreferenceStore(pool);
     const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
       messageId: () => `message_${randomUUID()}`,
     });
@@ -233,6 +235,9 @@ export async function createProductionRuntime(
       sendConversation: (input) => sender.send(input),
       assignTask: (input) => worldStore.assignTask(input),
       executeHubCommand: (command) => hubCommandStore.execute(command),
+      readExecutionPreferences: (selection) => executionPreferenceStore.read(selection),
+      writeExecutionPreferences: (layer, updatedAt) =>
+        executionPreferenceStore.writeLayer(layer, updatedAt),
       readHub: () => hubReader.read(),
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {

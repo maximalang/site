@@ -251,12 +251,52 @@ try {
   if (/credential|configurationRef|sourceRef|instructions|binding_|session_/.test(serializedHub)) {
     throw new Error("Authorized Hub leaked a private or runtime locator");
   }
+  const anonymousPreferences = await fetch(`${baseUrl}/api/hub/preferences`);
+  if (anonymousPreferences.status !== 401) {
+    throw new Error(`Anonymous execution preferences returned ${anonymousPreferences.status}`);
+  }
+  const preferences = await fetch(`${baseUrl}/api/hub/preferences`, { headers: { cookie } });
+  const preferencesBody = await preferences.json();
+  if (
+    preferences.status !== 200 ||
+    preferencesBody.local?.scope?.kind !== "SYSTEM" ||
+    preferencesBody.resolved?.budget?.value !== "BALANCED"
+  ) {
+    throw new Error("Owner execution preferences did not expose System provenance");
+  }
   const hubCommandHeaders = {
     cookie,
     "content-type": "application/json",
     origin: baseUrl,
     "x-agent-world-csrf": loginBody.csrfToken,
   };
+  const writePreferences = await fetch(`${baseUrl}/api/hub/preferences`, {
+    method: "PUT",
+    headers: hubCommandHeaders,
+    body: JSON.stringify({
+      schemaVersion: 1,
+      scope: { kind: "SYSTEM" },
+      overrides: {
+        model: { kind: "AUTO" },
+        account: { kind: "AUTO" },
+        mode: "AUTO",
+        context: "LEAN",
+        budget: "BALANCED",
+      },
+    }),
+  });
+  if (writePreferences.status !== 204) {
+    throw new Error(`Owner execution preference update returned ${writePreferences.status}`);
+  }
+  const updatedPreferences = await fetch(`${baseUrl}/api/hub/preferences`, {
+    headers: { cookie },
+  });
+  if (
+    updatedPreferences.status !== 200 ||
+    (await updatedPreferences.json()).resolved?.context?.value !== "LEAN"
+  ) {
+    throw new Error("Execution preference update was not visible through the read model");
+  }
   const createProvider = await fetch(`${baseUrl}/api/hub/commands`, {
     method: "POST",
     headers: hubCommandHeaders,
@@ -396,7 +436,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 8, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 8, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

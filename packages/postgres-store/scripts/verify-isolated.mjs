@@ -832,14 +832,16 @@ try {
     }),
     "2026-08-13T09:42:03.000Z",
   );
-  const resetPreferences = await preferenceStore.resolve({
+  const resetPreferenceModel = await preferenceStore.read({
     projectId: ids.project,
     agentId: ids.agent,
     taskId: taskAssignment.taskId,
   });
+  const resetPreferences = resetPreferenceModel.resolved;
   if (
     resetPreferences.budget.value !== "ECONOMY" ||
-    resetPreferences.budget.source.kind !== "PROJECT"
+    resetPreferences.budget.source.kind !== "PROJECT" ||
+    Object.keys(resetPreferenceModel.local.overrides).length !== 0
   ) {
     throw new Error("Execution preference reset did not reveal the inherited Project value");
   }
@@ -1057,7 +1059,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 5, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

@@ -41,6 +41,16 @@ export const applicationHubCommandDependencies = {
     runtime().executeHubCommand(command),
 };
 
+export const applicationExecutionPreferenceDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  read: (selection: Parameters<ReturnType<typeof runtime>["readExecutionPreferences"]>[0]) =>
+    runtime().readExecutionPreferences(selection),
+  write: (
+    layer: Parameters<ReturnType<typeof runtime>["writeExecutionPreferences"]>[0],
+    updatedAt: string,
+  ) => runtime().writeExecutionPreferences(layer, updatedAt),
+};
+
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {
   try {
     return runtime().auth.authorize(request);

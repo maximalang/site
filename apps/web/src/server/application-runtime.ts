@@ -2,6 +2,9 @@ import type { ConversationSendResult } from "@agent-world/conversation-service";
 import type { AgentId, SendMessageIntent } from "@agent-world/domain";
 import type { AssignTaskInput, ConversationReadInput } from "@agent-world/postgres-store";
 import type {
+  ExecutionPreferenceLayer,
+  ExecutionPreferenceReadModel,
+  ExecutionPreferenceSelection,
   HubCommandRequest,
   HubCommandResponse,
   HubReadModel,
@@ -16,6 +19,10 @@ export type ApplicationRuntime = {
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;
   assignTask(input: AssignTaskInput): Promise<unknown>;
   executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
+  readExecutionPreferences(
+    selection: ExecutionPreferenceSelection,
+  ): Promise<ExecutionPreferenceReadModel>;
+  writeExecutionPreferences(layer: ExecutionPreferenceLayer, updatedAt: string): Promise<void>;
   readHub(): Promise<HubReadModel>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;

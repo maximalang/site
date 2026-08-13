@@ -14,6 +14,8 @@ function runtime() {
     sendConversation: vi.fn(),
     assignTask: vi.fn(),
     executeHubCommand: vi.fn(),
+    readExecutionPreferences: vi.fn(),
+    writeExecutionPreferences: vi.fn(),
     readHub: vi.fn(),
     readWorld: vi.fn(),
     stop: vi.fn(async () => undefined),
