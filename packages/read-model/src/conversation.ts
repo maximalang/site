@@ -52,6 +52,26 @@ export const ConversationSendResponseSchema = z.strictObject({
 });
 export type ConversationSendResponse = z.infer<typeof ConversationSendResponseSchema>;
 
+export const AgentConversationListSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  generatedAt: TimestampSchema,
+  agent: z.strictObject({
+    agentId: AgentIdSchema,
+    displayName: AgentSchema.shape.displayName,
+  }),
+  conversations: z
+    .array(
+      z.strictObject({
+        conversationId: ConversationSchema.shape.id,
+        projectId: ConversationSchema.shape.projectId,
+        title: ConversationSchema.shape.title,
+        createdAt: TimestampSchema,
+      }),
+    )
+    .max(100),
+});
+export type AgentConversationList = z.infer<typeof AgentConversationListSchema>;
+
 export const ConversationReadModelSchema = z.strictObject({
   schemaVersion: z.literal(1),
   generatedAt: TimestampSchema,

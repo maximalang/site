@@ -11,6 +11,7 @@ import { Pool } from "pg";
 import {
   applyMigrations,
   discoverMigrations,
+  PostgresAgentConversationReader,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresOwnerSessionStore,
@@ -421,9 +422,25 @@ try {
       throw new Error("PostgreSQL reader leaked a runtime locator into the safe projection");
     }
   }
+  const agentConversationIndex = await new PostgresAgentConversationReader(
+    pool,
+    () => new Date("2026-08-13T10:00:15.000Z"),
+  ).read(ids.agent);
+  const serializedIndex = JSON.stringify(agentConversationIndex);
+  if (
+    agentConversationIndex?.conversations.length !== 1 ||
+    agentConversationIndex.conversations[0]?.conversationId !== ids.conversation
+  ) {
+    throw new Error("PostgreSQL reader did not list the Agent's canonical Conversation");
+  }
+  for (const forbidden of [ids.session, ids.binding, "gateway-message-private-locator"]) {
+    if (serializedIndex.includes(forbidden)) {
+      throw new Error("PostgreSQL Agent index leaked a runtime locator");
+    }
+  }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 1, ownerAuthScenarios: 6 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

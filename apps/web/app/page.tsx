@@ -1,5 +1,5 @@
-import { ControlCenter } from "../src/components/control-center";
+import { OwnerGate } from "../src/components/owner-gate";
 
 export default function HomePage() {
-  return <ControlCenter />;
+  return <OwnerGate />;
 }

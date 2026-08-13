@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { buildContractFixture } from "../src/test-fixtures";
 
 const fixtureAgent = "Research Lead";
 const fixtureTask = "Verify protocol contract";
@@ -10,6 +11,92 @@ test("World and Command expose one canonical agent projection", async ({ page },
   const failedRequests: string[] = [];
   const unexpectedOrigins: string[] = [];
   const apiCursors: number[] = [];
+  const fixture = buildContractFixture();
+  const fixtureAgentRecord = fixture.agents.find((agent) => agent.displayName === fixtureAgent);
+  if (!fixtureAgentRecord) throw new Error("Contract fixture is missing the Research Lead");
+  const agentId = fixtureAgentRecord.agentId;
+  const conversationId = "conversation_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const projectId = "project_33333333-3333-3333-3333-333333333333";
+  const csrfToken = "a".repeat(43);
+
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        authenticated: true,
+        csrfToken,
+        expiresAt: "2026-08-13T18:00:00.000Z",
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route("**/api/world", (route) =>
+    route.fulfill({ body: JSON.stringify(fixture), contentType: "application/json", status: 200 }),
+  );
+  await page.route(`**/api/agents/${agentId}/conversations`, (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        generatedAt: "2026-08-13T06:01:00.000Z",
+        agent: { agentId, displayName: fixtureAgent },
+        conversations: [
+          {
+            conversationId,
+            projectId,
+            title: "Protocol review",
+            createdAt: "2026-08-13T06:00:00.000Z",
+          },
+        ],
+      }),
+      contentType: "application/json",
+      status: 200,
+    }),
+  );
+  await page.route(`**/api/conversations/${conversationId}`, async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { messageId: string; content: string };
+      expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
+      await route.fulfill({
+        body: JSON.stringify({
+          schemaVersion: 1,
+          outcome: "DISPATCHED",
+          message: {
+            messageId: body.messageId,
+            author: "OWNER",
+            content: body.content,
+            delivery: "DISPATCHED",
+            createdAt: "2026-08-13T06:02:00.000Z",
+            provenance: { kind: "DOMAIN" },
+          },
+        }),
+        contentType: "application/json",
+        status: 200,
+      });
+      return;
+    }
+    await route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        generatedAt: "2026-08-13T06:01:00.000Z",
+        conversation: {
+          conversationId,
+          projectId,
+          title: "Protocol review",
+          createdAt: "2026-08-13T06:00:00.000Z",
+        },
+        agent: {
+          agentId,
+          displayName: fixtureAgent,
+          role: "Evidence-first research",
+          isEnabled: true,
+        },
+        messages: [],
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
 
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -59,6 +146,19 @@ test("World and Command expose one canonical agent projection", async ({ page },
     (element) => element.getBoundingClientRect().right,
   );
   expect(skipLinkRightEdge).toBeLessThanOrEqual(0);
+
+  await worldAgent.dblclick();
+  const conversationDialog = page.getByRole("dialog", { name: fixtureAgent });
+  await expect(conversationDialog).toBeVisible();
+  await expect(
+    conversationDialog.getByText("Сообщений пока нет. Начните рабочий диалог."),
+  ).toBeVisible();
+  await conversationDialog.getByLabel("Сообщение").fill("Проверь протокол");
+  await conversationDialog.getByRole("button", { name: "Отправить" }).click();
+  await expect(conversationDialog.getByText("Проверь протокол")).toBeVisible();
+  await expect(conversationDialog.locator('.message[data-author="AGENT"]')).toHaveCount(0);
+  await conversationDialog.getByRole("button", { name: "Закрыть диалог" }).click();
+  await expect(worldAgent).toBeFocused();
 
   const worldAccessibility = await new AxeBuilder({ page }).analyze();
   expect(worldAccessibility.violations).toEqual([]);
@@ -118,4 +218,47 @@ test("the public surface sends defensive response headers", async ({ request }) 
   expect(response.headers()["strict-transport-security"]).toContain("max-age=31536000");
   expect(response.headers()["x-content-type-options"]).toBe("nosniff");
   expect(response.headers()["x-frame-options"]).toBe("DENY");
+});
+
+test("the owner login gate does not persist credentials in browser storage", async ({ page }) => {
+  const fixture = buildContractFixture();
+  const csrfToken = "b".repeat(43);
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      body: JSON.stringify({ error: { code: "AUTHENTICATION_REQUIRED" } }),
+      contentType: "application/json",
+      status: 401,
+    }),
+  );
+  await page.route("**/api/auth/login", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      schemaVersion: 1,
+      password: "browser-only-secret",
+    });
+    await route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        authenticated: true,
+        csrfToken,
+        expiresAt: "2026-08-13T18:00:00.000Z",
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+  await page.route("**/api/world", (route) =>
+    route.fulfill({ body: JSON.stringify(fixture), contentType: "application/json", status: 200 }),
+  );
+
+  await page.goto("/");
+  await page.getByLabel("Пароль владельца").fill("browser-only-secret");
+  await page.getByRole("button", { name: "Войти" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "AI World" })).toBeVisible();
+  expect(
+    await page.evaluate(() => ({
+      local: Object.values(localStorage),
+      session: Object.values(sessionStorage),
+      visiblePassword: document.body.textContent?.includes("browser-only-secret"),
+    })),
+  ).toEqual({ local: [], session: [], visiblePassword: false });
 });

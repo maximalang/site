@@ -215,6 +215,15 @@ try {
     throw new Error("Authorized World did not return the bounded no-runtime projection");
   }
   const conversationId = "conversation_11111111-1111-1111-1111-111111111111";
+  const agentId = "agent_33333333-3333-3333-3333-333333333333";
+  const agentConversations = await fetch(`${baseUrl}/api/agents/${agentId}/conversations`, {
+    headers: { cookie },
+  });
+  if (agentConversations.status !== 404) {
+    throw new Error(
+      `Missing authorized Agent conversation index returned ${agentConversations.status}`,
+    );
+  }
   const conversation = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
     headers: { cookie },
   });
@@ -232,7 +241,7 @@ try {
     body: JSON.stringify({
       schemaVersion: 1,
       messageId: "message_22222222-2222-2222-2222-222222222222",
-      agentId: "agent_33333333-3333-3333-3333-333333333333",
+      agentId,
       content: "Verify the runtime boundary.",
     }),
   });
@@ -276,7 +285,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 2, authLifecycle: true, worldAuth: true, conversationAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 2, authLifecycle: true, worldAuth: true, conversationAuth: true, agentConversationAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

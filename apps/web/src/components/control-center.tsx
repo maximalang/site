@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { loadWorldReadModel } from "../client/world-api";
+import { type ConversationClient, ConversationDrawer } from "./conversation-drawer";
 import { WorldCanvas } from "./world-canvas";
 
 type Mode = "WORLD" | "COMMAND";
@@ -42,7 +43,13 @@ function StatusBadge({ status }: { status: AgentProjectionCore["status"] }) {
   );
 }
 
-function AgentInspector({ agent }: { agent: AgentProjectionCore | undefined }) {
+function AgentInspector({
+  agent,
+  onOpenConversation,
+}: {
+  agent: AgentProjectionCore | undefined;
+  onOpenConversation: (agentId: AgentId) => void;
+}) {
   if (!agent) {
     return (
       <section className="inspector empty-inspector" aria-label="Карточка агента">
@@ -80,6 +87,13 @@ function AgentInspector({ agent }: { agent: AgentProjectionCore | undefined }) {
         ) : null}
       </dl>
       <p className="inspector-note">Runtime-сессии и credentials не входят в эту проекцию.</p>
+      <button
+        className="primary-button inspector-chat-button"
+        onClick={() => onOpenConversation(agent.agentId)}
+        type="button"
+      >
+        Открыть диалог
+      </button>
     </section>
   );
 }
@@ -88,10 +102,12 @@ function AgentRoster({
   agents,
   selectedAgentId,
   onSelect,
+  onOpenConversation,
 }: {
   agents: AgentProjectionCore[];
   selectedAgentId: AgentId | undefined;
   onSelect: (agentId: AgentId) => void;
+  onOpenConversation: (agentId: AgentId) => void;
 }) {
   return (
     <section className="world-roster" aria-labelledby="world-roster-title">
@@ -109,6 +125,7 @@ function AgentRoster({
               className="agent-list-button"
               data-selected={agent.agentId === selectedAgentId}
               onClick={() => onSelect(agent.agentId)}
+              onDoubleClick={() => onOpenConversation(agent.agentId)}
               type="button"
             >
               <span>
@@ -128,10 +145,12 @@ function CommandTable({
   agents,
   selectedAgentId,
   onSelect,
+  onOpenConversation,
 }: {
   agents: AgentProjectionCore[];
   selectedAgentId: AgentId | undefined;
   onSelect: (agentId: AgentId) => void;
+  onOpenConversation: (agentId: AgentId) => void;
 }) {
   return (
     <section className="command-panel" aria-labelledby="command-agents-title">
@@ -166,7 +185,10 @@ function CommandTable({
                 <td>
                   <button
                     className="text-button"
-                    onClick={() => onSelect(agent.agentId)}
+                    onClick={() => {
+                      onSelect(agent.agentId);
+                      onOpenConversation(agent.agentId);
+                    }}
                     type="button"
                   >
                     Открыть
@@ -182,19 +204,28 @@ function CommandTable({
 }
 
 export function ControlCenter({
+  csrfToken,
   loadReadModel = defaultLoadReadModel,
+  conversationClient,
+  onLogout,
 }: {
+  csrfToken: string;
   loadReadModel?: LoadReadModel;
+  conversationClient?: ConversationClient;
+  onLogout?: () => Promise<void> | void;
 }) {
   const [mode, setMode] = useState<Mode>("WORLD");
   const [model, setModel] = useState<WorldReadModel>();
   const [loadError, setLoadError] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<AgentId>();
+  const [conversationAgentId, setConversationAgentId] = useState<AgentId>();
+  const [logoutState, setLogoutState] = useState<"IDLE" | "PENDING" | "ERROR">("IDLE");
   const worldTabId = useId();
   const commandTabId = useId();
   const worldTabRef = useRef<HTMLButtonElement>(null);
   const commandTabRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -223,6 +254,30 @@ export function ControlCenter({
   const selectAgent = useCallback((agentId: AgentId) => {
     setSelectedAgentId(agentId);
   }, []);
+
+  const openConversation = useCallback((agentId: AgentId) => {
+    setSelectedAgentId(agentId);
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    setConversationAgentId(agentId);
+  }, []);
+
+  const closeConversation = useCallback(() => {
+    setConversationAgentId(undefined);
+    window.requestAnimationFrame(() => returnFocusRef.current?.focus());
+  }, []);
+
+  const conversationAgent = agents.find((agent) => agent.agentId === conversationAgentId);
+
+  const logout = async () => {
+    if (!onLogout || logoutState === "PENDING") return;
+    setLogoutState("PENDING");
+    try {
+      await onLogout();
+    } catch {
+      setLogoutState("ERROR");
+    }
+  };
 
   const selectMode = (next: Mode, focus = false) => {
     setMode(next);
@@ -259,12 +314,31 @@ export function ControlCenter({
             <span>Operating Environment</span>
           </div>
         </div>
-        <div className="topbar-meta" aria-label="Состояние проекции" role="status">
-          <span className="live-indicator" data-live={model?.source === "LIVE"}>
-            <span aria-hidden="true" />
-            {model?.source === "LIVE" ? "Live" : "Read-only"}
-          </span>
-          <span>Cursor {model?.cursor.lastSequence ?? 0}</span>
+        <div className="topbar-meta">
+          <div className="topbar-status" aria-label="Состояние проекции" role="status">
+            <span className="live-indicator" data-live={model?.source === "LIVE"}>
+              <span aria-hidden="true" />
+              {model?.source === "LIVE" ? "Live" : "Read-only"}
+            </span>
+            <span>Cursor {model?.cursor.lastSequence ?? 0}</span>
+          </div>
+          {onLogout ? (
+            <div className="logout-control">
+              {logoutState === "ERROR" ? (
+                <span className="logout-error" role="alert">
+                  Сессия не завершена
+                </span>
+              ) : null}
+              <button
+                className="topbar-logout"
+                disabled={logoutState === "PENDING"}
+                onClick={() => void logout()}
+                type="button"
+              >
+                {logoutState === "PENDING" ? "Выходим…" : "Выйти"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -358,12 +432,14 @@ export function ControlCenter({
                   <div className="canvas-frame">
                     <WorldCanvas
                       agents={world.agents}
+                      onOpenConversation={openConversation}
                       onSelectAgent={selectAgent}
                       selectedAgentId={selectedAgentId}
                     />
                   </div>
                   <AgentRoster
                     agents={agents}
+                    onOpenConversation={openConversation}
                     onSelect={selectAgent}
                     selectedAgentId={selectedAgentId}
                   />
@@ -385,16 +461,25 @@ export function ControlCenter({
                 </div>
                 <CommandTable
                   agents={agents}
+                  onOpenConversation={openConversation}
                   onSelect={selectAgent}
                   selectedAgentId={selectedAgentId}
                 />
               </section>
             )}
 
-            <AgentInspector agent={selectedAgent} />
+            <AgentInspector agent={selectedAgent} onOpenConversation={openConversation} />
           </div>
         ) : null}
       </main>
+      {conversationAgent ? (
+        <ConversationDrawer
+          agent={conversationAgent}
+          {...(conversationClient ? { client: conversationClient } : {})}
+          csrfToken={csrfToken}
+          onClose={closeConversation}
+        />
+      ) : null}
     </div>
   );
 }

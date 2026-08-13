@@ -16,7 +16,7 @@ describe("ControlCenter", () => {
   it("switches World and Command over one read model without losing selection", async () => {
     const user = userEvent.setup();
     const loadReadModel = vi.fn(async () => buildContractFixture());
-    render(<ControlCenter loadReadModel={loadReadModel} />);
+    render(<ControlCenter csrfToken="csrf" loadReadModel={loadReadModel} />);
 
     expect(await screen.findByText(/контрактный снимок/i)).not.toBeNull();
     expect(loadReadModel).toHaveBeenCalledTimes(1);
@@ -49,7 +49,7 @@ describe("ControlCenter", () => {
       agents: [],
       tasks: [],
     }));
-    render(<ControlCenter loadReadModel={loadReadModel} />);
+    render(<ControlCenter csrfToken="csrf" loadReadModel={loadReadModel} />);
 
     expect(await screen.findByRole("status", { name: /runtime недоступен/i })).not.toBeNull();
     const worldTab = screen.getByRole("tab", { name: "World" });
@@ -60,5 +60,22 @@ describe("ControlCenter", () => {
         "true",
       ),
     );
+  });
+
+  it("does not claim logout when session revocation fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlCenter
+        csrfToken="csrf"
+        loadReadModel={async () => buildContractFixture()}
+        onLogout={async () => {
+          throw new Error("revoke unavailable");
+        }}
+      />,
+    );
+    await screen.findByRole("heading", { level: 1, name: "AI World" });
+    await user.click(screen.getByRole("button", { name: "Выйти" }));
+    expect(await screen.findByRole("alert")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Выйти" })).not.toBeNull();
   });
 });

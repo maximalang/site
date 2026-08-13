@@ -10,9 +10,15 @@ type WorldCanvasProps = {
   agents: WorldView["agents"];
   selectedAgentId: AgentId | undefined;
   onSelectAgent: (agentId: AgentId) => void;
+  onOpenConversation: (agentId: AgentId) => void;
 };
 
-export function WorldCanvas({ agents, selectedAgentId, onSelectAgent }: WorldCanvasProps) {
+export function WorldCanvas({
+  agents,
+  selectedAgentId,
+  onSelectAgent,
+  onOpenConversation,
+}: WorldCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layoutRef = useRef<LaidOutWorldAgent[]>([]);
 
@@ -42,21 +48,18 @@ export function WorldCanvas({ agents, selectedAgentId, onSelectAgent }: WorldCan
     return () => observer.disconnect();
   }, [agents, selectedAgentId]);
 
-  const handlePointer = (clientX: number, clientY: number) => {
+  const agentAt = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) {
-      return;
+      return undefined;
     }
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) {
-      return;
+      return undefined;
     }
     const x = ((clientX - rect.left) / rect.width) * canvas.width;
     const y = ((clientY - rect.top) / rect.height) * canvas.height;
-    const agent = getWorldAgentAt(x, y, layoutRef.current);
-    if (agent) {
-      onSelectAgent(agent.agentId);
-    }
+    return getWorldAgentAt(x, y, layoutRef.current);
   };
 
   return (
@@ -64,7 +67,14 @@ export function WorldCanvas({ agents, selectedAgentId, onSelectAgent }: WorldCan
       ref={canvasRef}
       className="world-canvas"
       aria-label="Карта AI World. Выберите агента в доступном списке рядом с картой."
-      onClick={(event) => handlePointer(event.clientX, event.clientY)}
+      onClick={(event) => {
+        const agent = agentAt(event.clientX, event.clientY);
+        if (agent) onSelectAgent(agent.agentId);
+      }}
+      onDoubleClick={(event) => {
+        const agent = agentAt(event.clientX, event.clientY);
+        if (agent) onOpenConversation(agent.agentId);
+      }}
       role="img"
     >
       Интерактивная карта агентов. Все агенты доступны в списке рядом с картой.

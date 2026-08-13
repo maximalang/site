@@ -64,6 +64,9 @@ button {
 
 button:focus-visible,
 a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 main:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
@@ -107,6 +110,7 @@ main {
 
 .brand-lockup,
 .topbar-meta,
+.topbar-status,
 .mode-navigation,
 .mode-tabs,
 .workspace-intro,
@@ -163,6 +167,37 @@ main {
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 0.75rem;
+}
+
+.topbar-status {
+  gap: var(--space-4);
+}
+
+.topbar-logout {
+  min-height: 2.5rem;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.topbar-logout:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.logout-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.logout-error {
+  color: var(--danger);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
 }
 
 .live-indicator {
@@ -480,6 +515,11 @@ main {
   font-size: 0.76rem;
 }
 
+.inspector-chat-button {
+  width: 100%;
+  margin-top: var(--space-5);
+}
+
 .empty-inspector {
   display: grid;
   align-content: center;
@@ -587,6 +627,243 @@ tbody tr:last-child > * {
   background-size: 1rem 1rem;
 }
 
+.auth-shell,
+.auth-main {
+  min-height: 100vh;
+}
+
+.auth-main {
+  display: grid;
+  width: min(100% - 2rem, 32rem);
+  place-items: center;
+  padding-block: var(--space-8);
+}
+
+.auth-card {
+  width: 100%;
+  padding: clamp(1.5rem, 6vw, 2.5rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.28);
+}
+
+.auth-brand {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: var(--space-6);
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.auth-card h1 {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: clamp(1.75rem, 7vw, 2.4rem);
+  letter-spacing: -0.04em;
+}
+
+.auth-card p {
+  color: var(--text-muted);
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.auth-form label,
+.composer label,
+.conversation-picker > span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.auth-form input,
+.composer textarea,
+.conversation-picker select {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.auth-form input {
+  min-height: 3rem;
+  padding-inline: var(--space-3);
+}
+
+.auth-card .auth-error,
+.composer .composer-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.84rem;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  justify-items: end;
+  background: rgba(2, 7, 6, 0.72);
+}
+
+.conversation-drawer {
+  display: grid;
+  width: min(100%, 42rem);
+  height: 100dvh;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  border-left: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: -1.5rem 0 5rem rgba(0, 0, 0, 0.4);
+}
+
+.drawer-header,
+.drawer-actions,
+.message-meta,
+.composer-footer {
+  display: flex;
+  align-items: center;
+}
+
+.drawer-header {
+  min-height: 5rem;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.025em;
+}
+
+.drawer-actions {
+  gap: var(--space-2);
+}
+
+.icon-button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.4rem;
+}
+
+.conversation-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.conversation-picker select {
+  min-height: 2.75rem;
+  padding-inline: var(--space-3);
+}
+
+.message-timeline {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-5);
+}
+
+.drawer-state {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.message {
+  width: min(88%, 32rem);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.message[data-author="OWNER"] {
+  margin-left: auto;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.message-meta {
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.message p {
+  margin: var(--space-2) 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.message small {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+}
+
+.composer {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) max(var(--space-4), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.composer textarea {
+  min-height: 6.5rem;
+  max-height: 14rem;
+  resize: vertical;
+  padding: var(--space-3);
+}
+
+.composer-footer {
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.composer-footer > span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 @media (max-width: 72rem) {
   .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -635,7 +912,8 @@ tbody tr:last-child > * {
     min-height: 4.25rem;
   }
 
-  .topbar-meta > span:last-child,
+  .topbar-status > span:last-child,
+  .logout-error,
   .projection-note,
   .brand-lockup div > span {
     display: none;
@@ -688,6 +966,20 @@ tbody tr:last-child > * {
 
   .inspector {
     padding: var(--space-4);
+  }
+
+  .drawer-header,
+  .message-timeline,
+  .composer {
+    padding-inline: var(--space-4);
+  }
+
+  .drawer-actions .text-button {
+    display: none;
+  }
+
+  .message {
+    width: 94%;
   }
 }
 

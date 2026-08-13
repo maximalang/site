@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AgentConversationListSchema,
   buildConversationReadModel,
   type ConversationReadModelInput,
   ConversationReadModelSchema,
@@ -164,5 +165,25 @@ describe("buildConversationReadModel", () => {
       provenance: { kind: "DOMAIN" },
     });
     expect(JSON.stringify(response)).not.toMatch(/session_|binding_|commandId/);
+  });
+
+  it("defines a bounded Agent conversation index without runtime identities", () => {
+    const list = AgentConversationListSchema.parse({
+      schemaVersion: 1,
+      generatedAt: "2026-08-13T10:00:03.000Z",
+      agent: {
+        agentId: "agent_22222222-2222-2222-2222-222222222222",
+        displayName: "Researcher",
+      },
+      conversations: [
+        {
+          conversationId: "conversation_11111111-1111-1111-1111-111111111111",
+          projectId: "project_33333333-3333-3333-3333-333333333333",
+          title: "Protocol review",
+          createdAt: "2026-08-13T09:00:00.000Z",
+        },
+      ],
+    });
+    expect(JSON.stringify(list)).not.toMatch(/session_|binding_|external|instructions/);
   });
 });

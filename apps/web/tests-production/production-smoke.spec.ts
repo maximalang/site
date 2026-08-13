@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("production fails closed and excludes development browser capabilities", async ({
+test("production without secrets fails closed at the owner gate", async ({
   page,
   request,
 }, testInfo) => {
@@ -19,30 +19,31 @@ test("production fails closed and excludes development browser capabilities", as
   });
 
   const pageResponse = await page.goto("/");
-  await expect(page.getByRole("status", { name: "Runtime недоступен" })).toBeVisible();
   await expect(
-    page.getByText("Интерфейс не создаёт вымышленных агентов или активность."),
+    page.getByRole("heading", { level: 1, name: "Контур входа недоступен" }),
   ).toBeVisible();
 
   const apiResponse = await request.get("/api/world");
-  const model = (await apiResponse.json()) as { source?: unknown; agents?: unknown[] };
+  const model = (await apiResponse.json()) as { error?: { code?: unknown } };
   const policy = pageResponse?.headers()["content-security-policy"] ?? "";
 
   expect(pageResponse?.ok()).toBe(true);
-  expect(apiResponse.ok()).toBe(true);
-  expect(model).toMatchObject({ source: "UNAVAILABLE", agents: [] });
+  expect(apiResponse.status()).toBe(401);
+  expect(model).toMatchObject({ error: { code: "UNAUTHORIZED" } });
   expect(policy).toContain("default-src 'self'");
   expect(policy).toContain("upgrade-insecure-requests");
   expect(policy).not.toContain("unsafe-eval");
   expect(policy).not.toContain("ws:");
   expect(pageResponse?.headers()["strict-transport-security"]).toContain("max-age=31536000");
-  expect(consoleErrors).toEqual([]);
+  expect(consoleErrors).toEqual([
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+  ]);
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
 
   await page.screenshot({
     animations: "disabled",
     fullPage: true,
-    path: testInfo.outputPath("production-unavailable.png"),
+    path: testInfo.outputPath("production-auth-unavailable.png"),
   });
 });

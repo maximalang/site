@@ -9,6 +9,7 @@ import {
 function runtime() {
   return {
     auth: {} as never,
+    readAgentConversations: vi.fn(),
     readConversation: vi.fn(),
     sendConversation: vi.fn(),
     readWorld: vi.fn(),

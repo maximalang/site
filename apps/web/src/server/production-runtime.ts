@@ -8,6 +8,7 @@ import {
 import {
   applyMigrations,
   discoverMigrations,
+  PostgresAgentConversationReader,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresOpenClawConfigurationReader,
@@ -138,6 +139,7 @@ export async function createProductionRuntime(
       secureCookies: environment.NODE_ENV === "production",
     });
 
+    const agentConversationReader = new PostgresAgentConversationReader(pool);
     const conversationReader = new PostgresConversationReader(pool);
     const conversationStore = new PostgresConversationStore(pool);
     const configuration = await new PostgresOpenClawConfigurationReader(pool).read();
@@ -212,6 +214,7 @@ export async function createProductionRuntime(
 
     return {
       auth,
+      readAgentConversations: (agentId) => agentConversationReader.read(agentId),
       readConversation: (input) => conversationReader.read(input),
       sendConversation: (input) => sender.send(input),
       readWorld: async () => world,
