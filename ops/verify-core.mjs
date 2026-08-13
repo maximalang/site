@@ -203,6 +203,15 @@ try {
     ]),
   );
   const codexVersion = run([...compose, "exec", "-T", "codex-worker", "codex", "--version"]).trim();
+  const codexCaBundle = run([
+    ...compose,
+    "exec",
+    "-T",
+    "codex-worker",
+    "test",
+    "-s",
+    "/etc/ssl/certs/ca-certificates.crt",
+  ]);
   if (
     webInspect.Config.User !== "10001:10001" ||
     webInspect.HostConfig.ReadonlyRootfs !== true ||
@@ -281,7 +290,7 @@ try {
   await waitForReady(200);
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", project, https: true, readinessDegradation: true, backupRestore: true, nonRoot: true, readOnly: true, privateDatabase: true, privateModelGateway: true, privateCodexWorker: true, codexAuthenticationSeparated: true, codexCliVersion: "0.147.0" })}\n`,
+    `${JSON.stringify({ status: "PASS", project, https: true, readinessDegradation: true, backupRestore: true, nonRoot: true, readOnly: true, privateDatabase: true, privateModelGateway: true, privateCodexWorker: true, codexAuthenticationSeparated: true, codexCaBundle: codexCaBundle === "", codexCliVersion: "0.147.0" })}\n`,
   );
 } finally {
   run([...compose, "down", "--volumes", "--remove-orphans"], { allowFailure: true });

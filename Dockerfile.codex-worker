@@ -21,7 +21,9 @@ RUN npm run clean && npm run build --workspace @agent-world/codex-worker
 FROM node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d AS runtime
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends git=1:2.39.5-0+deb12u3 \
+    && apt-get install --yes --no-install-recommends \
+      ca-certificates=20250419~deb12u1 \
+      git=1:2.39.5-0+deb12u3 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10002 codex-worker \
     && useradd --system --uid 10002 --gid codex-worker --home-dir /var/lib/agent-world/codex codex-worker \
