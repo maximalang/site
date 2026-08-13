@@ -3,6 +3,9 @@
   "references": [
     {
       "path": "./packages/domain"
+    },
+    {
+      "path": "./packages/openclaw-adapter"
     }
   ]
 }
