@@ -132,6 +132,7 @@ const verifierEnvironment = {
   AGENT_WORLD_CSRF_SECRET: randomBytes(32).toString("base64url"),
   AGENT_WORLD_SECRET_MASTER_KEY: randomBytes(32).toString("base64url"),
   AGENT_WORLD_SECRET_KEY_VERSION: "1",
+  AGENT_WORLD_LITELLM_MASTER_KEY: randomBytes(32).toString("base64url"),
   AGENT_WORLD_OWNER_PASSWORD_HASH:
     "scrypt-v1$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
   AGENT_WORLD_HTTP_PORT: String(httpPort),
@@ -151,6 +152,7 @@ writeFileSync(
     `AGENT_WORLD_CSRF_SECRET=${verifierEnvironment.AGENT_WORLD_CSRF_SECRET}`,
     `AGENT_WORLD_SECRET_MASTER_KEY=${verifierEnvironment.AGENT_WORLD_SECRET_MASTER_KEY}`,
     `AGENT_WORLD_SECRET_KEY_VERSION=${verifierEnvironment.AGENT_WORLD_SECRET_KEY_VERSION}`,
+    `AGENT_WORLD_LITELLM_MASTER_KEY=${verifierEnvironment.AGENT_WORLD_LITELLM_MASTER_KEY}`,
     `AGENT_WORLD_OWNER_PASSWORD_HASH='${verifierEnvironment.AGENT_WORLD_OWNER_PASSWORD_HASH}'`,
     `AGENT_WORLD_HTTP_PORT=${verifierEnvironment.AGENT_WORLD_HTTP_PORT}`,
     `AGENT_WORLD_HTTPS_PORT=${verifierEnvironment.AGENT_WORLD_HTTPS_PORT}`,
@@ -179,12 +181,19 @@ try {
   const postgresInspect = JSON.parse(
     run(["inspect", `${project}-postgres-1`, "--format", "{{json .}}"]),
   );
+  const liteLlmInspect = JSON.parse(
+    run(["inspect", `${project}-litellm-1`, "--format", "{{json .}}"]),
+  );
   if (
     webInspect.Config.User !== "10001:10001" ||
     webInspect.HostConfig.ReadonlyRootfs !== true ||
     !webInspect.HostConfig.CapDrop?.includes("ALL") ||
     webInspect.NetworkSettings.Ports["3000/tcp"] !== null ||
-    postgresInspect.NetworkSettings.Ports["5432/tcp"] !== null
+    postgresInspect.NetworkSettings.Ports["5432/tcp"] !== null ||
+    liteLlmInspect.Config.User !== "10001:10001" ||
+    liteLlmInspect.HostConfig.ReadonlyRootfs !== true ||
+    !liteLlmInspect.HostConfig.CapDrop?.includes("ALL") ||
+    liteLlmInspect.NetworkSettings.Ports["4000/tcp"] !== null
   ) {
     throw new Error("Container isolation contract is incomplete");
   }
@@ -245,7 +254,7 @@ try {
   await waitForReady(200);
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", project, https: true, readinessDegradation: true, backupRestore: true, nonRoot: true, readOnly: true, privateDatabase: true })}\n`,
+    `${JSON.stringify({ status: "PASS", project, https: true, readinessDegradation: true, backupRestore: true, nonRoot: true, readOnly: true, privateDatabase: true, privateModelGateway: true })}\n`,
   );
 } finally {
   run([...compose, "down", "--volumes", "--remove-orphans"], { allowFailure: true });

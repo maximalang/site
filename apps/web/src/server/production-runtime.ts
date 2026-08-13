@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
+import { LiteLlmModelGateway } from "@agent-world/model-gateway";
 import {
   type OpenClawCredential,
   OpenClawReadAdapter,
@@ -16,6 +17,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresModelRouteResolver,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
@@ -126,6 +128,18 @@ function parseOpenClawRuntimeConfig(
   };
 }
 
+function parseLiteLlmConfig(
+  environment: RuntimeEnvironment,
+): { baseUrl: string; masterKey: string } | undefined {
+  const baseUrl = environment.LITELLM_BASE_URL;
+  const masterKey = environment.LITELLM_MASTER_KEY;
+  if (!baseUrl && !masterKey) return undefined;
+  if (!baseUrl || !masterKey || masterKey.length < 16 || masterKey.length > 4_096) {
+    throw new Error("LiteLLM configuration is incomplete");
+  }
+  return { baseUrl, masterKey };
+}
+
 function record(component: string, event: unknown): void {
   try {
     const serialized = JSON.stringify({ component, event });
@@ -169,6 +183,23 @@ export async function createProductionRuntime(
     const hubReader = new PostgresHubReader(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
     const secretStore = new PostgresEncryptedSecretStore(pool, parseSecretKeyMaterial(environment));
+    const routeResolver = new PostgresModelRouteResolver(pool, {
+      allowedLocalOrigins: (environment.AGENT_WORLD_LOCAL_MODEL_ORIGINS ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    });
+    const liteLlmConfig = parseLiteLlmConfig(environment);
+    const modelGateway = liteLlmConfig
+      ? new LiteLlmModelGateway({
+          baseUrl: liteLlmConfig.baseUrl,
+          credentialProvider: async () => liteLlmConfig.masterKey,
+          routeResolver: async (modelRouteId) => {
+            const route = await routeResolver.resolve(modelRouteId);
+            return { modelRouteId: route.modelRouteId, modelAlias: route.modelAlias };
+          },
+        })
+      : undefined;
     const executionPreferenceStore = new PostgresExecutionPreferenceStore(pool);
     const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
       messageId: () => `message_${randomUUID()}`,
@@ -276,6 +307,10 @@ export async function createProductionRuntime(
       auth,
       probeReady: async () => {
         await pool.query("SELECT 1");
+        if (modelGateway) {
+          const gatewayHealth = await modelGateway.health();
+          if (gatewayHealth.status !== "READY") throw new Error("Model gateway is not ready");
+        }
       },
       readAgentConversations: (agentId) => agentConversationReader.read(agentId),
       readConversation: (input) => conversationReader.read(input),

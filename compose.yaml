@@ -34,6 +34,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      litellm:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://agent_world:${AGENT_WORLD_POSTGRES_PASSWORD}@postgres:5432/agent_world
       AGENT_WORLD_DATABASE_TLS: disable
@@ -42,6 +44,8 @@ services:
       AGENT_WORLD_CSRF_SECRET: ${AGENT_WORLD_CSRF_SECRET:?set AGENT_WORLD_CSRF_SECRET}
       AGENT_WORLD_SECRET_MASTER_KEY: ${AGENT_WORLD_SECRET_MASTER_KEY:?set AGENT_WORLD_SECRET_MASTER_KEY}
       AGENT_WORLD_SECRET_KEY_VERSION: ${AGENT_WORLD_SECRET_KEY_VERSION:-1}
+      LITELLM_BASE_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${AGENT_WORLD_LITELLM_MASTER_KEY:?set AGENT_WORLD_LITELLM_MASTER_KEY}
       AGENT_WORLD_INSTANCE_ID: ${AGENT_WORLD_INSTANCE_ID:-agent-world}
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
@@ -64,6 +68,40 @@ services:
       timeout: 3s
       retries: 6
       start_period: 30s
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  litellm:
+    image: ghcr.io/berriai/litellm@sha256:154e23bb5f31b1f10e16392a8ef299bd2cde08de3a64a6849002cfcc25ce3c63
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${AGENT_WORLD_LITELLM_MASTER_KEY:?set AGENT_WORLD_LITELLM_MASTER_KEY}
+    volumes:
+      - ./ops/litellm-config.yaml:/app/config.yaml:ro
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
+    networks:
+      - data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/readiness')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 9
+      start_period: 60s
     mem_limit: 768m
     cpus: 1.0
     pids_limit: 256
