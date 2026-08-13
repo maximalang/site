@@ -4,6 +4,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
+      "@agent-world/codex-adapter": fileURLToPath(
+        new URL("./packages/codex-adapter/src/index.ts", import.meta.url),
+      ),
       "@agent-world/conversation-service": fileURLToPath(
         new URL("./packages/conversation-service/src/index.ts", import.meta.url),
       ),
