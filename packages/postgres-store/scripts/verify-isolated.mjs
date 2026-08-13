@@ -1109,6 +1109,14 @@ try {
     throw new Error("Codex worker did not claim exactly one queued execution");
   }
   codexNow = "2026-08-13T12:00:02.000Z";
+  const renewedCodexLease = await codexStore.renewLease(
+    codex.execution,
+    "isolated-codex-worker",
+    60_000,
+  );
+  if (renewedCodexLease.leaseExpiresAt !== "2026-08-13T12:01:02.000Z") {
+    throw new Error("Codex worker lease did not renew for the active worker");
+  }
   const codexEvents = [
     {
       schemaVersion: 1,
@@ -1540,7 +1548,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 10 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 11 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

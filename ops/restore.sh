@@ -23,13 +23,13 @@ test -s "${backup_file}"
 
 compose=(docker compose --project-directory "${workspace_root}" --env-file "${env_file}")
 "${compose[@]}" exec -T postgres pg_restore --list <"${backup_file}" >/dev/null
-"${compose[@]}" stop web
+"${compose[@]}" stop web codex-worker
 restore_status=0
 "${compose[@]}" exec -T postgres pg_restore \
   --username=agent_world --dbname=agent_world --clean --if-exists \
   --no-owner --no-privileges --exit-on-error --single-transaction \
   <"${backup_file}" || restore_status=$?
-"${compose[@]}" up -d --no-deps --wait --wait-timeout 90 web
+"${compose[@]}" up -d --no-deps --wait --wait-timeout 90 web codex-worker
 if [[ "${restore_status}" -ne 0 ]]; then
   exit "${restore_status}"
 fi

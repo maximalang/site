@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1.7
+FROM node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d AS dependencies
+
+WORKDIR /workspace
+COPY package.json package-lock.json ./
+COPY apps/codex-worker/package.json apps/codex-worker/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/codex-adapter/package.json packages/codex-adapter/package.json
+COPY packages/conversation-service/package.json packages/conversation-service/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/model-gateway/package.json packages/model-gateway/package.json
+COPY packages/openclaw-adapter/package.json packages/openclaw-adapter/package.json
+COPY packages/postgres-store/package.json packages/postgres-store/package.json
+COPY packages/read-model/package.json packages/read-model/package.json
+RUN npm ci --ignore-scripts
+
+FROM dependencies AS build
+COPY . .
+RUN npm run clean && npm run build --workspace @agent-world/codex-worker
+
+FROM node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d AS runtime
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git=1:2.39.5-0+deb12u3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10002 codex-worker \
+    && useradd --system --uid 10002 --gid codex-worker --home-dir /var/lib/agent-world/codex codex-worker \
+    && mkdir -p /var/lib/agent-world/codex \
+    && chown 10002:10002 /var/lib/agent-world/codex
+
+ENV CODEX_HOME=/var/lib/agent-world/codex \
+    HOME=/var/lib/agent-world/codex \
+    NODE_ENV=production \
+    PATH=/app/node_modules/.bin:$PATH
+WORKDIR /app
+COPY --from=build --chown=10002:10002 /workspace/node_modules ./node_modules
+COPY --from=build --chown=10002:10002 /workspace/apps/codex-worker/dist ./apps/codex-worker/dist
+COPY --from=build --chown=10002:10002 /workspace/packages ./packages
+
+USER 10002:10002
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=6 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+CMD ["node", "apps/codex-worker/dist/main.js"]

@@ -78,12 +78,12 @@ Run the SDK in a private, resource-bounded worker rather than inside the public
 web process. Mount only the selected project root plus a dedicated Codex state
 location; keep the web and database private-network posture intact.
 
-- [ ] Worker runs non-root with no host port and a read-only root filesystem.
-- [ ] Repository paths resolve inside explicit allowlisted roots and reject
+- [x] Worker runs non-root with no host port and a read-only root filesystem.
+- [x] Repository paths resolve inside explicit allowlisted roots and reject
       traversal, symlink escape and non-Git roots.
 - [ ] Default execution is workspace-write, approval on request, network off;
       broader permissions require an approved canonical policy decision.
-- [ ] Health distinguishes worker availability from authentication readiness.
+- [x] Health distinguishes worker availability from authentication readiness.
 
 ## Slice 4: Official SDK live proof
 

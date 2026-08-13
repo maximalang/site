@@ -186,6 +186,21 @@ try {
   const liteLlmInspect = JSON.parse(
     run(["inspect", `${project}-litellm-1`, "--format", "{{json .}}"]),
   );
+  const codexWorkerInspect = JSON.parse(
+    run(["inspect", `${project}-codex-worker-1`, "--format", "{{json .}}"]),
+  );
+  const codexWorkerHealth = JSON.parse(
+    run([
+      ...compose,
+      "exec",
+      "-T",
+      "codex-worker",
+      "node",
+      "-e",
+      "fetch('http://127.0.0.1:3100/health').then(async r=>process.stdout.write(await r.text()))",
+    ]),
+  );
+  const codexVersion = run([...compose, "exec", "-T", "codex-worker", "codex", "--version"]).trim();
   if (
     webInspect.Config.User !== "10001:10001" ||
     webInspect.HostConfig.ReadonlyRootfs !== true ||
@@ -195,7 +210,15 @@ try {
     liteLlmInspect.Config.User !== "10001:10001" ||
     liteLlmInspect.HostConfig.ReadonlyRootfs !== true ||
     !liteLlmInspect.HostConfig.CapDrop?.includes("ALL") ||
-    liteLlmInspect.NetworkSettings.Ports["4000/tcp"] !== null
+    liteLlmInspect.NetworkSettings.Ports["4000/tcp"] !== null ||
+    codexWorkerInspect.Config.User !== "10002:10002" ||
+    codexWorkerInspect.HostConfig.ReadonlyRootfs !== true ||
+    !codexWorkerInspect.HostConfig.CapDrop?.includes("ALL") ||
+    codexWorkerInspect.NetworkSettings.Ports["3100/tcp"] !== undefined ||
+    codexWorkerInspect.NetworkSettings.Networks[`${project}_edge`] !== undefined ||
+    codexWorkerHealth.status !== "available" ||
+    codexWorkerHealth.authentication !== "UNAVAILABLE" ||
+    codexVersion !== "codex-cli 0.147.0"
   ) {
     throw new Error("Container isolation contract is incomplete");
   }
@@ -256,11 +279,12 @@ try {
   await waitForReady(200);
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", project, https: true, readinessDegradation: true, backupRestore: true, nonRoot: true, readOnly: true, privateDatabase: true, privateModelGateway: true })}\n`,
+    `${JSON.stringify({ status: "PASS", project, https: true, readinessDegradation: true, backupRestore: true, nonRoot: true, readOnly: true, privateDatabase: true, privateModelGateway: true, privateCodexWorker: true, codexAuthenticationSeparated: true, codexCliVersion: "0.147.0" })}\n`,
   );
 } finally {
   run([...compose, "down", "--volumes", "--remove-orphans"], { allowFailure: true });
   run(["image", "rm", `agent-world-web:${imageTag}`], { allowFailure: true });
+  run(["image", "rm", `agent-world-codex-worker:${imageTag}`], { allowFailure: true });
   rmSync(new URL(`../${envFileName}`, import.meta.url), { force: true });
   rmSync(new URL(`../${backupDirectoryName}`, import.meta.url), { force: true, recursive: true });
 }

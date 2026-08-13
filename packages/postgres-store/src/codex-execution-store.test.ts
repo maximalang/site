@@ -158,6 +158,31 @@ describe("PostgresCodexExecutionStore worker lifecycle", () => {
     });
   });
 
+  it("renews only the active worker lease", async () => {
+    const updates: unknown[][] = [];
+    const client: TransactionClient = {
+      async query<Row>(text: string, values: unknown[] = []) {
+        if (text.includes("SET lease_expires_at")) {
+          updates.push(values);
+          return { rows: [{ id: jobRow.id }] as Row[] };
+        }
+        return { rows: [] as Row[] };
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore(
+      { connect: async () => client },
+      { now: () => "2026-08-13T12:00:30.000Z" },
+    );
+
+    await expect(store.renewLease(jobRow.id, "worker-1", 60_000)).resolves.toEqual({
+      leaseExpiresAt: "2026-08-13T12:01:30.000Z",
+    });
+    expect(updates).toEqual([
+      [jobRow.id, "worker-1", "2026-08-13T12:00:30.000Z", "2026-08-13T12:01:30.000Z"],
+    ]);
+  });
+
   it("appends an event once and replays only its exact fingerprint", async () => {
     const events = new Map<number, string>();
     let status = "LEASED";

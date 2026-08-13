@@ -56,6 +56,7 @@ type JobRow = QueryResultRow & {
 
 type ExistingEventRow = QueryResultRow & { event_sha256: string };
 type SequenceRow = QueryResultRow & { last_sequence: number | string };
+type LeaseRow = QueryResultRow & { id: string };
 
 const WorkerIdSchema = z
   .string()
@@ -381,6 +382,37 @@ export class PostgresCodexExecutionStore {
       return { outcome: "APPLIED" as const, sequence: event.data.sequence };
     } catch (error) {
       await this.rollback(client);
+      if (error instanceof CodexExecutionStoreError) throw error;
+      throw new CodexExecutionStoreError("PERSISTENCE_FAILED");
+    } finally {
+      client.release();
+    }
+  }
+
+  async renewLease(executionIdValue: unknown, workerIdValue: unknown, leaseMsValue: unknown) {
+    const executionId = ExecutionIdSchema.safeParse(executionIdValue);
+    const workerId = WorkerIdSchema.safeParse(workerIdValue);
+    const leaseMs = LeaseDurationSchema.safeParse(leaseMsValue);
+    const renewedAt = TimestampSchema.safeParse(this.now());
+    if (!executionId.success || !workerId.success || !leaseMs.success || !renewedAt.success) {
+      throw new CodexExecutionStoreError("INVALID_REQUEST");
+    }
+    const leaseExpiresAt = new Date(Date.parse(renewedAt.data) + leaseMs.data).toISOString();
+    const client = await this.connect();
+    try {
+      const renewed = await client.query<LeaseRow>(
+        `UPDATE agent_world.codex_execution_jobs
+            SET lease_expires_at = $4
+          WHERE id = $1
+            AND lease_owner = $2
+            AND status IN ('LEASED', 'RUNNING')
+            AND lease_expires_at > $3
+        RETURNING id`,
+        [executionId.data, workerId.data, renewedAt.data, leaseExpiresAt],
+      );
+      if (renewed.rows.length !== 1) throw new CodexExecutionStoreError("LEASE_CONFLICT");
+      return { leaseExpiresAt };
+    } catch (error) {
       if (error instanceof CodexExecutionStoreError) throw error;
       throw new CodexExecutionStoreError("PERSISTENCE_FAILED");
     } finally {

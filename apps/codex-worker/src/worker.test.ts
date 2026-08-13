@@ -67,6 +67,7 @@ function storeFixture(request: CodexExecutionRequest | undefined) {
             }
           : undefined,
       ),
+      renewLease: vi.fn(async () => ({ leaseExpiresAt: "2026-08-13T12:01:30.000Z" })),
       appendEvent: vi.fn(async (_executionId, _workerId, event) => {
         appended.push(event);
         return { outcome: "APPLIED" as const, sequence: event.sequence };
@@ -136,9 +137,14 @@ describe("CodexWorker", () => {
         policy: expect.objectContaining({ workingDirectory: repository }),
       }),
       expect.any(Function),
-      undefined,
+      expect.any(AbortSignal),
     );
     expect(fixture.appended).toEqual(events);
+    expect(fixture.store.renewLease).toHaveBeenCalledWith(
+      "codex_execution_88888888-8888-8888-8888-888888888888",
+      "worker-1",
+      60_000,
+    );
   });
 
   it("fails a disallowed workspace before invoking the SDK", async () => {
@@ -196,5 +202,23 @@ describe("CodexWorker", () => {
     await expect(worker.runOnce()).rejects.toThrow("WORKER_CYCLE_FAILED");
     expect(fixture.store.claim).toHaveBeenCalledTimes(1);
     expect(fixture.store.appendEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not invoke the SDK when its initial lease renewal fails", async () => {
+    const { policy, repository } = await repositoryFixture();
+    const fixture = storeFixture(baseRequest(repository));
+    fixture.store.renewLease.mockRejectedValue(new Error("database unavailable"));
+    const runner = { run: vi.fn() };
+    const worker = new CodexWorker({
+      store: fixture.store,
+      runner,
+      workspacePolicy: policy,
+      workerId: "worker-1",
+      leaseMs: 60_000,
+    });
+
+    await expect(worker.runOnce()).rejects.toThrow("WORKER_CYCLE_FAILED");
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(fixture.store.appendEvent).not.toHaveBeenCalled();
   });
 });

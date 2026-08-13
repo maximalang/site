@@ -5,9 +5,12 @@ WORKDIR /workspace
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package.json package-lock.json ./
+COPY apps/codex-worker/package.json apps/codex-worker/package.json
 COPY apps/web/package.json apps/web/package.json
+COPY packages/codex-adapter/package.json packages/codex-adapter/package.json
 COPY packages/conversation-service/package.json packages/conversation-service/package.json
 COPY packages/domain/package.json packages/domain/package.json
+COPY packages/model-gateway/package.json packages/model-gateway/package.json
 COPY packages/openclaw-adapter/package.json packages/openclaw-adapter/package.json
 COPY packages/postgres-store/package.json packages/postgres-store/package.json
 COPY packages/read-model/package.json packages/read-model/package.json

@@ -17,6 +17,11 @@ type ExecutionClaim = {
 export interface CodexWorkerStore {
   recoverExpired(): Promise<{ interrupted: number }>;
   claim(workerId: string, leaseMs: number): Promise<ExecutionClaim | undefined>;
+  renewLease(
+    executionId: string,
+    workerId: string,
+    leaseMs: number,
+  ): Promise<{ leaseExpiresAt: string }>;
   appendEvent(
     executionId: string,
     workerId: string,
@@ -89,16 +94,59 @@ export class CodexWorker {
       ...claim.request,
       policy: { ...claim.request.policy, workingDirectory },
     });
+    const renewalAbort = new AbortController();
+    const executionSignal = signal
+      ? AbortSignal.any([signal, renewalAbort.signal])
+      : renewalAbort.signal;
+    let renewalFailed = false;
+    let renewalInFlight: Promise<void> | undefined;
+    const renew = async () => {
+      await this.options.store.renewLease(
+        claim.externalRunId,
+        this.options.workerId,
+        this.options.leaseMs,
+      );
+    };
+    try {
+      await renew();
+    } catch {
+      throw new CodexWorkerCycleError();
+    }
+    const heartbeat = setInterval(
+      () => {
+        if (renewalInFlight) return;
+        renewalInFlight = renew()
+          .catch(() => {
+            renewalFailed = true;
+            renewalAbort.abort();
+          })
+          .finally(() => {
+            renewalInFlight = undefined;
+          });
+      },
+      Math.max(1_000, Math.floor(this.options.leaseMs / 3)),
+    );
+    heartbeat.unref?.();
     try {
       await this.options.runner.run(
         request,
         async (event) =>
           this.options.store.appendEvent(claim.externalRunId, this.options.workerId, event),
-        signal,
+        executionSignal,
       );
     } catch (error) {
-      if (!(error instanceof CodexExecutionError)) throw new CodexWorkerCycleError();
+      if (
+        renewalFailed ||
+        !(error instanceof CodexExecutionError) ||
+        error.code === "DISPATCH_UNAVAILABLE"
+      ) {
+        throw new CodexWorkerCycleError();
+      }
+    } finally {
+      clearInterval(heartbeat);
+      await renewalInFlight;
     }
+    if (renewalFailed) throw new CodexWorkerCycleError();
     return { outcome: "PROCESSED", executionId: claim.externalRunId, interrupted };
   }
 }

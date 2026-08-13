@@ -14,8 +14,9 @@ durable canonical Run, dispatches through the official OpenClaw `agent` RPC,
 observes `agent.wait`, and recovers pending/running work after restart. Phase 2
 also has canonical Hub identities, owner-only control commands, inherited
 execution preferences and the Lobby UI. Later domain phases remain open, but
-the Phase 1 shell now has a verified single-user core deployment, HTTPS edge
-and transactional backup/restore path.
+the shell now has a verified single-user core deployment, HTTPS edge,
+transactional backup/restore path and a private official Codex SDK worker with
+durable PostgreSQL leases and normalized execution evidence.
 
 ## Quick start
 
@@ -54,6 +55,17 @@ placeholder before starting the composed server. PostgreSQL TLS policy is
 explicit; plaintext is accepted only on loopback or with the exact private
 network acknowledgement. OpenClaw is optional at startup and remains visibly
 unavailable until configured and authority-verified.
+
+The Codex worker is safe to start before authentication: its health keeps
+process/database availability separate from `CHATGPT` authentication readiness
+and it will not claim work while auth is unavailable. Authenticate the pinned
+official CLI into its dedicated Compose volume without copying credential files:
+
+```sh
+docker compose run --rm codex-worker codex login --device-auth
+docker compose run --rm codex-worker codex login status
+docker compose up -d --wait codex-worker
+```
 
 The hardened Compose topology, backup/restore procedure and rollback gates are
 documented in [`ops/DEPLOYMENT.md`](ops/DEPLOYMENT.md).
