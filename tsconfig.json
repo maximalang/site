@@ -2,6 +2,9 @@
   "files": [],
   "references": [
     {
+      "path": "./apps/codex-worker"
+    },
+    {
       "path": "./packages/codex-adapter"
     },
     {

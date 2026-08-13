@@ -14,5 +14,5 @@
     },
     "sourceMap": false
   },
-  "include": ["packages/**/*.ts", "vitest.config.ts"]
+  "include": ["apps/codex-worker/src/**/*.ts", "packages/**/*.ts", "vitest.config.ts"]
 }
