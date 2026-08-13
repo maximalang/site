@@ -91,7 +91,9 @@ Key evidence and decisions:
 - [Single-owner session decision](docs/decisions/0008-single-owner-session-boundary.md)
 - [Node runtime composition decision](docs/decisions/0009-node-runtime-composition.md)
 - [Approval-gated task assignment decision](docs/decisions/0010-approval-gated-task-assignment.md)
+- [Canonical Hub identity decision](docs/decisions/0011-canonical-hub-identities.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
+- [Phase 2 canonical Hub plan](tasks/phase-2-plan.md)
 
 ## Security baseline
 

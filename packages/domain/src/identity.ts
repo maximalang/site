@@ -16,11 +16,16 @@ export const BindingIdSchema = canonicalId("binding", "BindingId");
 export const ConversationIdSchema = canonicalId("conversation", "ConversationId");
 export const EventIdSchema = canonicalId("event", "EventId");
 export const MessageIdSchema = canonicalId("message", "MessageId");
+export const CanonicalModelIdSchema = canonicalId("model", "CanonicalModelId");
+export const ModelRouteIdSchema = canonicalId("model_route", "ModelRouteId");
 export const ProjectIdSchema = canonicalId("project", "ProjectId");
+export const ProviderIdSchema = canonicalId("provider", "ProviderId");
 export const RouteIdSchema = canonicalId("route", "RouteId");
 export const RunIdSchema = canonicalId("run", "RunId");
 export const SessionIdSchema = canonicalId("session", "SessionId");
+export const SkillIdSchema = canonicalId("skill", "SkillId");
 export const TaskIdSchema = canonicalId("task", "TaskId");
+export const ToolIdSchema = canonicalId("tool", "ToolId");
 
 export type AccountId = z.infer<typeof AccountIdSchema>;
 export type AgentId = z.infer<typeof AgentIdSchema>;
@@ -29,11 +34,16 @@ export type BindingId = z.infer<typeof BindingIdSchema>;
 export type ConversationId = z.infer<typeof ConversationIdSchema>;
 export type EventId = z.infer<typeof EventIdSchema>;
 export type MessageId = z.infer<typeof MessageIdSchema>;
+export type CanonicalModelId = z.infer<typeof CanonicalModelIdSchema>;
+export type ModelRouteId = z.infer<typeof ModelRouteIdSchema>;
 export type ProjectId = z.infer<typeof ProjectIdSchema>;
+export type ProviderId = z.infer<typeof ProviderIdSchema>;
 export type RouteId = z.infer<typeof RouteIdSchema>;
 export type RunId = z.infer<typeof RunIdSchema>;
 export type SessionId = z.infer<typeof SessionIdSchema>;
+export type SkillId = z.infer<typeof SkillIdSchema>;
 export type TaskId = z.infer<typeof TaskIdSchema>;
+export type ToolId = z.infer<typeof ToolIdSchema>;
 
 export const ExecutionModeSchema = z.enum(["CHAT", "WORK", "CODEX", "API", "LOCAL"]);
 export type ExecutionMode = z.infer<typeof ExecutionModeSchema>;
@@ -59,6 +69,7 @@ export const AgentSchema = z.strictObject({
   displayName: z.string().trim().min(1).max(100),
   role: z.string().trim().min(1).max(160),
   instructions: z.string().trim().min(1).max(32_000),
+  preferredRouteId: RouteIdSchema.optional(),
   isEnabled: z.boolean(),
 });
 export type Agent = z.infer<typeof AgentSchema>;
@@ -77,6 +88,7 @@ export const ExecutionRouteSchema = z.strictObject({
   mode: ExecutionModeSchema,
   adapterKind: ExecutionAdapterKindSchema,
   accountId: AccountIdSchema.optional(),
+  modelRouteId: ModelRouteIdSchema.optional(),
   isEnabled: z.boolean(),
 });
 export type ExecutionRoute = z.infer<typeof ExecutionRouteSchema>;

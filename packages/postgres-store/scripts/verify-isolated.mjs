@@ -134,8 +134,41 @@ try {
   });
 
   const migrations = await discoverMigrations();
+  const legacy = {
+    account: "account_09090909-0909-0909-0909-090909090909",
+    agent: "agent_0a0a0a0a-0a0a-0a0a-0a0a-0a0a0a0a0a0a",
+    conversation: "conversation_0b0b0b0b-0b0b-0b0b-0b0b-0b0b0b0b0b0b",
+    project: "project_0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c",
+  };
   const client = await pool.connect();
   try {
+    await applyMigrations(client, migrations.slice(0, 5));
+    await client.query("INSERT INTO agent_world.accounts (id, label) VALUES ($1, $2)", [
+      legacy.account,
+      "Legacy OpenClaw account",
+    ]);
+    await client.query("INSERT INTO agent_world.projects (id, name) VALUES ($1, $2)", [
+      legacy.project,
+      "Legacy project",
+    ]);
+    await client.query(
+      `INSERT INTO agent_world.agents
+         (id, slug, display_name, role, instructions)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [legacy.agent, "legacy-agent", "Legacy Agent", "Migration", "Preserve canonical state."],
+    );
+    await client.query(
+      `INSERT INTO agent_world.conversations
+         (id, agent_id, project_id, title, created_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        legacy.conversation,
+        legacy.agent,
+        legacy.project,
+        "Legacy conversation",
+        "2026-08-13T07:00:00.000Z",
+      ],
+    );
     await applyMigrations(client, migrations);
     await applyMigrations(client, migrations);
   } finally {
@@ -148,9 +181,36 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 5
+    ledger.rows.at(-1)?.version !== 6
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
+  }
+  const legacyUpgrade = await pool.query(
+    `SELECT a.provider_id, a.auth_mechanism, a.health, p.slug,
+            EXISTS (
+              SELECT 1
+                FROM agent_world.project_agents pa
+               WHERE pa.project_id = $2 AND pa.agent_id = $3
+            ) AS membership_backfilled,
+            EXISTS (
+              SELECT 1
+                FROM agent_world.account_surfaces s
+               WHERE s.account_id = $1 AND s.surface = 'CHAT'
+            ) AS surface_backfilled
+       FROM agent_world.accounts a
+       JOIN agent_world.projects p ON p.id = $2
+      WHERE a.id = $1`,
+    [legacy.account, legacy.project, legacy.agent],
+  );
+  if (
+    legacyUpgrade.rows[0]?.provider_id !== "provider_00000000-0000-0000-0000-000000000001" ||
+    legacyUpgrade.rows[0]?.auth_mechanism !== "TOKEN" ||
+    legacyUpgrade.rows[0]?.health !== "UNCONFIGURED" ||
+    legacyUpgrade.rows[0]?.slug !== "project-0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c" ||
+    legacyUpgrade.rows[0]?.membership_backfilled !== true ||
+    legacyUpgrade.rows[0]?.surface_backfilled !== true
+  ) {
+    throw new Error("Canonical Hub migration did not preserve and backfill legacy state");
   }
   const tables = await pool.query(
     `SELECT table_name
@@ -161,14 +221,27 @@ try {
   const names = tables.rows.map(({ table_name: tableName }) => tableName);
   for (const required of [
     "agents",
+    "agent_skills",
+    "agent_tools",
+    "account_surfaces",
+    "canonical_models",
+    "canonical_model_modalities",
     "conversations",
     "conversation_sessions",
     "conversation_messages",
+    "model_routes",
+    "model_route_modalities",
+    "model_route_reasoning_efforts",
+    "model_route_tools",
     "owner_auth_throttle",
     "owner_sessions",
+    "project_agents",
+    "providers",
     "runtime_bindings",
     "schema_migrations",
+    "skills",
     "tasks",
+    "tools",
     "world_event_stream",
     "world_agent_status",
     "world_events",
@@ -233,12 +306,33 @@ try {
     route: "route_66666666-6666-6666-6666-666666666666",
     session: "session_77777777-7777-7777-7777-777777777777",
   };
-  await pool.query("INSERT INTO agent_world.accounts (id, label) VALUES ($1, $2)", [
-    ids.account,
-    "OpenClaw account",
-  ]);
-  await pool.query("INSERT INTO agent_world.projects (id, name) VALUES ($1, $2)", [
+  const openClawProviderId = "provider_00000000-0000-0000-0000-000000000001";
+  const hub = {
+    provider: "provider_88888888-8888-8888-8888-888888888888",
+    primaryAccount: "account_89898989-8989-8989-8989-898989898989",
+    secondaryAccount: "account_90909090-9090-9090-9090-909090909090",
+    model: "model_91919191-9191-9191-9191-919191919191",
+    primaryModelRoute: "model_route_92929292-9292-9292-9292-929292929292",
+    secondaryModelRoute: "model_route_93939393-9393-9393-9393-939393939393",
+    tool: "tool_94949494-9494-9494-9494-949494949494",
+    skill: "skill_95959595-9595-9595-9595-959595959595",
+    secondaryAgent: "agent_96969696-9696-9696-9696-969696969696",
+    primaryExecutionRoute: "route_97979797-9797-9797-9797-979797979797",
+    secondaryExecutionRoute: "route_98989898-9898-9898-9898-989898989898",
+  };
+  await pool.query(
+    `INSERT INTO agent_world.accounts
+       (id, provider_id, label, auth_mechanism, health)
+     VALUES ($1, $2, $3, 'TOKEN', 'ACTIVE')`,
+    [ids.account, openClawProviderId, "OpenClaw account"],
+  );
+  await pool.query(
+    "INSERT INTO agent_world.account_surfaces (account_id, surface) VALUES ($1, 'CHAT')",
+    [ids.account],
+  );
+  await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
     ids.project,
+    "protocol-project",
     "Protocol project",
   ]);
   await pool.query(
@@ -253,6 +347,176 @@ try {
       "Verify protocol contracts with evidence.",
     ],
   );
+  await pool.query(
+    `INSERT INTO agent_world.providers
+       (id, slug, display_name, kind, category, base_url)
+     VALUES ($1, 'openai', 'OpenAI', 'OPENAI', 'LLM_API', 'https://api.openai.com/v1')`,
+    [hub.provider],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.accounts
+       (id, provider_id, label, auth_mechanism, health, credential_ref)
+     VALUES
+       ($1, $3, 'Primary OpenAI API', 'API_KEY', 'ACTIVE', 'secret-store:accounts/openai-primary'),
+       ($2, $3, 'Fallback OpenAI API', 'API_KEY', 'DEGRADED', 'vault:accounts/openai-fallback')`,
+    [hub.primaryAccount, hub.secondaryAccount, hub.provider],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.account_surfaces (account_id, surface)
+     VALUES ($1, 'API'), ($2, 'API')`,
+    [hub.primaryAccount, hub.secondaryAccount],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.canonical_models
+       (id, slug, display_name, family, reasoning, tool_use,
+        context_window_tokens, max_output_tokens)
+     VALUES ($1, 'gpt-x', 'GPT-X', 'gpt', true, true, 200000, 32000)`,
+    [hub.model],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.canonical_model_modalities (canonical_model_id, modality)
+     VALUES ($1, 'TEXT'), ($1, 'IMAGE_INPUT')`,
+    [hub.model],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.tools
+       (id, slug, display_name, kind, description, configuration_ref)
+     VALUES ($1, 'browser-search', 'Browser search', 'BROWSER',
+             'Search owner-approved primary sources.', 'env:BROWSER_SEARCH_CONFIG')`,
+    [hub.tool],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.skills
+       (id, slug, display_name, version, description, source_kind, source_ref, integrity_sha256)
+     VALUES ($1, 'source-research', 'Source research', '1.2.0',
+             'Collect and verify primary sources.', 'LOCAL_PATH',
+             'skills/source-research/SKILL.md', $2)`,
+    [hub.skill, "c".repeat(64)],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.model_routes
+       (id, canonical_model_id, provider_id, account_id, surface, remote_model_id,
+        availability, price_currency, input_price_per_million,
+        output_price_per_million, context_window_tokens)
+     VALUES
+       ($1, $3, $4, $5, 'API', 'gpt-x-2026-08-01', 'AVAILABLE', 'USD', 2.5, 10, 200000),
+       ($2, $3, $4, $6, 'API', 'gpt-x-2026-08-01', 'DEGRADED', 'USD', 2.7, 10.5, 200000)`,
+    [
+      hub.primaryModelRoute,
+      hub.secondaryModelRoute,
+      hub.model,
+      hub.provider,
+      hub.primaryAccount,
+      hub.secondaryAccount,
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.model_route_reasoning_efforts (model_route_id, effort)
+     VALUES ($1, 'LOW'), ($1, 'HIGH'), ($2, 'LOW')`,
+    [hub.primaryModelRoute, hub.secondaryModelRoute],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.model_route_modalities (model_route_id, modality)
+     VALUES ($1, 'TEXT'), ($1, 'IMAGE_INPUT'), ($2, 'TEXT')`,
+    [hub.primaryModelRoute, hub.secondaryModelRoute],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.model_route_tools (model_route_id, tool_id)
+     VALUES ($1, $2)`,
+    [hub.primaryModelRoute, hub.tool],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.agent_skills (agent_id, skill_id, priority)
+     VALUES ($1, $2, 10)`,
+    [ids.agent, hub.skill],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.agent_tools (agent_id, tool_id)
+     VALUES ($1, $2)`,
+    [ids.agent, hub.tool],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.agents
+       (id, slug, display_name, role, instructions)
+     VALUES ($1, 'hub-auditor', 'Hub Auditor', 'Canonical Hub verification',
+             'Verify canonical identities and route boundaries.')`,
+    [hub.secondaryAgent],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.execution_routes
+       (id, label, mode, adapter_kind, account_id, model_route_id)
+     VALUES
+       ($1, 'Primary GPT-X', 'API', 'API_MODEL', $3, $4),
+       ($2, 'Secondary GPT-X', 'API', 'API_MODEL', $3, $4)`,
+    [
+      hub.primaryExecutionRoute,
+      hub.secondaryExecutionRoute,
+      hub.primaryAccount,
+      hub.primaryModelRoute,
+    ],
+  );
+  await pool.query(
+    `UPDATE agent_world.agents
+        SET preferred_route_id = CASE id WHEN $1 THEN $2 WHEN $3 THEN $4 END
+      WHERE id IN ($1, $3)`,
+    [ids.agent, hub.primaryExecutionRoute, hub.secondaryAgent, hub.secondaryExecutionRoute],
+  );
+  await expectRejected(
+    pool.query(
+      `INSERT INTO agent_world.model_routes
+         (id, canonical_model_id, provider_id, account_id, surface, remote_model_id,
+          availability, context_window_tokens)
+       VALUES ('model_route_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1', $1, $2, $3,
+               'API', 'gpt-x-2026-08-01', 'AVAILABLE', 200000)`,
+      [hub.model, hub.provider, hub.primaryAccount],
+    ),
+    "Canonical Hub accepted a duplicate provider/account ModelRoute identity",
+  );
+  await expectRejected(
+    pool.query(
+      `INSERT INTO agent_world.model_routes
+         (id, canonical_model_id, provider_id, account_id, surface, remote_model_id,
+          availability, context_window_tokens)
+       VALUES ('model_route_a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2', $1, $2, $3,
+               'API', 'cross-provider', 'AVAILABLE', 200000)`,
+      [hub.model, openClawProviderId, hub.primaryAccount],
+    ),
+    "Canonical Hub accepted an Account under the wrong Provider",
+  );
+  await expectRejected(
+    pool.query(
+      `INSERT INTO agent_world.model_routes
+         (id, canonical_model_id, provider_id, account_id, surface, remote_model_id,
+          availability, context_window_tokens)
+       VALUES ('model_route_a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3', $1, $2, $3,
+               'CHAT', 'unsupported-surface', 'AVAILABLE', 200000)`,
+      [hub.model, hub.provider, hub.primaryAccount],
+    ),
+    "Canonical Hub accepted a ModelRoute on an unavailable Account surface",
+  );
+  const hubEvidence = await pool.query(
+    `SELECT
+       (SELECT count(*)::integer FROM agent_world.canonical_models WHERE id = $1) AS models,
+       (SELECT count(*)::integer FROM agent_world.model_routes WHERE canonical_model_id = $1) AS routes,
+       (SELECT count(*)::integer
+          FROM agent_world.agents a
+          JOIN agent_world.execution_routes r ON r.id = a.preferred_route_id
+         WHERE r.account_id = $2) AS agents_sharing_account,
+       (SELECT count(*)::integer
+          FROM information_schema.columns
+         WHERE table_schema = 'agent_world'
+           AND table_name IN ('providers', 'accounts', 'model_routes', 'tools')
+           AND column_name IN ('api_key', 'token', 'password', 'secret')) AS raw_secret_columns`,
+    [hub.model, hub.primaryAccount],
+  );
+  if (
+    hubEvidence.rows[0]?.models !== 1 ||
+    hubEvidence.rows[0]?.routes !== 2 ||
+    hubEvidence.rows[0]?.agents_sharing_account !== 2 ||
+    hubEvidence.rows[0]?.raw_secret_columns !== 0
+  ) {
+    throw new Error("Canonical Hub identities, route reuse, or secret boundaries drifted");
+  }
   await pool.query(
     `INSERT INTO agent_world.execution_routes
        (id, label, mode, adapter_kind, account_id)
@@ -332,6 +596,11 @@ try {
     );
   }
   await pool.query(
+    `INSERT INTO agent_world.project_agents (project_id, agent_id, created_at)
+     VALUES ($1, $2, $3)`,
+    [ids.project, ids.agent, "2026-08-13T08:59:00.000Z"],
+  );
+  await pool.query(
     `INSERT INTO agent_world.conversations
        (id, agent_id, project_id, title, created_at)
      VALUES ($1, $2, $3, $4, $5)`,
@@ -372,8 +641,9 @@ try {
     throw new Error("Task assignment did not return an idempotent replay");
   }
   const unrelatedProject = "project_18181818-1818-1818-1818-181818181818";
-  await pool.query("INSERT INTO agent_world.projects (id, name) VALUES ($1, $2)", [
+  await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
     unrelatedProject,
+    "unrelated-project",
     "Unrelated project",
   ]);
   await expectRejected(
@@ -616,7 +886,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 7, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 4 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

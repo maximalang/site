@@ -18,6 +18,7 @@ describe("discoverMigrations", () => {
       { version: 3, name: "0003_world_projection.sql" },
       { version: 4, name: "0004_runtime_message_inbox.sql" },
       { version: 5, name: "0005_task_assignment.sql" },
+      { version: 6, name: "0006_canonical_hub.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -25,6 +26,8 @@ describe("discoverMigrations", () => {
     expect(migrations[2]?.sql).toContain("CREATE TABLE agent_world.world_events");
     expect(migrations[3]?.sql).toContain("conversation_messages_runtime_identity");
     expect(migrations[4]?.sql).toContain("CREATE TABLE agent_world.tasks");
+    expect(migrations[5]?.sql).toContain("CREATE TABLE agent_world.canonical_models");
+    expect(migrations[5]?.sql).toContain("CREATE TABLE agent_world.model_routes");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {
