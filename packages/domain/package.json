@@ -10,7 +10,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map",
+    "dist/**/*.js",
+    "dist/**/*.js.map"
   ],
   "dependencies": {
     "zod": "4.4.3"
