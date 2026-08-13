@@ -1,0 +1,200 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildUnavailableWorldReadModel,
+  buildWorldReadModel,
+  projectCommandView,
+  projectWorldView,
+  WorldReadModelSchema,
+} from "./projection.js";
+
+const ids = {
+  researcher: "agent_11111111-1111-1111-1111-111111111111",
+  reviewer: "agent_22222222-2222-2222-2222-222222222222",
+  project: "project_33333333-3333-3333-3333-333333333333",
+  task: "task_44444444-4444-4444-4444-444444444444",
+  event1: "event_55555555-5555-5555-5555-555555555555",
+  event2: "event_66666666-6666-6666-6666-666666666666",
+  event3: "event_77777777-7777-7777-7777-777777777777",
+  binding: "binding_88888888-8888-8888-8888-888888888888",
+} as const;
+
+const agents = [
+  {
+    schemaVersion: 1,
+    id: ids.researcher,
+    slug: "researcher",
+    displayName: "Research Lead",
+    role: "Evidence-first research",
+    instructions: "Find sources and preserve provenance.",
+    isEnabled: true,
+  },
+  {
+    schemaVersion: 1,
+    id: ids.reviewer,
+    slug: "reviewer",
+    displayName: "Reviewer",
+    role: "Independent review",
+    instructions: "Review claims against primary sources.",
+    isEnabled: true,
+  },
+] as const;
+
+const tasks = [
+  {
+    schemaVersion: 1,
+    id: ids.task,
+    projectId: ids.project,
+    assigneeAgentId: ids.researcher,
+    title: "Verify protocol contract",
+    approvalRequirement: "NOT_REQUIRED",
+    idempotencyKey: "task:create:protocol-contract",
+    createdAt: "2026-08-13T06:00:00.000Z",
+  },
+] as const;
+
+const events = [
+  {
+    schemaVersion: 1,
+    id: ids.event1,
+    sequence: 1,
+    occurredAt: "2026-08-13T06:00:01.000Z",
+    source: {
+      kind: "DOMAIN",
+      actor: "OWNER",
+      commandId: "task:assign:protocol-contract",
+    },
+    eventType: "TASK_ASSIGNED",
+    payload: { taskId: ids.task, agentId: ids.researcher },
+  },
+  {
+    schemaVersion: 1,
+    id: ids.event2,
+    sequence: 2,
+    occurredAt: "2026-08-13T06:00:02.000Z",
+    source: {
+      kind: "RUNTIME",
+      adapterKind: "OPENCLAW",
+      bindingId: ids.binding,
+      externalEventId: "openclaw-event-2",
+    },
+    eventType: "AGENT_STATUS_CHANGED",
+    payload: {
+      agentId: ids.researcher,
+      status: "RUNNING",
+      taskId: ids.task,
+    },
+  },
+  {
+    schemaVersion: 1,
+    id: ids.event3,
+    sequence: 3,
+    occurredAt: "2026-08-13T06:00:03.000Z",
+    source: {
+      kind: "RUNTIME",
+      adapterKind: "OPENCLAW",
+      bindingId: ids.binding,
+      externalEventId: "openclaw-event-3",
+    },
+    eventType: "AGENT_STATUS_CHANGED",
+    payload: { agentId: ids.reviewer, status: "IDLE" },
+  },
+] as const;
+
+function buildFixture() {
+  return buildWorldReadModel({
+    source: "CONTRACT_FIXTURE",
+    generatedAt: "2026-08-13T06:00:04.000Z",
+    agents,
+    tasks,
+    events,
+  });
+}
+
+describe("buildWorldReadModel", () => {
+  it("replays canonical events into a strict deterministic read model", () => {
+    const model = buildFixture();
+
+    expect(WorldReadModelSchema.parse(model)).toEqual(model);
+    expect(model.cursor).toEqual({
+      schemaVersion: 1,
+      stream: "WORLD",
+      lastSequence: 3,
+      lastEventId: ids.event3,
+    });
+    expect(model.agents).toEqual([
+      expect.objectContaining({
+        agentId: ids.researcher,
+        status: "RUNNING",
+        currentTask: expect.objectContaining({ taskId: ids.task }),
+        world: expect.objectContaining({ zone: "WORK_ROOM" }),
+      }),
+      expect.objectContaining({
+        agentId: ids.reviewer,
+        status: "IDLE",
+        world: expect.objectContaining({ zone: "AGENT_HALL" }),
+      }),
+    ]);
+    expect(JSON.stringify(model)).not.toContain("openclaw-event-2");
+    expect(JSON.stringify(model)).not.toContain("instructions");
+    expect(JSON.stringify(model)).not.toContain("externalAgentId");
+    expect(() =>
+      WorldReadModelSchema.parse({
+        ...model,
+        agents: [{ ...model.agents[0], externalAgentId: "researcher" }, ...model.agents.slice(1)],
+      }),
+    ).toThrow();
+  });
+
+  it("gives World and Command the exact same cursor and Agent/status/task identity", () => {
+    const model = buildFixture();
+    const world = projectWorldView(model);
+    const command = projectCommandView(model);
+
+    expect(world.cursor).toEqual(command.cursor);
+    expect(world.agents.map(({ core }) => core)).toEqual(command.agents.map(({ core }) => core));
+  });
+
+  it("rejects gaps, duplicate order and references outside the canonical input", () => {
+    expect(() =>
+      buildWorldReadModel({
+        source: "LIVE",
+        generatedAt: "2026-08-13T06:00:04.000Z",
+        agents,
+        tasks,
+        events: [events[0], { ...events[2], sequence: 3 }],
+      }),
+    ).toThrow("contiguous");
+
+    expect(() =>
+      buildWorldReadModel({
+        source: "LIVE",
+        generatedAt: "2026-08-13T06:00:04.000Z",
+        agents,
+        tasks,
+        events: [
+          {
+            ...events[0],
+            payload: {
+              ...events[0].payload,
+              agentId: "agent_99999999-9999-9999-9999-999999999999",
+            },
+          },
+        ],
+      }),
+    ).toThrow("unknown Agent");
+  });
+
+  it("does not fabricate product objects when the source is unavailable", () => {
+    const model = buildUnavailableWorldReadModel("2026-08-13T06:00:04.000Z");
+
+    expect(model).toEqual({
+      schemaVersion: 1,
+      source: "UNAVAILABLE",
+      generatedAt: "2026-08-13T06:00:04.000Z",
+      cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
+      agents: [],
+      tasks: [],
+    });
+    expect(() => WorldReadModelSchema.parse({ ...model, agents: [{}] })).toThrow();
+  });
+});
