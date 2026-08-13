@@ -9,15 +9,18 @@
     "npm": ">=11.12.1 <12"
   },
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && npm run build --workspace @agent-world/web",
     "clean": "tsc -b --clean",
-    "format": "biome format --write packages biome.json package.json tsconfig.base.json tsconfig.json tsconfig.check.json vitest.config.ts",
-    "lint": "biome check packages biome.json package.json tsconfig.base.json tsconfig.json tsconfig.check.json vitest.config.ts",
+    "dev:web": "npm run build --workspace @agent-world/read-model && npm run dev --workspace @agent-world/web",
+    "format": "biome format --write apps packages biome.json package.json tsconfig.base.json tsconfig.json tsconfig.check.json vitest.config.ts",
+    "lint": "biome check apps packages biome.json package.json tsconfig.base.json tsconfig.json tsconfig.check.json vitest.config.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.check.json --noEmit"
+    "test:e2e": "npm run build --workspace @agent-world/read-model && npm run test:e2e --workspace @agent-world/web && npm run test:e2e:production --workspace @agent-world/web",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit && npm run typecheck --workspace @agent-world/web"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",

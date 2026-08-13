@@ -4,9 +4,10 @@ Personal, self-hosted AI World and control center in which World and Command are
 two projections of one canonical domain and event stream.
 
 The repository is under incremental construction. Phase 0 reuse/licensing audit
-is complete; Phase 1 currently provides versioned domain contracts and a
-server-side read-only OpenClaw projection adapter. It is not yet a deployable
-product.
+is complete; Phase 1 currently provides versioned domain contracts, a
+server-side read-only OpenClaw projection adapter, and one browser application
+with World and Command projections over the same strict read model. It is not
+yet a deployable product.
 
 ## Quick start
 
@@ -18,6 +19,7 @@ npm test
 npm run typecheck
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
 The committed `.npmrc` disables dependency lifecycle scripts. The current lock
@@ -32,7 +34,20 @@ file does not require install-time scripts for the supported toolchain.
 | `npm run typecheck` | Check source and negative type tests without emitting |
 | `npm run lint` | Run Biome formatting, lint and import checks |
 | `npm run build` | Build TypeScript project references in dependency order |
+| `npm run dev:web` | Build the shared read model and start the Next.js app |
+| `npm run test:e2e` | Run five responsive Chromium projects plus standalone production smoke |
 | `npm run clean` | Remove TypeScript project-reference outputs |
+
+The web app fails closed to an unavailable state until a live server provider
+is wired. For local contract-fixture inspection only:
+
+```powershell
+$env:AGENT_WORLD_DATA_SOURCE='contract-fixture'
+npm run dev:web
+```
+
+The provider ignores this fixture switch in production. Install the pinned test
+browser once with `npm exec --workspace @agent-world/web -- playwright install chromium`.
 
 ## Architecture
 
@@ -41,11 +56,16 @@ file does not require install-time scripts for the supported toolchain.
 - [`@agent-world/openclaw-adapter`](packages/openclaw-adapter/README.md) uses the
   official Gateway client to produce a least-privilege, binding-first runtime
   projection. It does not execute tasks.
+- [`@agent-world/read-model`](packages/read-model/README.md) replays canonical
+  events into one bounded, versioned World/Command read boundary.
+- [`@agent-world/web`](apps/web) exposes one `/api/world` endpoint and derives
+  both the primary Canvas World and the Command agent table from its validated
+  response. The browser has no direct runtime connection.
 - PostgreSQL will be the canonical source of truth. Runtime systems receive
   projections and return validated events.
 - OpenClaw is the primary general runtime; Codex and other execution surfaces
   remain adapters.
-- World and Command will consume the same read model and replay cursor.
+- World and Command consume the same read model and replay cursor.
 
 Key evidence and decisions:
 
@@ -53,6 +73,7 @@ Key evidence and decisions:
 - [Initial composition](docs/decisions/0003-initial-system-composition.md)
 - [Canonical contract decision](docs/decisions/0004-canonical-domain-contracts.md)
 - [OpenClaw read-adapter decision](docs/decisions/0005-openclaw-read-adapter-boundary.md)
+- [World/Command read-surface decision](docs/decisions/0006-shared-world-command-read-surface.md)
 - [Phase 1 delivery plan](tasks/phase-1-plan.md)
 
 ## Security baseline

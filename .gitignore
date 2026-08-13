@@ -4,5 +4,9 @@
 !.env.example
 node_modules/
 dist/
+.next/
+playwright-report/
+test-results/
 coverage/
 *.tsbuildinfo
+next-env.d.ts

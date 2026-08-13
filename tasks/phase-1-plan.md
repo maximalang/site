@@ -50,7 +50,7 @@ Evidence:
 
 ## Slice 3: One API, two projections
 
-Status: next.
+Status: complete on `codex/phase-1-contracts`.
 
 Expose one backend event/read-model API. Build the minimal Command agent list
 and the primary World canvas from the same `WorldReadModel`. World has no direct
@@ -59,6 +59,23 @@ runtime connection and no random dialogue.
 Verification: the same fixture/cursor produces equal Agent/status/task identity
 in both views; browser accessibility and responsive tests; zero decorative LLM
 calls.
+
+Evidence:
+
+- [x] One strict, bounded `WorldReadModel` endpoint with no-store semantics.
+- [x] World and Command derive from the same validated model and cursor.
+- [x] Selection resolves to the same canonical Agent/status/task inspector in
+  both projections.
+- [x] The narrow Agent Town Canvas port contains no store, random simulation,
+  generated dialogue or runtime transport.
+- [x] Contract fixtures are visibly labelled, development-only and rejected in
+  production.
+- [x] Chromium tests pass at 320, 390, 768, 1024 and 1440 CSS-pixel widths with
+  keyboard tab behavior, axe, network, console and overflow assertions.
+- [x] The traced standalone artifact serves its own static chunks, rejects the
+  fixture switch in production and excludes development CSP capabilities.
+- [x] Test, typecheck, lint, production build, dependency audit and visual
+  artifact gates pass.
 
 ## Slice 4: Safe selection and chat
 
