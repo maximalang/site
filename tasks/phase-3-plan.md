@@ -70,11 +70,11 @@ reference on Account.
 Resolve enabled route/provider/account records transactionally, render a
 deterministic LiteLLM projection and select only policy-eligible routes.
 
-- [ ] Disabled, unavailable, mismatched and unconfigured routes fail closed.
-- [ ] Canonical Model cards remain unique while several ModelRoutes may target
+- [x] Disabled, unavailable, mismatched and unconfigured routes fail closed.
+- [x] Canonical Model cards remain unique while several ModelRoutes may target
       the same physical model.
 - [ ] Reconciliation is deterministic and does not make LiteLLM authoritative.
-- [ ] Local routes require explicit allowlisted private endpoints and cannot be
+- [x] Local routes require explicit allowlisted private endpoints and cannot be
       used as arbitrary SSRF targets.
 
 ## Slice 5: Product flow and deployment

@@ -21,6 +21,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresModelRouteResolver,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
   PostgresRuntimeMessageStore,
@@ -139,6 +140,21 @@ try {
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 1_000,
   });
+
+  let sqlReady = false;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      await pool.query("SELECT 1");
+      sqlReady = true;
+      break;
+    } catch (error) {
+      if (error?.code !== "57P03") throw error;
+      await delay(250);
+    }
+  }
+  if (!sqlReady) {
+    throw new Error("Timed out waiting for isolated PostgreSQL SQL readiness");
+  }
 
   const migrations = await discoverMigrations();
   const legacy = {
@@ -493,6 +509,26 @@ try {
     `INSERT INTO agent_world.model_route_tools (model_route_id, tool_id)
      VALUES ($1, $2)`,
     [hub.primaryModelRoute, hub.tool],
+  );
+  await secretStore.write({
+    commandId: "isolated-openai-account-secret",
+    secretRef: "secret-store:accounts/openai-primary",
+    purpose: "PROVIDER_API_KEY",
+    plaintext: "isolated-openai-key",
+    writtenAt: "2026-08-13T09:00:00.000Z",
+  });
+  const routeResolver = new PostgresModelRouteResolver(pool);
+  const resolvedModelRoute = await routeResolver.resolve(hub.primaryModelRoute);
+  if (
+    resolvedModelRoute.modelAlias !== `route-${hub.primaryModelRoute}` ||
+    resolvedModelRoute.providerModel !== "openai/gpt-x-2026-08-01" ||
+    resolvedModelRoute.credentialRef !== "secret-store:accounts/openai-primary"
+  ) {
+    throw new Error("PostgreSQL route resolver did not resolve the eligible API route");
+  }
+  await expectRejected(
+    routeResolver.resolve(hub.secondaryModelRoute),
+    "PostgreSQL route resolver accepted a degraded route/account",
   );
   await pool.query(
     `INSERT INTO agent_world.agent_skills (agent_id, skill_id, priority)
@@ -1227,7 +1263,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

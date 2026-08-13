@@ -7,6 +7,7 @@ export * from "./execution-preference-store.js";
 export * from "./hub-command-store.js";
 export * from "./hub-reader.js";
 export * from "./migration.js";
+export * from "./model-route-resolver.js";
 export * from "./openclaw-configuration-reader.js";
 export * from "./owner-session-store.js";
 export * from "./run-dispatch-store.js";
