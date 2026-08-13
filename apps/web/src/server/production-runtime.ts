@@ -253,6 +253,9 @@ export async function createProductionRuntime(
 
     return {
       auth,
+      probeReady: async () => {
+        await pool.query("SELECT 1");
+      },
       readAgentConversations: (agentId) => agentConversationReader.read(agentId),
       readConversation: (input) => conversationReader.read(input),
       sendConversation: (input) => sender.send(input),

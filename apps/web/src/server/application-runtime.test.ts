@@ -9,6 +9,7 @@ import {
 function runtime() {
   return {
     auth: {} as never,
+    probeReady: vi.fn(async () => undefined),
     readAgentConversations: vi.fn(),
     readConversation: vi.fn(),
     sendConversation: vi.fn(),

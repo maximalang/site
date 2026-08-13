@@ -50,12 +50,14 @@ Phase 0 reuse and license audit
 - [x] Deliver one web app with World/Command switching over one API.
 - [x] Connect real OpenClaw agents, sessions and typed status events.
 - [x] Deliver click/chat and policy-aware task assignment.
+- [x] Package and verify the hardened single-user Compose core, HTTPS,
+      readiness degradation and transactional backup/restore.
 
 ### Phase 2: Canonical Hub
 
-- [ ] Add PostgreSQL-backed Accounts, Providers, Canonical Models and Routes.
-- [ ] Add durable Agents, Skills, Tools and Projects without duplicate models.
-- [ ] Add inherited settings from system through run scope.
+- [x] Add PostgreSQL-backed Accounts, Providers, Canonical Models and Routes.
+- [x] Add durable Agents, Skills, Tools and Projects without duplicate models.
+- [x] Add inherited settings from system through run scope.
 
 ### Phases 3-4: Model and Codex execution
 
@@ -96,9 +98,9 @@ Phase 0 reuse and license audit
 
 ### Production gate
 
-- [ ] Required automated test families pass.
-- [ ] Docker Compose core starts without optional profiles.
-- [ ] Backup/restore and upgrade are verified on an isolated environment.
+- [x] Required automated test families pass for the completed Phase 0-2 scope.
+- [x] Docker Compose core starts without optional profiles.
+- [x] Backup/restore and upgrade are verified on an isolated environment.
 - [ ] Every acceptance criterion has authoritative runtime evidence.
 
 ## Risks and mitigations

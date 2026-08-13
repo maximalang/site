@@ -1,0 +1,17 @@
+.git
+.github
+.next
+**/.next
+.cache
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+playwright-report
+test-results
+.env
+.env.*
+!.env.example
+backups
+*.tsbuildinfo

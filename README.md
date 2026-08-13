@@ -13,8 +13,9 @@ authenticated APIs and accessible drawers. Explicit approval now creates one
 durable canonical Run, dispatches through the official OpenClaw `agent` RPC,
 observes `agent.wait`, and recovers pending/running work after restart. Phase 2
 also has canonical Hub identities, owner-only control commands, inherited
-execution preferences and the Lobby UI. It is not yet a deployable product:
-HTTPS packaging and backup/restore hardening remain open.
+execution preferences and the Lobby UI. Later domain phases remain open, but
+the Phase 1 shell now has a verified single-user core deployment, HTTPS edge
+and transactional backup/restore path.
 
 ## Quick start
 
@@ -45,6 +46,7 @@ file does not require install-time scripts for the supported toolchain.
 | `npm run test:e2e` | Run five responsive Chromium projects plus standalone production smoke |
 | `npm run test:runtime` | Build and verify standalone auth/API/restart against disposable PostgreSQL |
 | `npm run test:openclaw-live` | Verify the pinned real OpenClaw Gateway and transcript round trip (explicit isolated ACK required) |
+| `npm run test:compose` | Destructively verify an isolated HTTPS core stack, degradation and backup/restore (explicit ACK required) |
 | `npm run clean` | Remove TypeScript project-reference outputs |
 
 Copy `.env.example` into an ignored local environment file and replace every
@@ -52,6 +54,9 @@ placeholder before starting the composed server. PostgreSQL TLS policy is
 explicit; plaintext is accepted only on loopback or with the exact private
 network acknowledgement. OpenClaw is optional at startup and remains visibly
 unavailable until configured and authority-verified.
+
+The hardened Compose topology, backup/restore procedure and rollback gates are
+documented in [`ops/DEPLOYMENT.md`](ops/DEPLOYMENT.md).
 
 For local contract-fixture inspection only:
 

@@ -1,0 +1,111 @@
+name: agent-world
+
+services:
+  postgres:
+    image: postgres:18.3-bookworm@sha256:80630f83606d8db77d30b3851b16a9f78be2d0d4dda6f7b82a1fdca5ebe3acba
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agent_world
+      POSTGRES_USER: agent_world
+      POSTGRES_PASSWORD: ${AGENT_WORLD_POSTGRES_PASSWORD:?set AGENT_WORLD_POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=agent_world --dbname=agent_world"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    shm_size: 128mb
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: agent-world-web:${AGENT_WORLD_IMAGE_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://agent_world:${AGENT_WORLD_POSTGRES_PASSWORD}@postgres:5432/agent_world
+      AGENT_WORLD_DATABASE_TLS: disable
+      AGENT_WORLD_DATABASE_PLAINTEXT_ACK: private-network
+      AGENT_WORLD_OWNER_PASSWORD_HASH: ${AGENT_WORLD_OWNER_PASSWORD_HASH:?set AGENT_WORLD_OWNER_PASSWORD_HASH}
+      AGENT_WORLD_CSRF_SECRET: ${AGENT_WORLD_CSRF_SECRET:?set AGENT_WORLD_CSRF_SECRET}
+      AGENT_WORLD_INSTANCE_ID: ${AGENT_WORLD_INSTANCE_ID:-agent-world}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_GATEWAY_DEVICE_TOKEN: ${OPENCLAW_GATEWAY_DEVICE_TOKEN:-}
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks:
+      - edge
+      - data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      AGENT_WORLD_SITE_ADDRESS: ${AGENT_WORLD_SITE_ADDRESS:-https://localhost}
+    ports:
+      - "${AGENT_WORLD_HTTP_PORT:-80}:80"
+      - "${AGENT_WORLD_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - edge
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  edge:
+  data:
+    internal: true
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

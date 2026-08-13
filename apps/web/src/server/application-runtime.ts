@@ -18,6 +18,7 @@ import type { OwnerSessionManager } from "./owner-session";
 
 export type ApplicationRuntime = {
   auth: OwnerSessionManager;
+  probeReady(): Promise<void>;
   readAgentConversations(agentId: AgentId): Promise<unknown | undefined>;
   readConversation(input: ConversationReadInput): Promise<unknown | undefined>;
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;

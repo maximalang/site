@@ -134,6 +134,8 @@ Assignment evidence:
 
 ## Slice 6: Working-shell hardening
 
+Status: complete on `codex/phase-1-contracts`.
+
 Add structured logs/metrics, bounded event buffers, redaction, adapter health,
 reconciliation and operator-visible drift. Package the core Docker Compose
 profile and prove backup/restart of the shell state available at this phase.
@@ -141,6 +143,23 @@ profile and prove backup/restart of the shell state available at this phase.
 Verification: isolated end-to-end run against a pinned OpenClaw instance,
 restart/reconnect replay, container health versus contract readiness, resource
 budget and security checks.
+
+Hardening evidence:
+
+- [x] Public liveness and PostgreSQL-backed readiness remain distinct; database
+  loss proves `live=200` and `ready=503`, then recovers without state loss.
+- [x] Digest-pinned Node, PostgreSQL and Caddy images; frozen script-disabled
+  install; explicit dependency-order clean build.
+- [x] Non-root, read-only, capability-dropped web container with bounded CPU,
+  memory, PID and temporary storage.
+- [x] PostgreSQL has no host port and only joins the internal data network;
+  Caddy is the sole HTTPS edge.
+- [x] Atomic custom-format backup and acknowledged transactional restore prove
+  rollback of a persisted marker and healthy restart.
+- [x] `test:compose` creates a unique disposable stack, proves HTTPS headers,
+  isolation, degradation and restore, then destroys only its own volumes.
+- [x] Exact pinned live OpenClaw verifier and all quality, database, runtime and
+  responsive-browser gates are represented in CI.
 
 ## Stop conditions
 

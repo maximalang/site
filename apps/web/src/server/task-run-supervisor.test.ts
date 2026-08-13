@@ -45,4 +45,16 @@ describe("TaskRunSupervisor", () => {
     await Promise.all([first, second]);
     expect(listActive).toHaveBeenCalledOnce();
   });
+
+  it("does not emit idle reconciliation noise", async () => {
+    const record = vi.fn();
+    const supervisor = new TaskRunSupervisor({
+      source: { listActive: vi.fn(async () => []) },
+      observer: { observe: vi.fn() },
+      telemetry: { record },
+    });
+
+    await supervisor.reconcileOnce();
+    expect(record).not.toHaveBeenCalled();
+  });
 });

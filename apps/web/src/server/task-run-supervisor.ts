@@ -64,6 +64,7 @@ export class TaskRunSupervisor {
       this.safeRecord({ event: "task_run_reconciliation", outcome: "BATCH_FAILED", runCount: 0 });
       return;
     }
+    if (runIds.length === 0) return;
     const results = await Promise.allSettled(
       runIds.map((runId) => this.options.observer.observe(runId, this.waitTimeoutMs)),
     );

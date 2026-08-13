@@ -1,0 +1,13 @@
+{
+	admin off
+}
+
+{$AGENT_WORLD_SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy web:3000
+	header -Server
+	log {
+		output stdout
+		format json
+	}
+}

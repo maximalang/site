@@ -56,7 +56,9 @@ function stopChild(child) {
 }
 
 async function waitForPort(port, child, output) {
-  const deadline = Date.now() + 60_000;
+  // The pinned CLI initializes its extension/runtime graph before the HTTP
+  // listener. Keep this separate from the protocol client's retry budget.
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(`Pinned OpenClaw Gateway exited before readiness: ${output().slice(-2_000)}`);
@@ -223,7 +225,10 @@ try {
     telemetry: { record: (event) => telemetry.push(event) },
     correlationId: "isolated-live-proof",
   });
-  const deadline = Date.now() + 30_000;
+  // The official client uses a 15 second connect-challenge timeout followed by
+  // exponential reconnect. One failed challenge plus a successful retry must
+  // fit inside the verifier's readiness window.
+  const deadline = Date.now() + 75_000;
   while (adapter.state !== "READY" && Date.now() < deadline) {
     if (gateway.exitCode !== null) {
       throw new Error(
