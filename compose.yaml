@@ -79,9 +79,16 @@ services:
   litellm:
     image: ghcr.io/berriai/litellm@sha256:154e23bb5f31b1f10e16392a8ef299bd2cde08de3a64a6849002cfcc25ce3c63
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000"]
     environment:
       LITELLM_MASTER_KEY: ${AGENT_WORLD_LITELLM_MASTER_KEY:?set AGENT_WORLD_LITELLM_MASTER_KEY}
+      LITELLM_SALT_KEY: ${AGENT_WORLD_LITELLM_SALT_KEY:?set AGENT_WORLD_LITELLM_SALT_KEY}
+      DATABASE_URL: postgresql://agent_world:${AGENT_WORLD_POSTGRES_PASSWORD}@postgres:5432/agent_world
+      STORE_MODEL_IN_DB: "True"
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
     volumes:
       - ./ops/litellm-config.yaml:/app/config.yaml:ro
     user: "10001:10001"
@@ -90,6 +97,7 @@ services:
       - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
     networks:
       - data
+      - egress
     healthcheck:
       test:
         [
@@ -102,7 +110,7 @@ services:
       timeout: 5s
       retries: 9
       start_period: 60s
-    mem_limit: 768m
+    mem_limit: 1536m
     cpus: 1.0
     pids_limit: 256
     cap_drop:
@@ -144,6 +152,7 @@ networks:
   edge:
   data:
     internal: true
+  egress:
 
 volumes:
   postgres_data:
