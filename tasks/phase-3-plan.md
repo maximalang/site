@@ -59,10 +59,10 @@ key outside PostgreSQL. The owner-authenticated write command creates or
 rotates a provider credential and stores only an opaque `secret-store:`
 reference on Account.
 
-- [ ] AES-256-GCM uses a fresh nonce and authenticated metadata per version.
-- [ ] Reads are adapter-only and never available through read models.
-- [ ] Rotation is atomic and auditable without secret values.
-- [ ] API responses, receipts, logs, browser storage and backups contain no
+- [x] AES-256-GCM uses a fresh nonce and authenticated metadata per version.
+- [x] Reads are adapter-only and never available through read models.
+- [x] Rotation is atomic and auditable without secret values.
+- [x] API responses, receipts, logs, browser storage and backups contain no
       plaintext provider key.
 
 ## Slice 4: PostgreSQL projection and routing

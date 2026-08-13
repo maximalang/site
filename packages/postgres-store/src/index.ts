@@ -2,6 +2,7 @@ export * from "./agent-conversation-reader.js";
 export * from "./approval-run-store.js";
 export * from "./conversation-reader.js";
 export * from "./conversation-store.js";
+export * from "./encrypted-secret-store.js";
 export * from "./execution-preference-store.js";
 export * from "./hub-command-store.js";
 export * from "./hub-reader.js";

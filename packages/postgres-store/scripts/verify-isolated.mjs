@@ -17,6 +17,7 @@ import {
   PostgresApprovalRunStore,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresEncryptedSecretStore,
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
@@ -187,7 +188,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 9
+    ledger.rows.at(-1)?.version !== 10
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -237,6 +238,7 @@ try {
     "conversation_messages",
     "hub_command_receipts",
     "execution_preference_overrides",
+    "encrypted_secrets",
     "approvals",
     "runs",
     "model_routes",
@@ -249,6 +251,7 @@ try {
     "providers",
     "runtime_bindings",
     "schema_migrations",
+    "secret_write_receipts",
     "skills",
     "tasks",
     "tools",
@@ -259,6 +262,62 @@ try {
     if (!names.includes(required)) {
       throw new Error(`Canonical table is missing after migration: ${required}`);
     }
+  }
+
+  const secretMasterKey = randomBytes(32);
+  const secretStore = new PostgresEncryptedSecretStore(pool, {
+    keyVersion: 1,
+    masterKey: secretMasterKey,
+  });
+  const secretRef = "secret-store:provider/isolated/api-key";
+  const firstSecret = "isolated-provider-key-first";
+  const firstSecretReceipt = await secretStore.write({
+    commandId: "isolated-secret-write-1",
+    secretRef,
+    purpose: "PROVIDER_API_KEY",
+    plaintext: firstSecret,
+    writtenAt: "2026-08-13T07:30:00.000Z",
+  });
+  if (
+    firstSecretReceipt.outcome !== "CREATED" ||
+    (await secretStore.read(secretRef, "PROVIDER_API_KEY")) !== firstSecret
+  ) {
+    throw new Error("Encrypted SecretStore did not round-trip its first version");
+  }
+  const encryptedRow = await pool.query(
+    `SELECT version, nonce, ciphertext, auth_tag
+       FROM agent_world.encrypted_secrets
+      WHERE secret_ref = $1`,
+    [secretRef],
+  );
+  if (
+    encryptedRow.rows[0]?.version !== 1 ||
+    encryptedRow.rows[0]?.nonce?.length !== 12 ||
+    encryptedRow.rows[0]?.auth_tag?.length !== 16 ||
+    encryptedRow.rows[0]?.ciphertext?.includes(Buffer.from(firstSecret, "utf8"))
+  ) {
+    throw new Error("Encrypted SecretStore persisted an invalid ciphertext envelope");
+  }
+  const firstNonce = Buffer.from(encryptedRow.rows[0].nonce);
+  const rotatedSecret = "isolated-provider-key-rotated";
+  const rotatedReceipt = await secretStore.write({
+    commandId: "isolated-secret-write-2",
+    secretRef,
+    purpose: "PROVIDER_API_KEY",
+    plaintext: rotatedSecret,
+    writtenAt: "2026-08-13T07:31:00.000Z",
+  });
+  const rotatedRow = await pool.query(
+    "SELECT version, nonce FROM agent_world.encrypted_secrets WHERE secret_ref = $1",
+    [secretRef],
+  );
+  if (
+    rotatedReceipt.outcome !== "ROTATED" ||
+    rotatedReceipt.version !== 2 ||
+    Buffer.from(rotatedRow.rows[0]?.nonce ?? []).equals(firstNonce) ||
+    (await secretStore.read(secretRef, "PROVIDER_API_KEY")) !== rotatedSecret
+  ) {
+    throw new Error("Encrypted SecretStore did not rotate atomically with a fresh nonce");
   }
 
   const ownerSessions = new PostgresOwnerSessionStore(pool);
@@ -1168,7 +1227,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

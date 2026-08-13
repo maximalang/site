@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { LiteLlmModelGateway, ModelGatewayFailure } from "./index.js";
+import { LiteLlmModelGateway, ModelGatewayFailure, ModelGatewayRequestSchema } from "./index.js";
 
-const gatewayRequest = {
-  schemaVersion: 1 as const,
-  runId: "run_11111111-1111-1111-1111-111111111111" as const,
-  modelRouteId: "model_route_22222222-2222-2222-2222-222222222222" as const,
-  messages: [{ role: "USER" as const, content: "hello" }],
+const gatewayRequest = ModelGatewayRequestSchema.parse({
+  schemaVersion: 1,
+  runId: "run_11111111-1111-1111-1111-111111111111",
+  modelRouteId: "model_route_22222222-2222-2222-2222-222222222222",
+  messages: [{ role: "USER", content: "hello" }],
   maxOutputTokens: 64,
   temperature: 0,
   timeoutMs: 30_000,
   idempotencyKey: "run-1-attempt-1",
-};
+});
 
 function createGateway(fetchImplementation: typeof fetch) {
   return new LiteLlmModelGateway({
