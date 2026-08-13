@@ -66,4 +66,29 @@ describe("createOfficialOpenClawWriteGateway", () => {
       } as never),
     ).toThrow("pinned protocol contract");
   });
+
+  it("rejects a shape outside the pinned official agent contract", () => {
+    const gateway = createOfficialOpenClawWriteGateway({
+      endpoint: "ws://127.0.0.1:18789",
+      credential: { kind: "TOKEN", value: "gateway-secret" },
+      clientVersion: "0.0.0-test",
+      instanceId: "writer-1",
+      callbacks: { onHello: vi.fn(), onClose: vi.fn(), onConnectError: vi.fn() },
+    });
+    expect(() =>
+      gateway.runAgent({
+        message: "Verify",
+        agentId: "researcher",
+        sessionKey: "agent:researcher:task",
+        idempotencyKey: "run:1",
+        label: "Verify",
+        deliver: false,
+        inputProvenance: {
+          kind: "internal_system",
+          sourceTool: "agent-world.task-dispatch",
+        },
+        unknownField: "forbidden",
+      } as never),
+    ).toThrow("pinned protocol contract");
+  });
 });

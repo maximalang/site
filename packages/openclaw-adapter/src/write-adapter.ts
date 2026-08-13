@@ -11,6 +11,9 @@ import {
   MessageContentSchema,
   MessageIdSchema,
   OpaqueExternalIdSchema,
+  RunIdSchema,
+  SessionIdSchema,
+  TaskIdSchema,
 } from "@agent-world/domain";
 import { PROTOCOL_VERSION } from "@openclaw/gateway-protocol/version";
 import * as z from "zod";
@@ -54,6 +57,22 @@ const DeliveryInputSchema = z.strictObject({
 const SendResultSchema = z.object({
   runId: OpaqueExternalIdSchema.optional(),
 });
+const TaskExecutionInputSchema = z.strictObject({
+  runId: RunIdSchema,
+  taskId: TaskIdSchema,
+  agentId: AgentIdSchema,
+  bindingId: BindingIdSchema,
+  sessionId: SessionIdSchema,
+  externalAgentId: OpaqueExternalIdSchema,
+  externalSessionRef: OpaqueExternalIdSchema,
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(20_000).optional(),
+  idempotencyKey: IdempotencyKeySchema,
+});
+const AgentRunResultSchema = z.object({ runId: OpaqueExternalIdSchema });
+
+export type OpenClawTaskExecutionInput = z.infer<typeof TaskExecutionInputSchema>;
+export type OpenClawTaskExecutionReceipt = { acceptedAt: string; externalRunId: string };
 
 export type OpenClawWriteAdapterState = "IDLE" | "CONNECTING" | "READY" | "DEGRADED" | "STOPPED";
 
@@ -80,6 +99,11 @@ export type OpenClawWriteTelemetryEvent = TelemetryBase &
       }
     | {
         event: "openclaw_chat_send_completed";
+        outcome: "ACCEPTED" | "REJECTED" | "INVALID_RESPONSE";
+        durationMs: number;
+      }
+    | {
+        event: "openclaw_task_dispatch_completed";
         outcome: "ACCEPTED" | "REJECTED" | "INVALID_RESPONSE";
         durationMs: number;
       }
@@ -223,6 +247,49 @@ export class OpenClawWriteAdapter implements ConversationDeliveryAdapter {
     };
   }
 
+  async executeTask(input: OpenClawTaskExecutionInput): Promise<OpenClawTaskExecutionReceipt> {
+    const parsed = TaskExecutionInputSchema.safeParse(input);
+    if (!parsed.success) throw new Error("OpenClaw Task execution input is invalid");
+    const gateway = this.gateway;
+    if (this.adapterState !== "READY" || !gateway) {
+      throw new Error("OpenClaw write adapter is not ready");
+    }
+    const startedAt = Date.now();
+    const deliveryEpoch = this.readinessEpoch;
+    let response: unknown;
+    try {
+      response = await gateway.runAgent({
+        message: parsed.data.description
+          ? `${parsed.data.title}\n\n${parsed.data.description}`
+          : parsed.data.title,
+        agentId: parsed.data.externalAgentId,
+        sessionKey: parsed.data.externalSessionRef,
+        idempotencyKey: parsed.data.idempotencyKey,
+        label: parsed.data.title,
+        deliver: false,
+        inputProvenance: {
+          kind: "internal_system",
+          sourceTool: "agent-world.task-dispatch",
+        },
+      });
+    } catch {
+      this.recordTaskDispatch("REJECTED", startedAt);
+      throw new Error("OpenClaw rejected the Task execution request");
+    }
+    const result = AgentRunResultSchema.safeParse(response);
+    if (
+      !result.success ||
+      deliveryEpoch !== this.readinessEpoch ||
+      this.adapterState !== "READY" ||
+      gateway !== this.gateway
+    ) {
+      this.recordTaskDispatch("INVALID_RESPONSE", startedAt);
+      throw new Error("OpenClaw returned an invalid or stale Task execution response");
+    }
+    this.recordTaskDispatch("ACCEPTED", startedAt);
+    return { acceptedAt: this.now().toISOString(), externalRunId: result.data.runId };
+  }
+
   private async handleHello(input: unknown, epoch: number): Promise<void> {
     if (epoch !== this.connectionEpoch || !this.gateway || this.adapterState === "STOPPED") {
       return;
@@ -284,6 +351,17 @@ export class OpenClawWriteAdapter implements ConversationDeliveryAdapter {
   ): void {
     this.record({
       event: "openclaw_chat_send_completed",
+      outcome,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    });
+  }
+
+  private recordTaskDispatch(
+    outcome: "ACCEPTED" | "REJECTED" | "INVALID_RESPONSE",
+    startedAt: number,
+  ): void {
+    this.record({
+      event: "openclaw_task_dispatch_completed",
       outcome,
       durationMs: Math.max(0, Date.now() - startedAt),
     });

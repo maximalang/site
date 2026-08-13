@@ -4,10 +4,14 @@ import {
   BindingIdSchema,
   ConversationIdSchema,
   MessageIdSchema,
+  RunIdSchema,
+  SessionIdSchema,
+  TaskIdSchema,
 } from "@agent-world/domain";
 import { PROTOCOL_VERSION } from "@openclaw/gateway-protocol/version";
 import { describe, expect, it, vi } from "vitest";
 import {
+  type OpenClawTaskExecutionInput,
   OpenClawWriteAdapter,
   type OpenClawWriteGateway,
   type OpenClawWriteGatewayCallbacks,
@@ -26,12 +30,28 @@ function input(): ConversationDeliveryInput {
   };
 }
 
+function taskInput(): OpenClawTaskExecutionInput {
+  return {
+    runId: RunIdSchema.parse("run_11111111-1111-1111-1111-111111111111"),
+    taskId: TaskIdSchema.parse("task_22222222-2222-2222-2222-222222222222"),
+    agentId: AgentIdSchema.parse("agent_33333333-3333-3333-3333-333333333333"),
+    bindingId: BindingIdSchema.parse("binding_44444444-4444-4444-4444-444444444444"),
+    sessionId: SessionIdSchema.parse("session_55555555-5555-5555-5555-555555555555"),
+    externalAgentId: "researcher",
+    externalSessionRef: "agent:researcher:task",
+    title: "Verify the protocol",
+    description: "Use primary evidence.",
+    idempotencyKey: "run:11111111-1111-1111-1111-111111111111",
+  };
+}
+
 function setup() {
   let callbacks: OpenClawWriteGatewayCallbacks | undefined;
   const gateway: OpenClawWriteGateway = {
     start: vi.fn(),
     stopAndWait: vi.fn(async () => undefined),
     sendChat: vi.fn(async () => ({ runId: "run-1", status: "started" })),
+    runAgent: vi.fn(async () => ({ runId: "openclaw-task-run-1" })),
   };
   const telemetry = { record: vi.fn() };
   const adapter = new OpenClawWriteAdapter({
@@ -81,6 +101,30 @@ describe("OpenClawWriteAdapter", () => {
       idempotencyKey: "message:11111111-1111-1111-1111-111111111111",
       suppressCommandInterpretation: true,
     });
+  });
+
+  it("dispatches an approved Task through the distinct official agent RPC", async () => {
+    const { adapter, callbacks, gateway } = setup();
+    await adapter.start();
+    await callbacks()?.onHello(validHello);
+
+    await expect(adapter.executeTask(taskInput())).resolves.toEqual({
+      acceptedAt: "2026-08-13T10:00:01.000Z",
+      externalRunId: "openclaw-task-run-1",
+    });
+    expect(gateway.runAgent).toHaveBeenCalledWith({
+      message: "Verify the protocol\n\nUse primary evidence.",
+      agentId: "researcher",
+      sessionKey: "agent:researcher:task",
+      idempotencyKey: "run:11111111-1111-1111-1111-111111111111",
+      label: "Verify the protocol",
+      deliver: false,
+      inputProvenance: {
+        kind: "internal_system",
+        sourceTool: "agent-world.task-dispatch",
+      },
+    });
+    expect(gateway.sendChat).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -199,6 +243,20 @@ describe("OpenClawWriteAdapter", () => {
     expect(recorded).toContain("INVALID_RESPONSE");
     expect(recorded).toContain("REJECTED");
     expect(recorded).not.toContain("secret upstream details");
+  });
+
+  it("rejects invalid and stale Task dispatch receipts without provider detail", async () => {
+    const { adapter, callbacks, gateway, telemetry } = setup();
+    await adapter.start();
+    await callbacks()?.onHello(validHello);
+    const task = taskInput();
+    vi.mocked(gateway.runAgent).mockResolvedValueOnce({});
+    await expect(adapter.executeTask(task)).rejects.toThrow("invalid or stale");
+    vi.mocked(gateway.runAgent).mockRejectedValueOnce(new Error("secret upstream detail"));
+    await expect(adapter.executeTask(task)).rejects.toThrow("rejected the Task execution");
+    const recorded = JSON.stringify(telemetry.record.mock.calls);
+    expect(recorded).toContain("openclaw_task_dispatch_completed");
+    expect(recorded).not.toContain("secret upstream detail");
   });
 
   it("rejects a receipt that completes after the connection closes", async () => {
