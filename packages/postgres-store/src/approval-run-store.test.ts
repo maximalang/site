@@ -101,6 +101,11 @@ describe("PostgresApprovalRunStore", () => {
     );
     expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
     expect(fake.release).toHaveBeenCalledOnce();
+    const activeSessionQuery = fake.query.mock.calls
+      .map(([sql]) => String(sql))
+      .find((sql) => sql.includes("FROM agent_world.conversation_sessions"));
+    expect(activeSessionQuery).toContain("s.adapter_kind IN ('OPENCLAW', 'CODEX')");
+    expect(activeSessionQuery).not.toContain("s.adapter_kind = 'OPENCLAW'");
   });
 
   it("denies without creating a Run or claiming runtime status", async () => {

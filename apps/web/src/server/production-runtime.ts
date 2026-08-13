@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { CodexTaskExecutionAdapter } from "@agent-world/codex-adapter";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
 import { RunIdSchema } from "@agent-world/domain";
 import { LiteLlmModelGateway, LiteLlmProjectionReconciler } from "@agent-world/model-gateway";
@@ -12,6 +13,8 @@ import {
   discoverMigrations,
   PostgresAgentConversationReader,
   PostgresApprovalRunStore,
+  PostgresCodexBindingResolver,
+  PostgresCodexExecutionStore,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresEncryptedSecretStore,
@@ -249,6 +252,12 @@ export async function createProductionRuntime(
     const runDispatchStore = new PostgresRunDispatchStore(pool, {
       eventId: () => `event_${randomUUID()}`,
     });
+    const codexAdapter = new CodexTaskExecutionAdapter({
+      resolver: new PostgresCodexBindingResolver(pool),
+      dispatcher: new PostgresCodexExecutionStore(pool, {
+        executionId: () => `codex_execution_${randomUUID()}`,
+      }),
+    });
     if (configuration.bindings.length > 0) {
       await worldStore.applyOpenClawSnapshot({
         observedAt: new Date().toISOString(),
@@ -326,8 +335,10 @@ export async function createProductionRuntime(
     const taskDispatcher = new TaskDispatchService({
       store: runDispatchStore,
       adapters: {
-        resolve: (kind) =>
-          kind === "OPENCLAW" && writeAdapter?.state === "READY" ? writeAdapter : undefined,
+        resolve: (kind) => {
+          if (kind === "CODEX") return codexAdapter;
+          return kind === "OPENCLAW" && writeAdapter?.state === "READY" ? writeAdapter : undefined;
+        },
       },
     });
     taskRunSupervisor = new TaskRunSupervisor({

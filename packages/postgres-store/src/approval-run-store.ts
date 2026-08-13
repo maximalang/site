@@ -280,7 +280,7 @@ export class PostgresApprovalRunStore {
             WHERE s.conversation_id = $1
               AND s.agent_id = $2
               AND s.ended_at IS NULL
-              AND s.adapter_kind = 'OPENCLAW'
+              AND s.adapter_kind IN ('OPENCLAW', 'CODEX')
               AND b.is_enabled = true
             FOR SHARE OF s, b`,
           [row.conversation_id, row.agent_id],

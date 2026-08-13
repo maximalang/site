@@ -15,6 +15,7 @@ import {
   discoverMigrations,
   PostgresAgentConversationReader,
   PostgresApprovalRunStore,
+  PostgresCodexBindingResolver,
   PostgresCodexExecutionStore,
   PostgresConversationReader,
   PostgresConversationStore,
@@ -205,7 +206,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 11
+    ledger.rows.at(-1)?.version !== 12
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -255,6 +256,7 @@ try {
     "conversation_messages",
     "codex_execution_events",
     "codex_execution_jobs",
+    "codex_execution_policies",
     "hub_command_receipts",
     "execution_preference_overrides",
     "encrypted_secrets",
@@ -990,6 +992,23 @@ try {
     [codex.route, codex.account],
   );
   await pool.query(
+    `INSERT INTO agent_world.codex_execution_policies
+       (route_id, account_id, working_directory, sandbox, approval_policy,
+        network_access, timeout_ms, model, reasoning_effort)
+     VALUES ($1, $2, '/workspaces/project', 'WORKSPACE_WRITE', 'ON_REQUEST',
+             false, 600000, 'gpt-5.6-codex', 'HIGH')`,
+    [codex.route, codex.account],
+  );
+  await expectRejected(
+    pool.query(
+      `UPDATE agent_world.codex_execution_policies
+          SET network_access = true
+        WHERE route_id = $1`,
+      [codex.route],
+    ),
+    "Codex route policy allowed network access to be broadened",
+  );
+  await pool.query(
     `INSERT INTO agent_world.runtime_bindings
        (id, agent_id, route_id, adapter_kind, external_agent_id)
      VALUES ($1, $2, $3, 'CODEX', 'codex:researcher')`,
@@ -1063,6 +1082,35 @@ try {
       "2026-08-13T11:54:00.000Z",
     ],
   );
+  const codexResolution = await new PostgresCodexBindingResolver(pool).resolve({
+    runId: codex.run,
+    bindingId: codex.binding,
+    agentId: ids.agent,
+    externalAgentId: "codex:researcher",
+  });
+  if (
+    codexResolution.routeId !== codex.route ||
+    codexResolution.accountId !== codex.account ||
+    codexResolution.policy.networkAccess !== false ||
+    codexResolution.policy.workingDirectory !== "/workspaces/project"
+  ) {
+    throw new Error("Codex binding resolver did not restore exact safe route provenance");
+  }
+  await pool.query("UPDATE agent_world.accounts SET health = 'UNCONFIGURED' WHERE id = $1", [
+    codex.account,
+  ]);
+  await expectRejected(
+    new PostgresCodexBindingResolver(pool).resolve({
+      runId: codex.run,
+      bindingId: codex.binding,
+      agentId: ids.agent,
+      externalAgentId: "codex:researcher",
+    }),
+    "Codex binding resolver accepted an unavailable ChatGPT account",
+  );
+  await pool.query("UPDATE agent_world.accounts SET health = 'ACTIVE' WHERE id = $1", [
+    codex.account,
+  ]);
   let codexExecutionId = codex.execution;
   let codexNow = "2026-08-13T12:00:00.000Z";
   const codexStore = new PostgresCodexExecutionStore(pool, {
@@ -1548,7 +1596,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 11 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 14, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 14 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
