@@ -185,7 +185,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 8
+    ledger.rows.at(-1)?.version !== 9
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -235,6 +235,8 @@ try {
     "conversation_messages",
     "hub_command_receipts",
     "execution_preference_overrides",
+    "approvals",
+    "runs",
     "model_routes",
     "model_route_modalities",
     "model_route_reasoning_efforts",
