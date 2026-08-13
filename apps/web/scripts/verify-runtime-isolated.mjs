@@ -381,6 +381,36 @@ try {
   if (anonymousTask.status !== 401) {
     throw new Error(`Anonymous Task assignment returned ${anonymousTask.status}`);
   }
+  const approvalBody = JSON.stringify({
+    schemaVersion: 1,
+    taskId: "task_44444444-4444-4444-4444-444444444444",
+    decisionId: "55555555-5555-4555-8555-555555555555",
+    decision: "APPROVE",
+  });
+  const anonymousApproval = await fetch(`${baseUrl}/api/approvals`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: approvalBody,
+  });
+  if (anonymousApproval.status !== 401) {
+    throw new Error(`Anonymous approval decision returned ${anonymousApproval.status}`);
+  }
+  const missingApproval = await fetch(`${baseUrl}/api/approvals`, {
+    method: "POST",
+    headers: {
+      cookie,
+      "content-type": "application/json",
+      origin: baseUrl,
+      "x-agent-world-csrf": loginBody.csrfToken,
+    },
+    body: approvalBody,
+  });
+  const missingApprovalBody = await missingApproval.json();
+  if (missingApproval.status !== 404 || missingApprovalBody.error?.code !== "APPROVAL_NOT_FOUND") {
+    throw new Error(
+      `Approval identity guard returned ${missingApproval.status}/${String(missingApprovalBody.error?.code).slice(0, 64)}`,
+    );
+  }
   const missingTaskTarget = await fetch(`${baseUrl}/api/tasks`, {
     method: "POST",
     headers: {
@@ -436,7 +466,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 9, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 9, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

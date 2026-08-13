@@ -570,6 +570,7 @@ export function ControlCenter({
           {...(taskClient ? { client: taskClient } : {})}
           csrfToken={csrfToken}
           onAssigned={() => setReloadNonce((value) => value + 1)}
+          onDecided={() => setReloadNonce((value) => value + 1)}
           onClose={closeTask}
         />
       ) : null}

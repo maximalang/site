@@ -21,6 +21,7 @@ import {
   PostgresHubCommandStore,
   PostgresHubReader,
   PostgresOwnerSessionStore,
+  PostgresRunDispatchStore,
   PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
 } from "../dist/index.js";
@@ -820,6 +821,29 @@ try {
   ) {
     throw new Error("Canonical Run persistence claimed unsupported dispatch evidence");
   }
+  const runDispatchStore = new PostgresRunDispatchStore(pool, {
+    eventId: () => "event_21212121-2121-2121-2121-212121212121",
+  });
+  const preparedDispatch = await runDispatchStore.prepare(approvalDecision.run.id);
+  if (
+    preparedDispatch.kind !== "READY" ||
+    preparedDispatch.binding.externalAgentId !== "researcher" ||
+    preparedDispatch.session.externalSessionRef !== "agent:researcher:protocol-review"
+  ) {
+    throw new Error("Run dispatch did not restore exact active runtime provenance");
+  }
+  const markedRunning = await runDispatchStore.markRunning({
+    runId: approvalDecision.run.id,
+    externalRunId: "isolated-openclaw-run-1",
+    startedAt: "2026-08-13T09:45:01.000Z",
+  });
+  if (
+    markedRunning.outcome !== "UPDATED" ||
+    markedRunning.run.status !== "RUNNING" ||
+    markedRunning.run.attempt !== 1
+  ) {
+    throw new Error("Accepted upstream Run receipt was not persisted exactly once");
+  }
   const unrelatedProject = "project_18181818-1818-1818-1818-181818181818";
   await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
     unrelatedProject,
@@ -846,9 +870,9 @@ try {
   );
   const taskWorld = await new PostgresWorldProjectionStore(pool).readWorld([worldAgent]);
   if (
-    taskWorld.cursor.lastSequence !== 6 ||
+    taskWorld.cursor.lastSequence !== 7 ||
     taskWorld.tasks[0]?.approval !== "APPROVED" ||
-    taskWorld.agents[0]?.status !== "QUEUED" ||
+    taskWorld.agents[0]?.status !== "RUNNING" ||
     taskWorld.agents[0]?.currentTask?.taskId !== taskAssignment.taskId
   ) {
     throw new Error("Restarted World projection did not restore the canonical Task assignment");

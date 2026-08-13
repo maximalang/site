@@ -177,4 +177,69 @@ describe("PostgresApprovalRunStore", () => {
     expect(fake.query.mock.calls.some(([sql]) => String(sql).startsWith("UPDATE"))).toBe(false);
     expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
   });
+
+  it("revokes only a not-yet-dispatched Run and cancels it atomically", async () => {
+    const approved = {
+      ...pendingApproval,
+      state: "APPROVED",
+      decided_at: "2026-08-13T10:05:00.000Z",
+      decision_command_id: "approval-decision:approve:11111111-1111-1111-1111-111111111111",
+    };
+    const pendingRun = {
+      id: runId,
+      task_id: taskId,
+      agent_id: agentId,
+      approval_id: approvalId,
+      adapter_kind: "OPENCLAW",
+      binding_id: "binding_55555555-5555-5555-5555-555555555555",
+      session_id: "session_44444444-4444-4444-4444-444444444444",
+      status: "DISPATCH_PENDING",
+      attempt: 0,
+      dispatch_idempotency_key: "run:11111111-1111-1111-1111-111111111111",
+      external_run_id: null,
+      created_at: "2026-08-13T10:05:00.000Z",
+      started_at: null,
+      completed_at: null,
+      failure_code: null,
+    };
+    const fake = pool([
+      [],
+      [],
+      [approved],
+      [pendingRun],
+      [],
+      [],
+      [{ last_sequence: "10" }],
+      [],
+      [{ last_sequence: "11" }],
+      [],
+      [],
+      [],
+    ]);
+    const eventIds = [
+      "event_99999999-9999-9999-9999-999999999999",
+      "event_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    ];
+    const result = await new PostgresApprovalRunStore(fake.value, {
+      eventId: () => eventIds.shift() ?? "invalid",
+    }).decide({
+      taskId,
+      approvalId,
+      decision: "REVOKE",
+      reason: "Owner withdrew authorization before dispatch.",
+      commandId: "approval-decision:revoke:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      decidedAt: "2026-08-13T10:06:00.000Z",
+    });
+    expect(result).toMatchObject({
+      outcome: "DECIDED",
+      approval: { type: "REVOKED" },
+      run: { status: "CANCELLED", completedAt: "2026-08-13T10:06:00.000Z" },
+    });
+    expect(fake.query.mock.calls.map(([sql]) => String(sql))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("SET state = 'REVOKED'"),
+        expect.stringContaining("SET status = 'CANCELLED'"),
+      ]),
+    );
+  });
 });

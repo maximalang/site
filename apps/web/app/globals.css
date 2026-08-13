@@ -893,6 +893,18 @@ tbody tr:last-child > * {
   color: var(--success);
 }
 
+.task-decision-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+}
+
+.task-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .composer-footer {
   justify-content: space-between;
   gap: var(--space-4);

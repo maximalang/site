@@ -13,6 +13,7 @@ function runtime() {
     readConversation: vi.fn(),
     sendConversation: vi.fn(),
     assignTask: vi.fn(),
+    decideApproval: vi.fn(),
     executeHubCommand: vi.fn(),
     readExecutionPreferences: vi.fn(),
     writeExecutionPreferences: vi.fn(),

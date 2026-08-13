@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ConversationSendService } from "@agent-world/conversation-service";
+import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
 import {
   type OpenClawCredential,
   OpenClawReadAdapter,
@@ -9,6 +9,7 @@ import {
   applyMigrations,
   discoverMigrations,
   PostgresAgentConversationReader,
+  PostgresApprovalRunStore,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresExecutionPreferenceStore,
@@ -16,6 +17,7 @@ import {
   PostgresHubReader,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
+  PostgresRunDispatchStore,
   PostgresRuntimeMessageStore,
   PostgresWorldProjectionStore,
 } from "@agent-world/postgres-store";
@@ -153,6 +155,12 @@ export async function createProductionRuntime(
     const worldStore = new PostgresWorldProjectionStore(pool, {
       eventId: () => `event_${randomUUID()}`,
     });
+    const approvalStore = new PostgresApprovalRunStore(pool, {
+      eventId: () => `event_${randomUUID()}`,
+    });
+    const runDispatchStore = new PostgresRunDispatchStore(pool, {
+      eventId: () => `event_${randomUUID()}`,
+    });
     if (configuration.bindings.length > 0) {
       await worldStore.applyOpenClawSnapshot({
         observedAt: new Date().toISOString(),
@@ -227,6 +235,13 @@ export async function createProductionRuntime(
           kind === "OPENCLAW" && writeAdapter?.state === "READY" ? writeAdapter : undefined,
       },
     });
+    const taskDispatcher = new TaskDispatchService({
+      store: runDispatchStore,
+      adapters: {
+        resolve: (kind) =>
+          kind === "OPENCLAW" && writeAdapter?.state === "READY" ? writeAdapter : undefined,
+      },
+    });
 
     return {
       auth,
@@ -234,6 +249,19 @@ export async function createProductionRuntime(
       readConversation: (input) => conversationReader.read(input),
       sendConversation: (input) => sender.send(input),
       assignTask: (input) => worldStore.assignTask(input),
+      decideApproval: async (input) => {
+        const decision = await approvalStore.decide(input);
+        if (decision.approval.type !== "APPROVED") {
+          return { ...decision, dispatch: "NOT_APPLICABLE" as const };
+        }
+        if (!decision.run) throw new Error("Approved decision is missing its canonical Run");
+        try {
+          const dispatched = await taskDispatcher.dispatch(decision.run.id);
+          return { ...decision, run: dispatched.run, dispatch: dispatched.outcome };
+        } catch {
+          return { ...decision, dispatch: "PENDING" as const };
+        }
+      },
       executeHubCommand: (command) => hubCommandStore.execute(command),
       readExecutionPreferences: (selection) => executionPreferenceStore.read(selection),
       writeExecutionPreferences: (layer, updatedAt) =>

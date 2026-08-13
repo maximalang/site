@@ -1,7 +1,12 @@
 "use client";
 
-import type { AgentConversationList, TaskAssignmentResponse } from "@agent-world/read-model";
+import type {
+  AgentConversationList,
+  ApprovalDecisionResponse,
+  TaskAssignmentResponse,
+} from "@agent-world/read-model";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { decideApproval } from "../client/approval-api";
 import { loadAgentConversations } from "../client/conversation-api";
 import { assignTask } from "../client/task-api";
 
@@ -17,11 +22,22 @@ export type TaskClient = {
     description?: string;
     csrfToken: string;
   }): Promise<TaskAssignmentResponse>;
+  decide?(input: {
+    taskId: string;
+    decisionId: string;
+    decision: "APPROVE" | "DENY" | "REVOKE";
+    reason?: string;
+    csrfToken: string;
+  }): Promise<ApprovalDecisionResponse>;
 };
 
 const defaultTaskClient: TaskClient = {
   loadIndex: (agentId) => loadAgentConversations(agentId),
   assign: (input) => assignTask(input),
+  decide: (input) =>
+    input.decision === "APPROVE"
+      ? decideApproval({ ...input, decision: "APPROVE" })
+      : decideApproval({ ...input, decision: input.decision, reason: input.reason ?? "" }),
 };
 
 function newTaskId() {
@@ -32,12 +48,14 @@ export function TaskDrawer({
   agent,
   csrfToken,
   onAssigned,
+  onDecided,
   onClose,
   client = defaultTaskClient,
 }: {
   agent: AgentIdentity;
   csrfToken: string;
   onAssigned: (result: TaskAssignmentResponse) => void;
+  onDecided?: (result: ApprovalDecisionResponse) => void;
   onClose: () => void;
   client?: TaskClient;
 }) {
@@ -50,6 +68,14 @@ export function TaskDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
   const [assigned, setAssigned] = useState<TaskAssignmentResponse>();
+  const [decision, setDecision] = useState<ApprovalDecisionResponse>();
+  const [decisionReason, setDecisionReason] = useState("");
+  const [deciding, setDeciding] = useState(false);
+  const [decisionError, setDecisionError] = useState(false);
+  const [decisionRetry, setDecisionRetry] = useState<{
+    decisionId: string;
+    signature: string;
+  }>();
   const [retry, setRetry] = useState<{ taskId: string; signature: string }>();
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -138,6 +164,36 @@ export function TaskDrawer({
       setSubmitError(true);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const submitDecision = async (kind: "APPROVE" | "DENY" | "REVOKE") => {
+    if (!assigned || !client.decide || deciding) return;
+    const reason = decisionReason.trim();
+    if (kind !== "APPROVE" && !reason) return;
+    const signature = JSON.stringify([assigned.task.id, kind, reason]);
+    const attempt =
+      decisionRetry?.signature === signature
+        ? decisionRetry
+        : { decisionId: crypto.randomUUID(), signature };
+    setDecisionRetry(attempt);
+    setDeciding(true);
+    setDecisionError(false);
+    try {
+      const result = await client.decide({
+        taskId: assigned.task.id,
+        decisionId: attempt.decisionId,
+        decision: kind,
+        ...(kind === "APPROVE" ? {} : { reason }),
+        csrfToken,
+      });
+      setDecision(result);
+      setDecisionRetry(kind === "APPROVE" && result.dispatch === "PENDING" ? attempt : undefined);
+      onDecided?.(result);
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setDeciding(false);
     }
   };
 
@@ -234,9 +290,73 @@ export function TaskDrawer({
               </p>
             ) : null}
             {assigned ? (
-              <p className="task-success" role="status">
-                Задача назначена. Статус: требует подтверждения; запуск не выполнен.
-              </p>
+              <div className="task-decision-panel">
+                <p className="task-success" role="status">
+                  {decision?.approval.type === "APPROVED"
+                    ? decision.dispatch === "PENDING"
+                      ? "Задача подтверждена и ожидает доступный runtime."
+                      : "Задача подтверждена и передана в runtime."
+                    : decision?.approval.type === "DENIED"
+                      ? "Выполнение задачи отклонено."
+                      : "Задача назначена. Статус: требует подтверждения; запуск не выполнен."}
+                </p>
+                {!decision || decision.approval.type === "APPROVED" ? (
+                  <>
+                    <label htmlFor="task-decision-reason">
+                      Причина {decision?.dispatch === "PENDING" ? "отзыва" : "отклонения"}
+                    </label>
+                    <textarea
+                      id="task-decision-reason"
+                      disabled={deciding}
+                      maxLength={1_000}
+                      onChange={(event) => {
+                        setDecisionReason(event.target.value);
+                        setDecisionRetry(undefined);
+                        setDecisionError(false);
+                      }}
+                      rows={3}
+                      value={decisionReason}
+                    />
+                    <div className="task-decision-actions">
+                      {!decision ? (
+                        <button
+                          className="primary-button"
+                          disabled={deciding}
+                          onClick={() => void submitDecision("APPROVE")}
+                          type="button"
+                        >
+                          {deciding ? "Сохраняем…" : "Подтвердить и запустить"}
+                        </button>
+                      ) : null}
+                      {decision?.dispatch === "PENDING" ? (
+                        <button
+                          className="primary-button"
+                          disabled={deciding}
+                          onClick={() => void submitDecision("APPROVE")}
+                          type="button"
+                        >
+                          {deciding ? "Отправляем…" : "Повторить отправку"}
+                        </button>
+                      ) : null}
+                      <button
+                        className="secondary-button"
+                        disabled={deciding || !decisionReason.trim()}
+                        onClick={() =>
+                          void submitDecision(decision?.dispatch === "PENDING" ? "REVOKE" : "DENY")
+                        }
+                        type="button"
+                      >
+                        {decision?.dispatch === "PENDING" ? "Отозвать разрешение" : "Отклонить"}
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+                {decisionError ? (
+                  <p className="composer-error" role="alert">
+                    Решение не сохранено. Повторите без изменения полей.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
             <div className="composer-footer">
               <span>{title.length} / 200</span>
