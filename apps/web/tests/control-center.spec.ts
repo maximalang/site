@@ -37,7 +37,18 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
         isEnabled: true,
       },
     ],
-    accounts: [],
+    accounts: [
+      {
+        accountId: "account_11111111-1111-1111-1111-111111111111",
+        providerId: "provider_10101010-1010-1010-1010-101010101010",
+        label: "OpenAI owner API",
+        authMechanism: "API_KEY",
+        availableSurfaces: ["API"],
+        health: "UNCONFIGURED",
+        isEnabled: true,
+        createdAt: "2026-08-13T06:00:00.000Z",
+      },
+    ],
     models: [
       {
         modelId: "model_20202020-2020-2020-2020-202020202020",
@@ -51,7 +62,21 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
           contextWindowTokens: 200000,
         },
         isEnabled: true,
-        routes: [],
+        routes: [
+          {
+            modelRouteId: "model_route_30303030-3030-3030-3030-303030303030",
+            providerId: "provider_10101010-1010-1010-1010-101010101010",
+            accountId: "account_11111111-1111-1111-1111-111111111111",
+            surface: "API",
+            remoteModelId: "gpt-5-mini",
+            availability: "AVAILABLE",
+            contextWindowTokens: 200000,
+            reasoningEfforts: ["MEDIUM"],
+            supportedModalities: ["TEXT"],
+            supportedToolIds: [],
+            isEnabled: true,
+          },
+        ],
       },
     ],
     executionRoutes: [],
@@ -111,6 +136,56 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       status: 200,
     }),
   );
+  await page.route("**/api/hub/provider-credentials", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
+    const body = route.request().postDataJSON() as {
+      schemaVersion: number;
+      commandId: string;
+      accountId: string;
+      apiKey: string;
+    };
+    expect(body).toEqual({
+      schemaVersion: 1,
+      commandId: expect.stringMatching(/^provider-key-[0-9a-f-]{36}$/),
+      accountId: "account_11111111-1111-1111-1111-111111111111",
+      apiKey: "browser-provider-secret",
+    });
+    await route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        outcome: "CREATED",
+        accountId: body.accountId,
+        credentialConfigured: true,
+        version: 1,
+      }),
+      contentType: "application/json",
+      status: 201,
+    });
+  });
+  await page.route("**/api/hub/model-routes/check", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
+    expect(route.request().postDataJSON()).toEqual({
+      schemaVersion: 1,
+      modelRouteId: "model_route_30303030-3030-3030-3030-303030303030",
+    });
+    await route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        runId: "run_40404040-4040-4040-4040-404040404040",
+        modelRouteId: "model_route_30303030-3030-3030-3030-303030303030",
+        providerId: "provider_10101010-1010-1010-1010-101010101010",
+        accountId: "account_11111111-1111-1111-1111-111111111111",
+        mode: "API",
+        remoteModelId: "gpt-5-mini",
+        status: "SUCCEEDED",
+        usage: { inputTokens: 4, outputTokens: 3, totalTokens: 7 },
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
   await page.route("**/api/hub/preferences", (route) =>
     route.fulfill({
       body: JSON.stringify(preferenceFixture),
@@ -344,6 +419,28 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     page.getByRole("heading", { level: 2, name: "Execution preferences" }),
   ).toBeVisible();
   await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
+
+  const providerKeySection = page
+    .locator("section.hub-registry-section")
+    .filter({ has: page.getByRole("heading", { name: "API provider key" }) });
+  const apiKeyInput = providerKeySection.getByLabel("API key");
+  await expect(apiKeyInput).toHaveAttribute("type", "password");
+  await apiKeyInput.fill("browser-provider-secret");
+  await providerKeySection.locator('button[type="submit"]').click();
+  await expect(providerKeySection.getByRole("status")).toBeVisible();
+  await expect(apiKeyInput).toHaveValue("");
+  await expect(page.getByText("browser-provider-secret")).toHaveCount(0);
+
+  const routeCheckSection = page
+    .locator("section.hub-registry-section")
+    .filter({ hasText: "gpt-5-mini" });
+  await routeCheckSection.locator("button").click();
+  const routeReceipt = routeCheckSection.getByRole("status");
+  await expect(routeReceipt).toContainText("API");
+  await expect(routeReceipt).toContainText("provider_10101010-1010-1010-1010-101010101010");
+  await expect(routeReceipt).toContainText("account_11111111-1111-1111-1111-111111111111");
+  await expect(routeReceipt).toContainText("gpt-5-mini");
+  await expect(routeReceipt).toContainText("7 tokens");
 
   const hubAccessibility = await new AxeBuilder({ page }).analyze();
   expect(hubAccessibility.violations).toEqual([]);
