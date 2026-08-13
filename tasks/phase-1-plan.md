@@ -5,6 +5,8 @@ vertical, reviewable increment and must retain the previous slice's tests.
 
 ## Slice 1: Canonical contracts without persistence
 
+Status: complete on `codex/phase-1-contracts`.
+
 Define versioned identifiers and contracts for `Agent`, `AccountRef`,
 `ExecutionRoute`, `RuntimeBinding`, `WorldEvent`, `TaskIntent`, approval state
 and projection cursors. Prove at the type/schema level that Agent IDs cannot be
@@ -13,7 +15,18 @@ runtime session or account IDs.
 Verification: schema fixtures, invalid-event rejection, exhaustive event
 projection tests and architecture-boundary checks.
 
+Evidence:
+
+- [x] Runtime-prefixed and compile-time branded canonical identifiers.
+- [x] Strict Agent, AccountRef, ExecutionRoute and RuntimeBinding schemas.
+- [x] Strict TaskIntent and explicit approval-state schemas.
+- [x] Provenance-bearing WorldEvent union with no simulation source.
+- [x] Replay cursor invariant and negative identity type tests.
+- [x] Test, typecheck, lint, build and package-content gates pass.
+
 ## Slice 2: OpenClaw read-only adapter
+
+Status: next.
 
 Use only public gateway packages. Connect with least-privilege read scope,
 normalize agent/session/presence events, preserve sequence/state version and
