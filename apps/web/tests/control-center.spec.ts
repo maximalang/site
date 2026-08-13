@@ -1,3 +1,4 @@
+import { HubReadModelSchema } from "@agent-world/read-model";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { buildContractFixture } from "../src/test-fixtures";
@@ -5,7 +6,7 @@ import { buildContractFixture } from "../src/test-fixtures";
 const fixtureAgent = "Research Lead";
 const fixtureTask = "Verify protocol contract";
 
-test("World and Command expose one canonical agent projection", async ({ page }, testInfo) => {
+test("World, Command and Hub expose one canonical control surface", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];
@@ -18,6 +19,52 @@ test("World and Command expose one canonical agent projection", async ({ page },
   const conversationId = "conversation_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const projectId = "project_33333333-3333-3333-3333-333333333333";
   const csrfToken = "a".repeat(43);
+  const hubFixture = HubReadModelSchema.parse({
+    schemaVersion: 1,
+    generatedAt: "2026-08-13T06:00:04.000Z",
+    providers: [
+      {
+        providerId: "provider_10101010-1010-1010-1010-101010101010",
+        slug: "openai",
+        displayName: "OpenAI",
+        kind: "OPENAI",
+        category: "LLM_API",
+        isEnabled: true,
+      },
+    ],
+    accounts: [],
+    models: [
+      {
+        modelId: "model_20202020-2020-2020-2020-202020202020",
+        slug: "gpt-x",
+        displayName: "GPT-X",
+        family: "gpt",
+        capabilities: {
+          reasoning: true,
+          toolUse: true,
+          modalities: ["TEXT"],
+          contextWindowTokens: 200000,
+        },
+        isEnabled: true,
+        routes: [],
+      },
+    ],
+    executionRoutes: [],
+    agents: [
+      {
+        agentId,
+        slug: "researcher",
+        displayName: fixtureAgent,
+        role: fixtureAgentRecord.role,
+        isEnabled: true,
+        skillAssignments: [],
+        toolAssignments: [],
+      },
+    ],
+    skills: [],
+    tools: [],
+    projects: [],
+  });
   let assignedTaskId: string | undefined;
 
   await page.route("**/api/auth/session", (route) =>
@@ -34,6 +81,13 @@ test("World and Command expose one canonical agent projection", async ({ page },
   );
   await page.route("**/api/world", (route) =>
     route.fulfill({ body: JSON.stringify(fixture), contentType: "application/json", status: 200 }),
+  );
+  await page.route("**/api/hub", (route) =>
+    route.fulfill({
+      body: JSON.stringify(hubFixture),
+      contentType: "application/json",
+      status: 200,
+    }),
   );
   await page.route(`**/api/agents/${agentId}/conversations`, (route) =>
     route.fulfill({
@@ -237,17 +291,29 @@ test("World and Command expose one canonical agent projection", async ({ page },
   await expect(canonicalRow).toContainText("Выполняет");
   await expect(inspector.getByRole("heading", { level: 2, name: fixtureAgent })).toBeVisible();
 
+  const commandAccessibility = await new AxeBuilder({ page }).analyze();
+  expect(commandAccessibility.violations).toEqual([]);
+  await page.screenshot({
+    animations: "disabled",
+    fullPage: true,
+    path: testInfo.outputPath(`${testInfo.project.name}-command.png`),
+  });
+
   await commandTab.focus();
   await page.keyboard.press("Home");
   const worldTab = page.getByRole("tab", { name: "World" });
   await expect(worldTab).toBeFocused();
   await expect(worldTab).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("End");
-  await expect(commandTab).toBeFocused();
-  await expect(commandTab).toHaveAttribute("aria-selected", "true");
+  const hubTab = page.getByRole("tab", { name: "Hub" });
+  await expect(hubTab).toBeFocused();
+  await expect(hubTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { level: 1, name: "Canonical Hub" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
 
-  const commandAccessibility = await new AxeBuilder({ page }).analyze();
-  expect(commandAccessibility.violations).toEqual([]);
+  const hubAccessibility = await new AxeBuilder({ page }).analyze();
+  expect(hubAccessibility.violations).toEqual([]);
 
   const viewport = page.viewportSize();
   const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -262,7 +328,7 @@ test("World and Command expose one canonical agent projection", async ({ page },
   await page.screenshot({
     animations: "disabled",
     fullPage: true,
-    path: testInfo.outputPath(`${testInfo.project.name}-command.png`),
+    path: testInfo.outputPath(`${testInfo.project.name}-hub.png`),
   });
 });
 

@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { AgentConversationListSchema, TaskAssignmentResponseSchema } from "@agent-world/read-model";
+import {
+  AgentConversationListSchema,
+  HubReadModelSchema,
+  TaskAssignmentResponseSchema,
+} from "@agent-world/read-model";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -61,6 +65,44 @@ describe("ControlCenter", () => {
         "true",
       ),
     );
+  });
+
+  it("opens Canonical Hub inside the same shell even when runtime is unavailable", async () => {
+    const user = userEvent.setup();
+    const loadHubReadModel = vi.fn(async () =>
+      HubReadModelSchema.parse({
+        schemaVersion: 1,
+        generatedAt: "2026-08-13T12:00:00.000Z",
+        providers: [],
+        accounts: [],
+        models: [],
+        executionRoutes: [],
+        agents: [],
+        skills: [],
+        tools: [],
+        projects: [],
+      }),
+    );
+    render(
+      <ControlCenter
+        csrfToken="csrf"
+        loadHubReadModel={loadHubReadModel}
+        loadReadModel={async () => ({
+          schemaVersion: 1,
+          source: "UNAVAILABLE",
+          generatedAt: "2026-08-13T06:00:00.000Z",
+          cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
+          agents: [],
+          tasks: [],
+        })}
+      />,
+    );
+    await screen.findByRole("status", { name: /runtime недоступен/i });
+    expect(loadHubReadModel).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "Hub" }));
+    expect(await screen.findByRole("heading", { name: "Canonical Hub" })).not.toBeNull();
+    expect(loadHubReadModel).toHaveBeenCalledOnce();
+    expect(screen.getByRole("tab", { name: "Hub" }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("does not claim logout when session revocation fails", async () => {

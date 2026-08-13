@@ -59,6 +59,8 @@ Evidence:
 
 ## Slice 3: Idempotent control-plane commands
 
+Status: complete on `codex/phase-1-contracts` (`1bfe19d`, `bf5793f`).
+
 Add narrow commands for Provider, Account metadata, CanonicalModel/ModelRoute,
 Agent, Skill, Tool and Project creation. Commands are same-origin, CSRF
 protected, caller-idempotent and transactional. Raw provider keys are rejected
@@ -69,7 +71,18 @@ Verification: create/replay/conflict, duplicate remote model discovery,
 cross-provider Account/ModelRoute rejection, invalid Skill integrity and no
 partial writes.
 
+Evidence:
+
+- [x] Strict metadata-only contracts reject raw credentials and provider drift.
+- [x] PostgreSQL advisory serialization plus immutable SHA-256 receipts.
+- [x] Atomic create/replay/conflict behavior for all eight canonical resources.
+- [x] Duplicate ModelRoute and cross-provider Account references fail closed.
+- [x] Owner authorization, CSRF, same-origin and bounded request enforcement.
+- [x] Disposable PostgreSQL and standalone production runtime verification.
+
 ## Slice 4: Integrated Lobby UI
+
+Status: complete on `codex/phase-1-contracts`.
 
 Add a Hub/Lobby mode inside the same application. Reuse the canonical Agent
 selection and existing Command presentation rather than opening component
@@ -79,6 +92,17 @@ advanced route metadata remains progressively disclosed.
 Verification: keyboard navigation, focus, reduced motion, responsive
 320/390/768/1024/1440 viewports, Axe, no horizontal overflow, no credentials in
 storage or DOM and no network calls to third-party dashboards.
+
+Evidence:
+
+- [x] Hub is a third mode in the existing World/Command shell and remains usable
+  when OpenClaw is unavailable.
+- [x] One CanonicalModel card owns nested ModelRoutes; advanced route metadata
+  is progressively disclosed.
+- [x] Providers, Accounts, Routes, Agents, Skills, Tools and Projects use one
+  bounded owner-only Hub read model with explicit empty/error states.
+- [x] Chromium, Axe, keyboard, console/network and overflow checks pass at all
+  five named viewports plus the standalone production smoke test.
 
 ## Slice 5: Inherited execution preferences
 

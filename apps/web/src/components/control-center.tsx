@@ -17,11 +17,13 @@ import {
 } from "react";
 import { loadWorldReadModel } from "../client/world-api";
 import { type ConversationClient, ConversationDrawer } from "./conversation-drawer";
+import { HubPanel } from "./hub-panel";
 import { type TaskClient, TaskDrawer } from "./task-drawer";
 import { WorldCanvas } from "./world-canvas";
 
-type Mode = "WORLD" | "COMMAND";
+type Mode = "WORLD" | "COMMAND" | "HUB";
 type LoadReadModel = (attempt: number) => Promise<WorldReadModel>;
+type LoadHubReadModel = () => Promise<import("@agent-world/read-model").HubReadModel>;
 type AgentId = AgentProjectionCore["agentId"];
 const defaultLoadReadModel: LoadReadModel = () => loadWorldReadModel();
 
@@ -230,12 +232,14 @@ function CommandTable({
 export function ControlCenter({
   csrfToken,
   loadReadModel = defaultLoadReadModel,
+  loadHubReadModel,
   conversationClient,
   taskClient,
   onLogout,
 }: {
   csrfToken: string;
   loadReadModel?: LoadReadModel;
+  loadHubReadModel?: LoadHubReadModel;
   conversationClient?: ConversationClient;
   taskClient?: TaskClient;
   onLogout?: () => Promise<void> | void;
@@ -250,8 +254,10 @@ export function ControlCenter({
   const [logoutState, setLogoutState] = useState<"IDLE" | "PENDING" | "ERROR">("IDLE");
   const worldTabId = useId();
   const commandTabId = useId();
+  const hubTabId = useId();
   const worldTabRef = useRef<HTMLButtonElement>(null);
   const commandTabRef = useRef<HTMLButtonElement>(null);
+  const hubTabRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | undefined>(undefined);
 
   useEffect(() => {
@@ -322,20 +328,25 @@ export function ControlCenter({
   const selectMode = (next: Mode, focus = false) => {
     setMode(next);
     if (focus) {
-      (next === "WORLD" ? worldTabRef : commandTabRef).current?.focus();
+      ({ WORLD: worldTabRef, COMMAND: commandTabRef, HUB: hubTabRef })[next].current?.focus();
     }
   };
 
   const handleTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
-      selectMode(mode === "WORLD" ? "COMMAND" : "WORLD", true);
+      const modes: Mode[] = ["WORLD", "COMMAND", "HUB"];
+      const offset = event.key === "ArrowRight" ? 1 : -1;
+      selectMode(
+        modes[(modes.indexOf(mode) + offset + modes.length) % modes.length] ?? "WORLD",
+        true,
+      );
     } else if (event.key === "Home") {
       event.preventDefault();
       selectMode("WORLD", true);
     } else if (event.key === "End") {
       event.preventDefault();
-      selectMode("COMMAND", true);
+      selectMode("HUB", true);
     }
   };
 
@@ -383,7 +394,7 @@ export function ControlCenter({
       </header>
 
       <nav className="mode-navigation" aria-label="Режим интерфейса">
-        <div className="mode-tabs" role="tablist" aria-label="World или Command">
+        <div className="mode-tabs" role="tablist" aria-label="World, Command или Hub">
           <button
             ref={worldTabRef}
             aria-controls="world-panel"
@@ -410,18 +421,45 @@ export function ControlCenter({
           >
             Command
           </button>
+          <button
+            ref={hubTabRef}
+            aria-controls="hub-panel"
+            aria-selected={mode === "HUB"}
+            id={hubTabId}
+            onClick={() => selectMode("HUB")}
+            onKeyDown={handleTabKey}
+            role="tab"
+            tabIndex={mode === "HUB" ? 0 : -1}
+            type="button"
+          >
+            Hub
+          </button>
         </div>
-        <p className="projection-note">Один read model · две проекции</p>
+        <p className="projection-note">Один domain layer · World, Command и Hub</p>
       </nav>
 
       <main id="main-content" tabIndex={-1}>
-        {model?.source === "CONTRACT_FIXTURE" ? (
+        {mode !== "HUB" && model?.source === "CONTRACT_FIXTURE" ? (
           <div className="fixture-banner" role="note">
             Контрактный снимок — это проверочные данные, не live runtime.
           </div>
         ) : null}
 
-        {!model && !loadError ? (
+        {mode === "HUB" ? (
+          <section
+            aria-labelledby={hubTabId}
+            className="hub-workspace"
+            id="hub-panel"
+            role="tabpanel"
+          >
+            <HubPanel
+              {...(loadHubReadModel ? { load: loadHubReadModel } : {})}
+              onSelectAgent={selectAgent}
+            />
+          </section>
+        ) : null}
+
+        {mode !== "HUB" && !model && !loadError ? (
           <section className="center-state" aria-busy="true" aria-label="Загрузка состояния">
             <span aria-hidden="true" className="loading-grid" />
             <h1>Загружаем общую проекцию</h1>
@@ -429,7 +467,7 @@ export function ControlCenter({
           </section>
         ) : null}
 
-        {loadError ? (
+        {mode !== "HUB" && loadError ? (
           <section className="center-state" role="alert">
             <p className="eyebrow">Ошибка API</p>
             <h1>Не удалось проверить read model</h1>
@@ -444,7 +482,7 @@ export function ControlCenter({
           </section>
         ) : null}
 
-        {model?.source === "UNAVAILABLE" ? (
+        {mode !== "HUB" && model?.source === "UNAVAILABLE" ? (
           <section className="center-state" role="status" aria-label="Runtime недоступен">
             <p className="eyebrow">Нет авторитетного источника</p>
             <h1>Runtime недоступен</h1>
@@ -452,7 +490,7 @@ export function ControlCenter({
           </section>
         ) : null}
 
-        {model && model.source !== "UNAVAILABLE" && world && command ? (
+        {mode !== "HUB" && model && model.source !== "UNAVAILABLE" && world && command ? (
           <div className="workspace-grid">
             {mode === "WORLD" ? (
               <section
