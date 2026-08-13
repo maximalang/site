@@ -1088,6 +1088,29 @@ button:disabled {
   margin-block: var(--space-2);
 }
 
+.provider-key-form {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 36rem;
+}
+
+.provider-key-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.provider-key-form input,
+.provider-key-form select {
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+}
+
 .hub-state p {
   color: var(--text-muted);
 }

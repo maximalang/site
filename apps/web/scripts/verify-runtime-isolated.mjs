@@ -180,6 +180,8 @@ try {
     AGENT_WORLD_DATABASE_TLS: "disable",
     AGENT_WORLD_OWNER_PASSWORD_HASH: ownerHash,
     AGENT_WORLD_CSRF_SECRET: csrfSecret,
+    AGENT_WORLD_SECRET_MASTER_KEY: randomBytes(32).toString("base64url"),
+    AGENT_WORLD_SECRET_KEY_VERSION: "1",
   };
   const secrets = [databasePassword, ownerPassword, ownerHash, csrfSecret];
 
@@ -461,12 +463,12 @@ try {
        (SELECT count(*)::integer FROM agent_world.schema_migrations) AS migrations,
        (SELECT count(*)::integer FROM agent_world.owner_sessions WHERE revoked_at IS NOT NULL) AS revoked_sessions`,
   );
-  if (evidence.rows[0]?.migrations !== 9 || evidence.rows[0]?.revoked_sessions !== 1) {
+  if (evidence.rows[0]?.migrations !== 10 || evidence.rows[0]?.revoked_sessions !== 1) {
     throw new Error("Standalone runtime did not preserve migration or revocation evidence");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 9, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 10, authLifecycle: true, worldAuth: true, hubAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

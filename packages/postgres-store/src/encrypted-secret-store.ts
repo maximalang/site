@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import { TimestampSchema } from "@agent-world/domain";
+import { AccountIdSchema, TimestampSchema } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
 
@@ -36,6 +36,13 @@ export type SecretWriteReceipt = {
   outcome: "CREATED" | "ROTATED" | "REPLAY";
   secretRef: string;
   version: number;
+};
+
+export type ProviderCredentialWriteInput = {
+  commandId: string;
+  accountId: string;
+  plaintext: string;
+  writtenAt: string;
 };
 
 export interface SecretStore {
@@ -153,6 +160,27 @@ export class PostgresEncryptedSecretStore implements SecretStore {
   }
 
   async write(input: SecretWriteInput): Promise<SecretWriteReceipt> {
+    return this.writeTransaction(input);
+  }
+
+  async writeProviderCredential(input: ProviderCredentialWriteInput): Promise<SecretWriteReceipt> {
+    const accountId = AccountIdSchema.parse(input.accountId);
+    return this.writeTransaction(
+      {
+        commandId: input.commandId,
+        secretRef: `secret-store:accounts/${accountId}/provider-api-key`,
+        purpose: "PROVIDER_API_KEY",
+        plaintext: input.plaintext,
+        writtenAt: input.writtenAt,
+      },
+      accountId,
+    );
+  }
+
+  private async writeTransaction(
+    input: SecretWriteInput,
+    accountId?: ReturnType<typeof AccountIdSchema.parse>,
+  ): Promise<SecretWriteReceipt> {
     validateInput(input);
     const hash = requestHash(input);
     const client = await this.pool.connect();
@@ -227,6 +255,24 @@ export class PostgresEncryptedSecretStore implements SecretStore {
           ],
         );
         const outcome = existing ? "ROTATED" : "CREATED";
+        if (accountId !== undefined) {
+          const bound = await client.query<{ id: string }>(
+            `UPDATE agent_world.accounts a
+                SET credential_ref = $2, health = 'ACTIVE'
+               FROM agent_world.providers p
+              WHERE a.id = $1
+                AND p.id = a.provider_id
+                AND p.category = 'LLM_API'
+                AND p.is_enabled = true
+                AND a.auth_mechanism = 'API_KEY'
+                AND a.is_enabled = true
+              RETURNING a.id`,
+            [accountId, input.secretRef],
+          );
+          if (bound.rows.length !== 1 || bound.rows[0]?.id !== accountId) {
+            throw new SecretStoreError("INVALID_REFERENCE");
+          }
+        }
         await client.query(
           `INSERT INTO agent_world.secret_write_receipts
              (command_id, request_sha256, secret_ref, version, outcome, created_at)

@@ -12,6 +12,7 @@ import {
   PostgresApprovalRunStore,
   PostgresConversationReader,
   PostgresConversationStore,
+  PostgresEncryptedSecretStore,
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
@@ -33,6 +34,25 @@ type OpenClawRuntimeConfig = {
   credential: OpenClawCredential;
   instanceId: string;
 };
+
+export function parseSecretKeyMaterial(environment: RuntimeEnvironment): {
+  keyVersion: number;
+  masterKey: Buffer;
+} {
+  const encoded = environment.AGENT_WORLD_SECRET_MASTER_KEY;
+  const version = Number(environment.AGENT_WORLD_SECRET_KEY_VERSION);
+  if (!encoded || !/^[A-Za-z0-9_-]{43}$/.test(encoded)) {
+    throw new Error("AGENT_WORLD_SECRET_MASTER_KEY must be a 32-byte base64url value");
+  }
+  if (!Number.isSafeInteger(version) || version < 1 || version > 2_147_483_647) {
+    throw new Error("AGENT_WORLD_SECRET_KEY_VERSION must be a positive integer");
+  }
+  const masterKey = Buffer.from(encoded, "base64url");
+  if (masterKey.byteLength !== 32 || masterKey.toString("base64url") !== encoded) {
+    throw new Error("AGENT_WORLD_SECRET_MASTER_KEY is not canonical base64url");
+  }
+  return { keyVersion: version, masterKey };
+}
 
 function loopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
@@ -148,6 +168,7 @@ export async function createProductionRuntime(
     const conversationStore = new PostgresConversationStore(pool);
     const hubReader = new PostgresHubReader(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
+    const secretStore = new PostgresEncryptedSecretStore(pool, parseSecretKeyMaterial(environment));
     const executionPreferenceStore = new PostgresExecutionPreferenceStore(pool);
     const runtimeMessageStore = new PostgresRuntimeMessageStore(pool, {
       messageId: () => `message_${randomUUID()}`,
@@ -274,6 +295,7 @@ export async function createProductionRuntime(
         }
       },
       executeHubCommand: (command) => hubCommandStore.execute(command),
+      writeProviderCredential: (input) => secretStore.writeProviderCredential(input),
       readExecutionPreferences: (selection) => executionPreferenceStore.read(selection),
       writeExecutionPreferences: (layer, updatedAt) =>
         executionPreferenceStore.writeLayer(layer, updatedAt),

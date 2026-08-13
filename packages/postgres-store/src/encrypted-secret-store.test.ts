@@ -63,6 +63,9 @@ function fakeDatabase() {
         });
         return { rows: [] as Row[] };
       }
+      if (text.includes("UPDATE agent_world.accounts")) {
+        return { rows: [{ id: String(values[0]) }] as Row[] };
+      }
       if (text.includes("FROM agent_world.encrypted_secrets") && !text.includes("FOR UPDATE")) {
         const stored = secrets.get(String(values[0]));
         return { rows: (stored ? [stored] : []) as Row[] };
@@ -160,5 +163,31 @@ describe("PostgresEncryptedSecretStore", () => {
     await expect(store.read(input.secretRef, "OTHER" as never)).rejects.toMatchObject({
       code: "INVALID_REFERENCE",
     });
+  });
+
+  it("binds an API-key Account to only its opaque derived reference", async () => {
+    const database = fakeDatabase();
+    const store = new PostgresEncryptedSecretStore(database.pool, {
+      keyVersion: 1,
+      masterKey: randomBytes(32),
+    });
+    const receipt = await store.writeProviderCredential({
+      commandId: "provider-key-write-1",
+      accountId: "account_33333333-3333-3333-3333-333333333333",
+      plaintext: "provider-key",
+      writtenAt: "2026-08-13T12:00:00.000Z",
+    });
+    expect(receipt).toMatchObject({
+      outcome: "CREATED",
+      secretRef:
+        "secret-store:accounts/account_33333333-3333-3333-3333-333333333333/provider-api-key",
+    });
+    const binding = database.queries.find(({ text }) =>
+      text.includes("UPDATE agent_world.accounts"),
+    );
+    expect(binding?.values).toEqual([
+      "account_33333333-3333-3333-3333-333333333333",
+      "secret-store:accounts/account_33333333-3333-3333-3333-333333333333/provider-api-key",
+    ]);
   });
 });

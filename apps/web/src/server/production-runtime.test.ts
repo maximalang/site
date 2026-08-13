@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDatabasePoolConfig } from "./production-runtime";
+import { parseDatabasePoolConfig, parseSecretKeyMaterial } from "./production-runtime";
 
 describe("production runtime configuration", () => {
   it("accepts explicit verified TLS without leaking URL components", () => {
@@ -48,6 +48,24 @@ describe("production runtime configuration", () => {
       { DATABASE_URL: "postgresql://agent_world:secret@db.internal/agent_world" },
     ]) {
       expect(() => parseDatabasePoolConfig(environment)).toThrow();
+    }
+  });
+
+  it("accepts only canonical 32-byte base64url secret key material", () => {
+    const encoded = Buffer.alloc(32, 7).toString("base64url");
+    expect(
+      parseSecretKeyMaterial({
+        AGENT_WORLD_SECRET_MASTER_KEY: encoded,
+        AGENT_WORLD_SECRET_KEY_VERSION: "2",
+      }),
+    ).toEqual({ keyVersion: 2, masterKey: Buffer.alloc(32, 7) });
+    for (const environment of [
+      {},
+      { AGENT_WORLD_SECRET_MASTER_KEY: encoded, AGENT_WORLD_SECRET_KEY_VERSION: "0" },
+      { AGENT_WORLD_SECRET_MASTER_KEY: "not-a-key", AGENT_WORLD_SECRET_KEY_VERSION: "1" },
+      { AGENT_WORLD_SECRET_MASTER_KEY: `${encoded}=`, AGENT_WORLD_SECRET_KEY_VERSION: "1" },
+    ]) {
+      expect(() => parseSecretKeyMaterial(environment)).toThrow();
     }
   });
 });

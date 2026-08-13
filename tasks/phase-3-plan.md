@@ -83,8 +83,8 @@ Add the single-owner provider/key flow, route health/status and actual execution
 evidence to Command without exposing third-party dashboards. Extend the
 hardened Compose core with the private, bounded gateway service.
 
-- [ ] Owner can add or rotate an API provider/key once through the product.
-- [ ] No plaintext key is rendered after submission.
+- [x] Owner can add or rotate an API provider/key once through the product.
+- [x] No plaintext key is rendered after submission.
 - [ ] A real API or local-model run shows Account/API/Model/Mode provenance.
 - [ ] LiteLLM has no host port, runs with bounded resources and participates in
       readiness without weakening the existing web/PostgreSQL gates.

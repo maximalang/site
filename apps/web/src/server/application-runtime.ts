@@ -4,6 +4,8 @@ import type {
   ApprovalDecisionInput,
   AssignTaskInput,
   ConversationReadInput,
+  ProviderCredentialWriteInput,
+  SecretWriteReceipt,
 } from "@agent-world/postgres-store";
 import type {
   ExecutionPreferenceLayer,
@@ -25,6 +27,7 @@ export type ApplicationRuntime = {
   assignTask(input: AssignTaskInput): Promise<unknown>;
   decideApproval(input: ApprovalDecisionInput): Promise<unknown>;
   executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
+  writeProviderCredential(input: ProviderCredentialWriteInput): Promise<SecretWriteReceipt>;
   readExecutionPreferences(
     selection: ExecutionPreferenceSelection,
   ): Promise<ExecutionPreferenceReadModel>;

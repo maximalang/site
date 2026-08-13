@@ -9,6 +9,7 @@ import {
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
+import { ProviderCredentialForm } from "./provider-credential-form";
 
 type LoadHub = (attempt: number) => Promise<HubReadModel>;
 const defaultLoadHub: LoadHub = () => loadHubReadModel();
@@ -80,6 +81,7 @@ export function HubPanel({
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <ProviderCredentialForm csrfToken={csrfToken} model={model} />
       <ExecutionPreferencesPanel
         {...(preferenceClient ? { client: preferenceClient } : {})}
         csrfToken={csrfToken}

@@ -47,6 +47,12 @@ export const applicationHubCommandDependencies = {
     runtime().executeHubCommand(command),
 };
 
+export const applicationProviderCredentialDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  write: (input: Parameters<ReturnType<typeof runtime>["writeProviderCredential"]>[0]) =>
+    runtime().writeProviderCredential(input),
+};
+
 export const applicationExecutionPreferenceDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   read: (selection: Parameters<ReturnType<typeof runtime>["readExecutionPreferences"]>[0]) =>
