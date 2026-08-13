@@ -17,6 +17,7 @@ function runtime() {
     decideApproval: vi.fn(),
     executeHubCommand: vi.fn(),
     writeProviderCredential: vi.fn(),
+    checkModelRoute: vi.fn(),
     readExecutionPreferences: vi.fn(),
     writeExecutionPreferences: vi.fn(),
     readHub: vi.fn(),

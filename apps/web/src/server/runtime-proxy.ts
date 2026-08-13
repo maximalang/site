@@ -53,6 +53,12 @@ export const applicationProviderCredentialDependencies = {
     runtime().writeProviderCredential(input),
 };
 
+export const applicationModelRouteCheckDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  check: (modelRouteId: Parameters<ReturnType<typeof runtime>["checkModelRoute"]>[0]) =>
+    runtime().checkModelRoute(modelRouteId),
+};
+
 export const applicationExecutionPreferenceDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   read: (selection: Parameters<ReturnType<typeof runtime>["readExecutionPreferences"]>[0]) =>

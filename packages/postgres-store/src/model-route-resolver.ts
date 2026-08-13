@@ -1,4 +1,9 @@
-import { ModelRouteIdSchema, type ProviderKind } from "@agent-world/domain";
+import {
+  AccountIdSchema,
+  ModelRouteIdSchema,
+  ProviderIdSchema,
+  type ProviderKind,
+} from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
 
@@ -22,6 +27,10 @@ export type ResolvedModelRoute = {
   modelRouteId: ReturnType<typeof ModelRouteIdSchema.parse>;
   modelAlias: string;
   providerKind: ProviderKind;
+  providerId: ReturnType<typeof ProviderIdSchema.parse>;
+  accountId?: ReturnType<typeof AccountIdSchema.parse>;
+  mode: "API" | "LOCAL";
+  remoteModelId: string;
   providerModel: string;
   apiBase?: string;
   credentialRef?: string;
@@ -153,6 +162,8 @@ export class PostgresModelRouteResolver {
       modelRouteId,
       modelAlias: `route-${modelRouteId}`,
       providerKind: row.provider_kind,
+      providerId: ProviderIdSchema.parse(row.provider_id),
+      remoteModelId: row.remote_model_id,
       providerModel: `${prefix}/${row.remote_model_id}`,
     };
     if (row.surface === "API" && row.provider_category === "LLM_API") {
@@ -168,6 +179,8 @@ export class PostgresModelRouteResolver {
       }
       return {
         ...common,
+        accountId: AccountIdSchema.parse(row.account_id),
+        mode: "API",
         ...(row.provider_base_url === null ? {} : { apiBase: row.provider_base_url }),
         credentialRef: row.credential_ref,
       };
@@ -180,7 +193,7 @@ export class PostgresModelRouteResolver {
       ) {
         throw new RouteResolutionError("LOCAL_ENDPOINT_DENIED");
       }
-      return { ...common, apiBase: row.provider_base_url };
+      return { ...common, mode: "LOCAL", apiBase: row.provider_base_url };
     }
     throw new RouteResolutionError("INELIGIBLE_ROUTE");
   }

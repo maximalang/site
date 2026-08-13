@@ -1,5 +1,5 @@
 import type { ConversationSendResult } from "@agent-world/conversation-service";
-import type { AgentId, SendMessageIntent } from "@agent-world/domain";
+import type { AgentId, ModelRouteId, SendMessageIntent } from "@agent-world/domain";
 import type {
   ApprovalDecisionInput,
   AssignTaskInput,
@@ -14,6 +14,7 @@ import type {
   HubCommandRequest,
   HubCommandResponse,
   HubReadModel,
+  ModelRouteCheckResponse,
   WorldReadModel,
 } from "@agent-world/read-model";
 import type { OwnerSessionManager } from "./owner-session";
@@ -28,6 +29,7 @@ export type ApplicationRuntime = {
   decideApproval(input: ApprovalDecisionInput): Promise<unknown>;
   executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
   writeProviderCredential(input: ProviderCredentialWriteInput): Promise<SecretWriteReceipt>;
+  checkModelRoute(modelRouteId: ModelRouteId): Promise<ModelRouteCheckResponse>;
   readExecutionPreferences(
     selection: ExecutionPreferenceSelection,
   ): Promise<ExecutionPreferenceReadModel>;

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
+import { RunIdSchema } from "@agent-world/domain";
 import { LiteLlmModelGateway, LiteLlmProjectionReconciler } from "@agent-world/model-gateway";
 import {
   type OpenClawCredential,
@@ -26,6 +27,7 @@ import {
   RouteResolutionError,
   SecretStoreError,
 } from "@agent-world/postgres-store";
+import { ModelRouteCheckResponseSchema } from "@agent-world/read-model";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
 import { OwnerSessionManager } from "./owner-session";
@@ -366,6 +368,36 @@ export async function createProductionRuntime(
         const receipt = await secretStore.writeProviderCredential(input);
         await reconcileModelRoutes();
         return receipt;
+      },
+      checkModelRoute: async (modelRouteId) => {
+        if (!modelGateway) throw new Error("Model gateway is unavailable");
+        const route = await routeResolver.resolve(modelRouteId);
+        const runId = RunIdSchema.parse(`run_${randomUUID()}`);
+        const result = await modelGateway.complete({
+          schemaVersion: 1,
+          runId,
+          modelRouteId,
+          messages: [{ role: "USER", content: "Reply with exactly: OK" }],
+          maxOutputTokens: 16,
+          temperature: 0,
+          timeoutMs: 60_000,
+          idempotencyKey: `route-check-${runId}`,
+        });
+        return ModelRouteCheckResponseSchema.parse({
+          schemaVersion: 1,
+          runId,
+          modelRouteId,
+          providerId: route.providerId,
+          ...(route.accountId === undefined ? {} : { accountId: route.accountId }),
+          mode: route.mode,
+          remoteModelId: route.remoteModelId,
+          status: "SUCCEEDED",
+          usage: {
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            totalTokens: result.usage.totalTokens,
+          },
+        });
       },
       readExecutionPreferences: (selection) => executionPreferenceStore.read(selection),
       writeExecutionPreferences: (layer, updatedAt) =>

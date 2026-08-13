@@ -9,6 +9,7 @@ import {
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
+import { ModelRouteCheckPanel } from "./model-route-check-panel";
 import { ProviderCredentialForm } from "./provider-credential-form";
 
 type LoadHub = (attempt: number) => Promise<HubReadModel>;
@@ -82,6 +83,7 @@ export function HubPanel({
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
       <ProviderCredentialForm csrfToken={csrfToken} model={model} />
+      <ModelRouteCheckPanel csrfToken={csrfToken} model={model} />
       <ExecutionPreferencesPanel
         {...(preferenceClient ? { client: preferenceClient } : {})}
         csrfToken={csrfToken}

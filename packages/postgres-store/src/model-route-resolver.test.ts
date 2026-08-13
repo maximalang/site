@@ -52,6 +52,10 @@ describe("PostgresModelRouteResolver", () => {
       modelRouteId: routeId,
       modelAlias: "route-model_route_22222222-2222-2222-2222-222222222222",
       providerKind: "OPENAI",
+      providerId: apiRoute.provider_id,
+      accountId: apiRoute.account_id,
+      mode: "API",
+      remoteModelId: "gpt-5-mini",
       providerModel: "openai/gpt-5-mini",
       credentialRef: "secret-store:provider/openai/api-key",
     });
@@ -89,6 +93,7 @@ describe("PostgresModelRouteResolver", () => {
     });
     await expect(allowed.resolve(routeId)).resolves.toMatchObject({
       providerKind: "OLLAMA",
+      mode: "LOCAL",
       providerModel: "ollama/qwen3:8b",
       apiBase: "http://ollama.internal:11434/v1",
     });

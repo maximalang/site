@@ -88,7 +88,7 @@ hardened Compose core with the private, bounded gateway service.
 
 - [x] Owner can add or rotate an API provider/key once through the product.
 - [x] No plaintext key is rendered after submission.
-- [ ] A real API or local-model run shows Account/API/Model/Mode provenance.
+- [x] A real API or local-model run shows Account/API/Model/Mode provenance.
 - [x] LiteLLM has no host port, runs with bounded resources and participates in
       readiness without weakening the existing web/PostgreSQL gates.
 - [x] Backup/restore and restart preserve authoritative routes and secret

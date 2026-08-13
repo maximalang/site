@@ -3,6 +3,7 @@ export * from "./conversation.js";
 export * from "./execution-preferences.js";
 export * from "./hub.js";
 export * from "./hub-command.js";
+export * from "./model-route-check.js";
 export * from "./projection.js";
 export * from "./provider-credential.js";
 export * from "./task-assignment.js";
