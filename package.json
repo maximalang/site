@@ -1,0 +1,28 @@
+{
+  "name": "agent-operating-environment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=24.15.0 <25",
+    "npm": ">=11.12.1 <12"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "format": "biome format --write packages biome.json package.json tsconfig.base.json tsconfig.json tsconfig.check.json vitest.config.ts",
+    "lint": "biome check packages biome.json package.json tsconfig.base.json tsconfig.json tsconfig.check.json vitest.config.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.8",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}
