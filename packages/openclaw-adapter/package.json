@@ -17,6 +17,7 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "@agent-world/conversation-service": "0.0.0",
     "@agent-world/domain": "0.0.0",
     "@openclaw/gateway-client": "2026.8.1-beta.1",
     "@openclaw/gateway-protocol": "2026.8.1-beta.1",

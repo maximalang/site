@@ -1,12 +1,29 @@
 # `@agent-world/openclaw-adapter`
 
-Server-side, read-only OpenClaw Gateway adapter for the Agent Operating
-Environment. It converts a narrow upstream projection into canonical Agent
-runtime facts without allowing OpenClaw Agent or Session identifiers to become
-product identity.
+Server-side OpenClaw Gateway integration for the Agent Operating Environment.
+It combines physically separate read-only lifecycle projection and narrowly
+scoped chat delivery without allowing OpenClaw Agent or Session identifiers to
+become product identity.
 
-This package is not a task executor. Its public adapter surface exposes no raw
-Gateway request method and no side-effecting operation.
+Its public surfaces expose no raw Gateway request method. The read adapter has
+no side-effecting operation; the write adapter exposes only canonical
+conversation delivery.
+
+## Write boundary
+
+`OpenClawWriteAdapter` uses a separate official Gateway client and requests the
+`operator` role with exactly `operator.write`. A handshake with missing,
+additional or incompatible authority is rejected. The client exposes only
+`chat.send` internally and every projected request is checked by the public,
+pinned `validateChatSendParams` protocol validator before transport.
+
+The domain idempotency key is forwarded unchanged, `suppressCommandInterpretation`
+is always true, and only the persistence-verified external Agent/session pair
+can be projected into the call. The immediate response is treated only as an
+acceptance receipt; it never becomes Agent-authored conversation content.
+
+Write telemetry is bounded to state, authority, outcome and duration. It omits
+message text, session keys, external Agent IDs, provider errors and credentials.
 
 ## Public boundary
 
