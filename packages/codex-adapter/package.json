@@ -17,6 +17,7 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "@agent-world/conversation-service": "0.0.0",
     "@agent-world/domain": "0.0.0",
     "@openai/codex-sdk": "0.147.0",
     "zod": "4.4.3"

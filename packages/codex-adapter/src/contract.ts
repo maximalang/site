@@ -136,6 +136,7 @@ const RunCompletedEventSchema = z.strictObject({
 export const CodexExecutionFailureCodeSchema = z.enum([
   "AUTH_UNAVAILABLE",
   "POLICY_VIOLATION",
+  "DISPATCH_UNAVAILABLE",
   "SDK_UNAVAILABLE",
   "TIMEOUT",
   "CANCELLED",
