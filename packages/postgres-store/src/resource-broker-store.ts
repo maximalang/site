@@ -162,6 +162,7 @@ export async function decideResourceRouteInTransaction(
   const selectedEvaluation = decision.selected
     ? decision.evaluations.find(({ candidate }) => candidate.routeId === decision.selected?.routeId)
     : undefined;
+  const decisionHash = sha256(decision);
   await client.query(
     `INSERT INTO agent_world.resource_broker_decisions
        (id, task_id, request_sha256, policy_version, decision, decision_sha256,
@@ -174,13 +175,34 @@ export async function decideResourceRouteInTransaction(
       requestHash,
       request.policy.version,
       JSON.stringify(decision),
-      sha256(decision),
+      decisionHash,
       decision.selected?.routeId ?? null,
       decision.selected?.accountId ?? null,
       decision.selected?.adapterKind ?? null,
       decision.selected?.mode ?? null,
       selectedEvaluation?.score ?? null,
       decision.selected ? null : "NO_ELIGIBLE_ROUTE",
+      request.decidedAt,
+    ],
+  );
+  await client.query(
+    `INSERT INTO agent_world.resource_broker_events
+       (id, event_type, task_id, decision_id, selected_route_id,
+        selected_account_id, selected_adapter_kind, selected_mode, selected_score,
+        fallback_reason, policy_version, decision_sha256, occurred_at)
+     VALUES ($1, 'RESOURCE_ROUTE_DECIDED', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [
+      `broker_event_${request.decisionId.slice("broker_decision_".length)}`,
+      request.taskId,
+      request.decisionId,
+      decision.selected?.routeId ?? null,
+      decision.selected?.accountId ?? null,
+      decision.selected?.adapterKind ?? null,
+      decision.selected?.mode ?? null,
+      selectedEvaluation?.score ?? null,
+      decision.selected ? null : "NO_ELIGIBLE_ROUTE",
+      request.policy.version,
+      decisionHash,
       request.decidedAt,
     ],
   );

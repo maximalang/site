@@ -122,9 +122,9 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 
 ## Slice 4: Resource Broker and durable orchestration
 
-- [ ] Score eligible Account/Chat/Work/Codex/API/Local candidates from fresh
+- [x] Score eligible Account/Chat/Work/Codex/API/Local candidates from fresh
       quality, remaining limits, marginal cost, latency and load observations.
-- [ ] Fail closed on stale quota/auth/capability evidence; record the selected
+- [x] Fail closed on stale quota/auth/capability evidence; record the selected
       candidate, score inputs, policy version and fallback reason as events.
 - [ ] LangGraph checkpoints reference canonical Mission/Task/Run/Event IDs and
       resume without duplicating side effects.

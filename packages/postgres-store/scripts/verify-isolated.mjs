@@ -222,7 +222,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 27
+    ledger.rows.at(-1)?.version !== 28
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -310,6 +310,7 @@ try {
     "rag_document_sources",
     "rag_documents",
     "resource_broker_decisions",
+    "resource_broker_events",
     "resource_route_observations",
     "runtime_bindings",
     "schema_migrations",
@@ -2208,10 +2209,13 @@ try {
     "Resource Broker accepted conflicting decision idempotency input",
   );
   const brokerEvidence = await pool.query(
-    `SELECT decision_sha256, selected_route_id, selected_account_id, selected_score,
-            fallback_reason
-       FROM agent_world.resource_broker_decisions
-      WHERE id = $1`,
+    `SELECT decision.decision_sha256, decision.selected_route_id,
+            decision.selected_account_id, decision.selected_score,
+            decision.fallback_reason, event.sequence AS event_sequence,
+            event.decision_sha256 AS event_decision_sha256
+       FROM agent_world.resource_broker_decisions decision
+       JOIN agent_world.resource_broker_events event ON event.decision_id = decision.id
+      WHERE decision.id = $1`,
     [brokerRequest.decisionId],
   );
   if (
@@ -2219,7 +2223,9 @@ try {
     !/^[a-f0-9]{64}$/.test(brokerEvidence.rows[0]?.decision_sha256 ?? "") ||
     brokerEvidence.rows[0]?.selected_route_id !== nativeChat.route ||
     brokerEvidence.rows[0]?.selected_account_id !== codex.account ||
-    brokerEvidence.rows[0]?.fallback_reason !== null
+    brokerEvidence.rows[0]?.fallback_reason !== null ||
+    brokerEvidence.rows[0]?.event_sequence < 1 ||
+    brokerEvidence.rows[0]?.event_decision_sha256 !== brokerEvidence.rows[0]?.decision_sha256
   ) {
     throw new Error("Resource Broker decision evidence was not canonical and attributable");
   }

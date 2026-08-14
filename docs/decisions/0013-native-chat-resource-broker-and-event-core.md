@@ -38,6 +38,9 @@ provider execution; every transport remains replaceable behind its adapter.
 Observations expire explicitly and decisions are append-only PostgreSQL rows
 containing the complete normalized evaluation and SHA-256 evidence. Unknown or
 stale limits fail closed rather than being guessed from Chat UI state.
+Every new decision also appends one ordered `RESOURCE_ROUTE_DECIDED` event in
+the same transaction, including selected route/account/score or the explicit
+`NO_ELIGIBLE_ROUTE` fallback and the exact decision hash.
 
 `Mission` sits above Tasks and stores a user goal plus success criteria.
 Reusable `AgentTemplate` behavior is separate from project/Mission-bound
