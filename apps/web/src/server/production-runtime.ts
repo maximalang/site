@@ -22,6 +22,7 @@ import {
   PostgresHubCommandStore,
   PostgresHubReader,
   PostgresModelRouteResolver,
+  PostgresNativeChatControlStore,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
@@ -253,6 +254,9 @@ export async function createProductionRuntime(
     const runDispatchStore = new PostgresRunDispatchStore(pool, {
       eventId: () => `event_${randomUUID()}`,
     });
+    const nativeChatControlStore = new PostgresNativeChatControlStore(pool, {
+      eventId: () => `event_${randomUUID()}`,
+    });
     const runProvenanceReader = new PostgresRunProvenanceReader(pool);
     const codexAdapter = new CodexTaskExecutionAdapter({
       resolver: new PostgresCodexBindingResolver(pool),
@@ -377,6 +381,8 @@ export async function createProductionRuntime(
           return { ...decision, execution, dispatch: "PENDING" as const };
         }
       },
+      appendNativeChatControl: (accountId, event) =>
+        nativeChatControlStore.append(accountId, event),
       executeHubCommand: (command) => hubCommandStore.execute(command),
       writeProviderCredential: async (input) => {
         const receipt = await secretStore.writeProviderCredential(input);

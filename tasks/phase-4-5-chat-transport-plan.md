@@ -95,7 +95,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 
 ## Slice 2: Canonical event and Control API
 
-- [ ] Persist dispatches and authenticated Control events atomically in
+- [x] Persist dispatches and authenticated Control events atomically in
       PostgreSQL with per-Run sequence and idempotency conflict detection.
 - [ ] Expose OAuth-protected `begin_run`, bounded pull endpoints and event tools;
       derive Account from auth instead of trusting request fields.

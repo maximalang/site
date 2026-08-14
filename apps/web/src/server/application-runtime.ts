@@ -1,5 +1,11 @@
 import type { ConversationSendResult } from "@agent-world/conversation-service";
-import type { AgentId, ModelRouteId, SendMessageIntent } from "@agent-world/domain";
+import type {
+  AccountId,
+  AgentId,
+  ModelRouteId,
+  NativeChatControlEventInput,
+  SendMessageIntent,
+} from "@agent-world/domain";
 import type {
   ApprovalDecisionInput,
   AssignTaskInput,
@@ -27,6 +33,10 @@ export type ApplicationRuntime = {
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;
   assignTask(input: AssignTaskInput): Promise<unknown>;
   decideApproval(input: ApprovalDecisionInput): Promise<unknown>;
+  appendNativeChatControl(
+    accountId: AccountId,
+    event: NativeChatControlEventInput,
+  ): Promise<unknown>;
   executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
   writeProviderCredential(input: ProviderCredentialWriteInput): Promise<SecretWriteReceipt>;
   checkModelRoute(modelRouteId: ModelRouteId): Promise<ModelRouteCheckResponse>;

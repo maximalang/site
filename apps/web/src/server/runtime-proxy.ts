@@ -41,6 +41,13 @@ export const applicationApprovalDependencies = {
     runtime().decideApproval(input),
 };
 
+export function appendApplicationNativeChatControl(
+  accountId: Parameters<ReturnType<typeof runtime>["appendNativeChatControl"]>[0],
+  event: Parameters<ReturnType<typeof runtime>["appendNativeChatControl"]>[1],
+) {
+  return runtime().appendNativeChatControl(accountId, event);
+}
+
 export const applicationHubCommandDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   execute: (command: Parameters<ReturnType<typeof runtime>["executeHubCommand"]>[0]) =>
