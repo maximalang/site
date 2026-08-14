@@ -1,0 +1,17 @@
+{
+  "name": "@agent-world/native-chat-auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "scripts": {
+    "start": "node src/entrypoint.js",
+    "check": "node --check src/config.js && node --check src/owner-password.js && node --check src/postgres-adapter.js"
+  },
+  "dependencies": {
+    "oidc-provider": "9.11.1",
+    "pg": "8.23.0"
+  }
+}

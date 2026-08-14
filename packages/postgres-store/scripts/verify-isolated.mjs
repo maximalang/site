@@ -209,7 +209,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 15
+    ledger.rows.at(-1)?.version !== 16
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -289,6 +289,16 @@ try {
   ]) {
     if (!names.includes(required)) {
       throw new Error(`Canonical table is missing after migration: ${required}`);
+    }
+  }
+  const oauthTables = await pool.query(
+    `SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'agent_world_oauth' ORDER BY table_name`,
+  );
+  const oauthNames = oauthTables.rows.map(({ table_name: tableName }) => tableName);
+  for (const required of ["account_grants", "login_throttle", "oidc_store"]) {
+    if (!oauthNames.includes(required)) {
+      throw new Error(`Native Chat OAuth table is missing after migration: ${required}`);
     }
   }
 

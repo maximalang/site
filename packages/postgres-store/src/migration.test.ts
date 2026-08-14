@@ -28,6 +28,7 @@ describe("discoverMigrations", () => {
       { version: 13, name: "0013_codex_route_command.sql" },
       { version: 14, name: "0014_codex_worker_readiness.sql" },
       { version: 15, name: "0015_native_chat_control.sql" },
+      { version: 16, name: "0016_native_chat_oauth.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
