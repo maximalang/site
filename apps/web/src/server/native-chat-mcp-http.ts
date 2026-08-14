@@ -43,6 +43,7 @@ const ToolCallSchema = z.strictObject({
   name: z.enum(["begin_run", "get_run_resources", "emit_run_event", "commit_result", "fail_run"]),
   arguments: z.unknown().optional(),
 });
+export type NativeChatControlToolName = z.infer<typeof ToolCallSchema>["name"];
 
 const EnvelopeArguments = {
   run_id: RunIdSchema,
@@ -273,50 +274,48 @@ export function createNativeChatMcpHandlers(dependencies: NativeChatMcpDependenc
       } catch {
         return rpcError(id, -32602, "Invalid params");
       }
-      let event: unknown;
-      if (call.name === "get_run_resources") {
-        try {
-          const args = PullArgumentsSchema.parse(call.arguments ?? {});
-          const pullRequest = NativeChatPullRequestSchema.parse({
-            schemaVersion: 1,
-            runId: args.run_id,
-            resources: args.resources,
-            ...(args.query ? { query: args.query } : {}),
-            maxItems: args.max_items,
-            maxTokens: args.max_tokens,
-          });
-          const structuredContent = await dependencies.pull(principal.accountId, pullRequest);
-          return rpcResult(id, {
-            content: [{ type: "text", text: JSON.stringify(structuredContent) }],
-            structuredContent,
-          });
-        } catch {
-          return rpcResult(id, {
-            content: [{ type: "text", text: "AI World rejected the resource pull." }],
-            isError: true,
-          });
-        }
-      }
       try {
-        event = eventFromTool(call.name, call.arguments);
-      } catch {
-        return rpcError(id, -32602, "Invalid params");
-      }
-      try {
-        const receipt = await dependencies.append(principal.accountId, event);
-        const structuredContent = projectReceipt(receipt);
+        const structuredContent = await invokeNativeChatControlTool(
+          dependencies,
+          principal.accountId,
+          call.name,
+          call.arguments,
+        );
         return rpcResult(id, {
           content: [{ type: "text", text: JSON.stringify(structuredContent) }],
           structuredContent,
         });
-      } catch {
+      } catch (cause) {
+        if (cause instanceof z.ZodError) return rpcError(id, -32602, "Invalid params");
         return rpcResult(id, {
-          content: [{ type: "text", text: "AI World rejected the Control event." }],
+          content: [{ type: "text", text: "AI World rejected the Control operation." }],
           isError: true,
         });
       }
     },
   };
+}
+
+export async function invokeNativeChatControlTool(
+  dependencies: Pick<NativeChatMcpDependencies, "append" | "pull">,
+  accountId: z.infer<typeof AccountIdSchema>,
+  name: NativeChatControlToolName,
+  input: unknown,
+) {
+  if (name === "get_run_resources") {
+    const args = PullArgumentsSchema.parse(input ?? {});
+    const pullRequest = NativeChatPullRequestSchema.parse({
+      schemaVersion: 1,
+      runId: args.run_id,
+      resources: args.resources,
+      ...(args.query ? { query: args.query } : {}),
+      maxItems: args.max_items,
+      maxTokens: args.max_tokens,
+    });
+    return dependencies.pull(accountId, pullRequest);
+  }
+  const event = eventFromTool(name, input);
+  return projectReceipt(await dependencies.append(accountId, event));
 }
 
 export function nativeChatProtectedResourceMetadata(resourceInput: string, issuerInput: string) {

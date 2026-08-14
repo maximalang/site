@@ -109,14 +109,14 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 
 ## Slice 3: Plus launcher and MCP/App adapter
 
-- [ ] Isolated on-demand launcher selects an already authenticated Account,
+- [x] Isolated on-demand launcher selects an already authenticated Account,
       opens a new Chat with the AI World MCP/App available and submits only
       `run_id`.
-- [ ] No DOM output read, final-response wait, cookie access or private API.
-- [ ] Publish one remote MCP contract over the Control API; each ChatGPT account
+- [x] No DOM output read, final-response wait, cookie access or private API.
+- [x] Publish one remote MCP contract over the Control API; each ChatGPT account
       connects once through its own OAuth identity to the same AI World owner
       and control plane.
-- [ ] Keep an equivalent OpenAPI contract for Custom GPT Actions as fallback;
+- [x] Keep an equivalent OpenAPI contract for Custom GPT Actions as fallback;
       each ChatGPT account connects through its own OAuth identity to the same
       AI World owner/control plane.
 

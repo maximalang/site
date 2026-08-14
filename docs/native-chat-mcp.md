@@ -58,6 +58,25 @@ structured results and canonical Control events.
 The server does not read Chat output from the DOM and does not treat a visible
 Chat response as completion evidence.
 
+## Custom GPT Actions fallback
+
+During development, a Custom GPT can use the equivalent OpenAPI 3.1 contract
+at `/api/chat-actions/openapi.json`. It exposes five explicit operations over
+the same canonical Control implementation:
+
+- `beginRun`;
+- `getRunResources`;
+- `emitRunEvent`;
+- `commitResult`;
+- `failRun`.
+
+Configure the Action with OAuth Authorization Code using `<issuer>/auth`,
+`<issuer>/token` and scope `ai_world.run.write`. The access token has the same
+exact `/api/mcp` resource audience as the MCP connection. Account identity is
+derived only from the OAuth subject and is intentionally absent from every
+request schema. This adapter does not own state and cannot bypass event order,
+idempotency, project boundaries or the terminal commit requirement.
+
 ## Host-local browser launcher
 
 The on-demand launcher runs on the owner's laptop, outside Docker and Timeweb,
@@ -115,7 +134,8 @@ the web resource server.
 ## Remaining activation gates
 
 - Deploy the implemented authorization server behind the production HTTPS
-  endpoint and verify its public discovery/JWKS/DCR contract.
+  endpoint and verify its public discovery/JWKS/DCR and Actions OpenAPI
+  contracts.
 - Connect ingestion/chunking and an embedding adapter to the canonical RAG
   write store. Every written chunk is already materialized as provenance-linked
   shared context and ranked against the Task during ContextPack compilation,
