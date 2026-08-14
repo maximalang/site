@@ -21,9 +21,9 @@ The Chat agent authenticates to the single AI World Control Plane, calls
 `begin_run`, lazily pulls bounded task/project/memory/RAG/skill/artifact/history
 resources, emits structured intermediate events and terminates through exactly
 one `commit_result` or `fail`. Account identity comes from OAuth/app auth, not a
-request-supplied Account field. Custom GPT Actions are the supported Plus bridge
-until the same use cases can be exposed through a live-verified personal Plus
-App/Plugin write surface.
+request-supplied Account field. A custom remote MCP/App connected once in each
+personal Plus account through developer mode is the primary bridge. Custom GPT
+Actions are a development/fallback adapter over the same Control API.
 
 A product-owned Resource Broker chooses among eligible
 Account/Chat/Work/Codex/API/Local candidates. It consumes normalized evidence
@@ -49,7 +49,7 @@ chooses `Accept`, `Merge` or `Reject`, with provenance preserved.
 Settings expose a Simple layer with safe `Auto` defaults and an Advanced layer
 for explicit policies. Product-owned infrastructure stays limited to AI World
 UI, Unified Hub, Resource Broker, Context/Token Governor, shared Event/Memory
-layer and Native Chat integration. OpenClaw, Agent Town, LiteLLM, LangGraph,
+layer and Native Chat integration. OpenClaw, OpenClaw Office, LiteLLM, LangGraph,
 Graphiti/FalkorDB, PostgreSQL/pgvector, Langfuse, n8n and MCP remain the selected
 reused components.
 
@@ -62,7 +62,8 @@ reused components.
 - One AI World owner can connect multiple ChatGPT Accounts without merging
   Accounts into Agents or creating duplicate control planes.
 - Provider capability drift is isolated to transport readiness. Personal Plus
-  App/Plugin writes remain experimental until official and live evidence exists.
+  custom MCP connectivity has owner-provided live evidence, while AI World's
+  write path stays disabled until its own `commit_result` E2E passes.
 - Every operational and game-world view can be rebuilt from canonical events;
   graph, memory and orchestration services may be replaced without losing truth.
 

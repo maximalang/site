@@ -83,8 +83,8 @@ Phase 0 reuse and license audit
 - [ ] Represent Chat/Work transports explicitly as official, experimental,
       unsupported or disabled.
 - [ ] Deliver Native Plus Chat dispatch-only launcher and authenticated
-      pull/Control API through Custom GPT Actions, with an App/Plugin adapter
-      capability-gated until personal Plus write support is live-proven.
+      pull/Control API through one custom MCP/App connected to each Plus
+      account, with Custom GPT Actions retained only as a fallback.
 
 ### Phases 5-8: Context, memory and orchestration
 

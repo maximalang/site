@@ -9,19 +9,21 @@ Chat and sends only `run_id`. It never reads output, waits for a final response,
 scrapes the DOM, copies cookies or calls private ChatGPT endpoints.
 
 The Chat agent pulls only the resources it actually needs and writes progress
-and the terminal structured result through the same AI World Control API used
-by a Custom GPT Action today and an AI World App/Plugin when Plus write support
-is available and verified.
+and the terminal structured result through one AI World MCP/App connected in
+ChatGPT developer mode. Custom GPT Actions remain a fallback over the same
+Control API rather than the primary personal Plus path.
 
-## Current upstream boundary (refreshed 2026-08-14)
+## Current capability boundary (corrected 2026-08-14)
 
-- Custom GPTs are available on Plus and Actions call external APIs described by
-  OpenAPI with API-key or OAuth authentication. This is the current supported
-  implementation path for personal Plus accounts.
-- Full custom MCP write apps are currently documented for Business,
-  Enterprise and Edu, not personal Plus. The App/Plugin adapter remains the
-  target, but must stay capability-gated and experimental until OpenAI exposes
-  and a live verifier proves the required Plus write surface.
+- Personal Plus accounts can connect a custom remote MCP in developer mode.
+  The owner has live-proven this connection path with the Recruiter Radar MCP;
+  AI World therefore treats MCP/App as the primary Native Plus integration.
+- That prior connection is not evidence that AI World's write lifecycle works.
+  `CHAT` remains non-selectable until a real Plus run authenticates to AI World,
+  pulls a Run and completes the exact `commit_result` contract.
+- Custom GPT Actions remain a compatible development/fallback bridge using the
+  same Control API and canonical events; they must not create a second state or
+  orchestration path.
 - ChatGPT can request confirmation for external writes. AI World must model this
   as an execution condition; it must not bypass or conceal the confirmation.
 
@@ -75,7 +77,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 - Memory Center projects Network, Timeline and Inbox. Curator proposals require
   explicit `Accept`, `Merge` or `Reject`, retaining provenance for every choice.
 - Settings expose `Simple` and `Advanced`; `Simple` uses safe `Auto` defaults.
-- Reuse OpenClaw, Agent Town, LiteLLM, LangGraph, Graphiti/FalkorDB,
+- Reuse OpenClaw, OpenClaw Office, LiteLLM, LangGraph, Graphiti/FalkorDB,
   PostgreSQL/pgvector, Langfuse, n8n and MCP. Product-owned code is limited to
   AI World UI, Unified Hub, Resource Broker, Context/Token Governor, shared
   Event/Memory layer and Native Chat integration.
@@ -102,16 +104,18 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 - [ ] Reconcile restart, late/duplicate calls, missing commit and expired
       capabilities deterministically.
 
-## Slice 3: Plus launcher and Actions adapter
+## Slice 3: Plus launcher and MCP/App adapter
 
 - [ ] Isolated on-demand launcher selects an already authenticated Account,
-      opens the configured Custom GPT/new Chat and submits only `run_id`.
+      opens a new Chat with the AI World MCP/App available and submits only
+      `run_id`.
 - [ ] No DOM output read, final-response wait, cookie access or private API.
-- [ ] Publish one OpenAPI contract for Custom GPT Actions using the Control API;
+- [ ] Publish one remote MCP contract over the Control API; each ChatGPT account
+      connects once through its own OAuth identity to the same AI World owner
+      and control plane.
+- [ ] Keep an equivalent OpenAPI contract for Custom GPT Actions as fallback;
       each ChatGPT account connects through its own OAuth identity to the same
       AI World owner/control plane.
-- [ ] Add an MCP/App adapter over the same use cases without a second state
-      store or orchestration path.
 
 ## Slice 4: Resource Broker and durable orchestration
 
@@ -133,6 +137,6 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
   exact provenance.
 - Browser verifier proves only `run_id` is submitted and no response DOM is
   observed on each supported account profile.
-- A real Plus Custom GPT + Actions run must commit through the Control API before
-  CHAT becomes selectable. The App/Plugin path stays experimental until the
-  exact personal Plus write capability is officially available and live-proven.
+- A real personal Plus Chat using the AI World MCP/App must commit through the
+  Control API before CHAT becomes selectable. Recruiter Radar proves connector
+  availability only; it does not satisfy this AI World write-cycle gate.
