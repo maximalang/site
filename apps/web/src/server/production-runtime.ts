@@ -27,6 +27,7 @@ import {
   PostgresNativeChatResourceReader,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
+  PostgresRunContextPackProvider,
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
@@ -346,6 +347,9 @@ export async function createProductionRuntime(
     });
     const taskDispatcher = new TaskDispatchService({
       store: runDispatchStore,
+      contextPacks: new PostgresRunContextPackProvider(pool, {
+        packId: () => `context_pack_${randomUUID()}`,
+      }),
       adapters: {
         resolve: (kind) => {
           if (kind === "CODEX") return codexAdapter;

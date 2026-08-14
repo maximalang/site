@@ -33,6 +33,7 @@ import {
   PostgresNativeChatResourceReader,
   PostgresOwnerSessionStore,
   PostgresResourceBrokerStore,
+  PostgresRunContextPackProvider,
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
@@ -1337,6 +1338,25 @@ try {
     executionId: () => codexExecutionId,
     now: () => codexNow,
   });
+  const codexContextPackProvider = new PostgresRunContextPackProvider(pool, {
+    packId: () => "context_pack_a7a7a7a7-a7a7-a7a7-a7a7-a7a7a7a7a7a7",
+    now: () => "2026-08-13T11:59:00.000Z",
+    tokenBudget: 2_000,
+  });
+  const codexContextPack = await codexContextPackProvider.prepare(codex.run);
+  const codexContextPackReplay = await new PostgresRunContextPackProvider(pool, {
+    packId: () => {
+      throw new Error("Persisted ContextPack must be recovered without recompilation");
+    },
+  }).prepare(codex.run);
+  if (
+    codexContextPack.routeId !== codex.route ||
+    codexContextPack.runId !== codex.run ||
+    codexContextPack.contentHash !== codexContextPackReplay.contentHash ||
+    codexContextPack.rendered !== codexContextPackReplay.rendered
+  ) {
+    throw new Error("Codex ContextPack did not preserve exact Run and Route provenance");
+  }
   const codexRequest = {
     schemaVersion: 1,
     runId: codex.run,
@@ -1348,7 +1368,7 @@ try {
     sessionId: codex.session,
     codexThreadId: "codex-thread-isolated-1",
     idempotencyKey: "codex:isolated-lifecycle",
-    prompt: "Verify the repository contracts and return bounded evidence.",
+    prompt: codexContextPack.rendered,
     policy: {
       workingDirectory: "C:/isolated/agent-world",
       sandbox: "WORKSPACE_WRITE",
@@ -1442,14 +1462,16 @@ try {
   );
   const codexObservation = await codexStore.observe(codex.execution, 0);
   const codexEvidence = await pool.query(
-    `SELECT job.status, job.attempt, job.final_output, job.input_tokens,
+    `SELECT job.status, job.attempt, job.final_output, job.input_tokens, job.prompt,
             job.cached_input_tokens, job.output_tokens,
+            pack.content_sha256 AS context_pack_sha256,
             count(event.*)::integer AS event_count,
             max(event.summary) FILTER (WHERE event.event_type = 'ITEM_COMPLETED') AS item_summary
        FROM agent_world.codex_execution_jobs job
+       JOIN agent_world.context_packs pack ON pack.run_id = job.run_id
        JOIN agent_world.codex_execution_events event ON event.execution_id = job.id
       WHERE job.id = $1
-      GROUP BY job.id`,
+      GROUP BY job.id, pack.id`,
     [codex.execution],
   );
   if (
@@ -1457,6 +1479,8 @@ try {
     codexEvidence.rows[0]?.status !== "COMPLETED" ||
     codexEvidence.rows[0]?.attempt !== 1 ||
     codexEvidence.rows[0]?.final_output !== "All selected contracts passed." ||
+    codexEvidence.rows[0]?.prompt !== codexContextPack.rendered ||
+    codexEvidence.rows[0]?.context_pack_sha256 !== codexContextPack.contentHash ||
     codexEvidence.rows[0]?.input_tokens !== "120" ||
     codexEvidence.rows[0]?.cached_input_tokens !== "20" ||
     codexEvidence.rows[0]?.output_tokens !== "30" ||
@@ -2262,7 +2286,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 10, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, codexExecutionScenarios: 21, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

@@ -2,6 +2,7 @@ import type { ConversationDeliveryInput } from "@agent-world/conversation-servic
 import {
   AgentIdSchema,
   BindingIdSchema,
+  ContextPackSchema,
   ConversationIdSchema,
   MessageIdSchema,
   RunIdSchema,
@@ -31,10 +32,13 @@ function input(): ConversationDeliveryInput {
 }
 
 function taskInput(): OpenClawTaskExecutionInput {
+  const runId = RunIdSchema.parse("run_11111111-1111-1111-1111-111111111111");
+  const taskId = TaskIdSchema.parse("task_22222222-2222-2222-2222-222222222222");
+  const agentId = AgentIdSchema.parse("agent_33333333-3333-3333-3333-333333333333");
   return {
-    runId: RunIdSchema.parse("run_11111111-1111-1111-1111-111111111111"),
-    taskId: TaskIdSchema.parse("task_22222222-2222-2222-2222-222222222222"),
-    agentId: AgentIdSchema.parse("agent_33333333-3333-3333-3333-333333333333"),
+    runId,
+    taskId,
+    agentId,
     bindingId: BindingIdSchema.parse("binding_44444444-4444-4444-4444-444444444444"),
     sessionId: SessionIdSchema.parse("session_55555555-5555-5555-5555-555555555555"),
     externalAgentId: "researcher",
@@ -42,6 +46,34 @@ function taskInput(): OpenClawTaskExecutionInput {
     title: "Verify the protocol",
     description: "Use primary evidence.",
     idempotencyKey: "run:11111111-1111-1111-1111-111111111111",
+    contextPack: ContextPackSchema.parse({
+      schemaVersion: 1,
+      compilerVersion: "1.0.0",
+      id: "context_pack_66666666-6666-6666-6666-666666666666",
+      runId,
+      taskId,
+      agentId,
+      projectId: "project_77777777-7777-7777-7777-777777777777",
+      routeId: "route_88888888-8888-8888-8888-888888888888",
+      tokenBudget: 1_000,
+      estimatedTokens: 20,
+      contentHash: "a".repeat(64),
+      compiledAt: "2026-08-13T10:00:00.000Z",
+      sections: [
+        "GOAL",
+        "CURRENT_PROJECT_STATE",
+        "RELEVANT_DECISIONS",
+        "RELEVANT_MEMORY",
+        "RELEVANT_FINDINGS",
+        "REQUIRED_SKILLS",
+        "AVAILABLE_TOOLS",
+        "ARTIFACT_REFERENCES",
+        "EXPECTED_OUTPUT",
+        "HANDOFF_CONTRACT",
+      ].map((name) => ({ name, content: "" })),
+      rendered: "## GOAL\nVerify the protocol\n\n## RELEVANT_MEMORY\nPrimary evidence.",
+      evidence: [],
+    }),
   };
 }
 
@@ -114,7 +146,7 @@ describe("OpenClawWriteAdapter", () => {
       externalRunId: "openclaw-task-run-1",
     });
     expect(gateway.runAgent).toHaveBeenCalledWith({
-      message: "Verify the protocol\n\nUse primary evidence.",
+      message: taskInput().contextPack.rendered,
       agentId: "researcher",
       sessionKey: "agent:researcher:task",
       idempotencyKey: "run:11111111-1111-1111-1111-111111111111",

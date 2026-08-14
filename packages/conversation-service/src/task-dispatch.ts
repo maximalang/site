@@ -1,6 +1,8 @@
 import {
   AgentIdSchema,
   BindingIdSchema,
+  type ContextPack,
+  ContextPackSchema,
   type ExecutionAdapterKind,
   ExecutionAdapterKindSchema,
   type IdempotencyKeySchema,
@@ -70,6 +72,10 @@ export interface TaskDispatchStore {
   ): Promise<unknown>;
 }
 
+export interface TaskContextPackProvider {
+  prepare(runId: Run["id"]): Promise<unknown>;
+}
+
 export type TaskExecutionInput = {
   runId: Run["id"];
   taskId: z.infer<typeof TaskIdSchema>;
@@ -81,6 +87,7 @@ export type TaskExecutionInput = {
   title: string;
   description?: string;
   idempotencyKey: z.infer<typeof IdempotencyKeySchema>;
+  contextPack: ContextPack;
 };
 
 export interface TaskExecutionAdapter {
@@ -110,6 +117,7 @@ export class TaskDispatchService {
   constructor(
     private readonly options: {
       store: TaskDispatchStore;
+      contextPacks: TaskContextPackProvider;
       adapters: TaskExecutionAdapterRegistry;
     },
   ) {}
@@ -161,6 +169,21 @@ export class TaskDispatchService {
     if (!adapter || adapter.kind !== parsedRun.data.adapterKind) {
       throw new TaskDispatchError("DISPATCH_UNAVAILABLE");
     }
+    let contextPack: ContextPack;
+    try {
+      contextPack = ContextPackSchema.parse(
+        await this.options.contextPacks.prepare(parsedRun.data.id),
+      );
+    } catch {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
+    if (
+      contextPack.runId !== parsedRun.data.id ||
+      contextPack.taskId !== parsedRun.data.taskId ||
+      contextPack.agentId !== parsedRun.data.agentId
+    ) {
+      throw new TaskDispatchError("PERSISTENCE_FAILED");
+    }
     let receipt: z.infer<typeof ReceiptSchema>;
     try {
       receipt = ReceiptSchema.parse(
@@ -175,6 +198,7 @@ export class TaskDispatchService {
           title: task.data.title,
           ...(task.data.description === undefined ? {} : { description: task.data.description }),
           idempotencyKey: parsedRun.data.dispatchIdempotencyKey,
+          contextPack,
         }),
       );
     } catch {

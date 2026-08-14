@@ -6,6 +6,7 @@ import type {
 import {
   AgentIdSchema,
   BindingIdSchema,
+  ContextPackSchema,
   ConversationIdSchema,
   IdempotencyKeySchema,
   MessageContentSchema,
@@ -57,18 +58,29 @@ const DeliveryInputSchema = z.strictObject({
 const SendResultSchema = z.object({
   runId: OpaqueExternalIdSchema.optional(),
 });
-const TaskExecutionInputSchema = z.strictObject({
-  runId: RunIdSchema,
-  taskId: TaskIdSchema,
-  agentId: AgentIdSchema,
-  bindingId: BindingIdSchema,
-  sessionId: SessionIdSchema,
-  externalAgentId: OpaqueExternalIdSchema,
-  externalSessionRef: OpaqueExternalIdSchema,
-  title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1).max(20_000).optional(),
-  idempotencyKey: IdempotencyKeySchema,
-});
+const TaskExecutionInputSchema = z
+  .strictObject({
+    runId: RunIdSchema,
+    taskId: TaskIdSchema,
+    agentId: AgentIdSchema,
+    bindingId: BindingIdSchema,
+    sessionId: SessionIdSchema,
+    externalAgentId: OpaqueExternalIdSchema,
+    externalSessionRef: OpaqueExternalIdSchema,
+    title: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(1).max(20_000).optional(),
+    idempotencyKey: IdempotencyKeySchema,
+    contextPack: ContextPackSchema,
+  })
+  .superRefine((input, context) => {
+    if (
+      input.contextPack.runId !== input.runId ||
+      input.contextPack.taskId !== input.taskId ||
+      input.contextPack.agentId !== input.agentId
+    ) {
+      context.addIssue({ code: "custom", message: "ContextPack execution identity mismatch" });
+    }
+  });
 const AgentRunResultSchema = z.object({ runId: OpaqueExternalIdSchema });
 const AgentWaitResultSchema = z.object({ status: z.enum(["ok", "error", "timeout"]) });
 const AgentWaitTimeoutSchema = z.number().int().min(0).max(30_000);
@@ -266,9 +278,7 @@ export class OpenClawWriteAdapter implements ConversationDeliveryAdapter {
     let response: unknown;
     try {
       response = await gateway.runAgent({
-        message: parsed.data.description
-          ? `${parsed.data.title}\n\n${parsed.data.description}`
-          : parsed.data.title,
+        message: parsed.data.contextPack.rendered,
         agentId: parsed.data.externalAgentId,
         sessionKey: parsed.data.externalSessionRef,
         idempotencyKey: parsed.data.idempotencyKey,

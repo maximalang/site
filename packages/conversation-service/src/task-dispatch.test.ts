@@ -1,4 +1,4 @@
-import { RunSchema } from "@agent-world/domain";
+import { ContextPackSchema, RunSchema } from "@agent-world/domain";
 import { describe, expect, it, vi } from "vitest";
 import { TaskDispatchError, TaskDispatchService } from "./task-dispatch.js";
 
@@ -38,6 +38,35 @@ const prepared = {
     externalSessionRef: "agent:researcher:protocol",
   },
 };
+const contextPack = ContextPackSchema.parse({
+  schemaVersion: 1,
+  compilerVersion: "1.0.0",
+  id: "context_pack_55555555-5555-5555-5555-555555555555",
+  runId: run.id,
+  taskId: run.taskId,
+  agentId: run.agentId,
+  projectId: "project_66666666-6666-6666-6666-666666666666",
+  routeId: "route_77777777-7777-7777-7777-777777777777",
+  tokenBudget: 1_000,
+  estimatedTokens: 20,
+  contentHash: "a".repeat(64),
+  compiledAt: "2026-08-13T10:00:04.000Z",
+  sections: [
+    "GOAL",
+    "CURRENT_PROJECT_STATE",
+    "RELEVANT_DECISIONS",
+    "RELEVANT_MEMORY",
+    "RELEVANT_FINDINGS",
+    "REQUIRED_SKILLS",
+    "AVAILABLE_TOOLS",
+    "ARTIFACT_REFERENCES",
+    "EXPECTED_OUTPUT",
+    "HANDOFF_CONTRACT",
+  ].map((name) => ({ name, content: "" })),
+  rendered: "## GOAL\nVerify the protocol.",
+  evidence: [],
+});
+const contextPacks = { prepare: vi.fn(async () => contextPack) };
 
 describe("TaskDispatchService", () => {
   it("dispatches exact persisted provenance and records the accepted upstream Run", async () => {
@@ -58,6 +87,7 @@ describe("TaskDispatchService", () => {
     }));
     const service = new TaskDispatchService({
       store: { prepare, markRunning },
+      contextPacks,
       adapters: { resolve: () => ({ kind: "OPENCLAW", executeTask }) },
     });
 
@@ -76,6 +106,7 @@ describe("TaskDispatchService", () => {
       title: "Verify the protocol",
       description: "Use primary sources.",
       idempotencyKey: run.dispatchIdempotencyKey,
+      contextPack,
     });
     expect(markRunning).toHaveBeenCalledWith({
       runId: run.id,
@@ -88,6 +119,7 @@ describe("TaskDispatchService", () => {
     const markRunning = vi.fn();
     const service = new TaskDispatchService({
       store: { prepare: async () => prepared, markRunning },
+      contextPacks,
       adapters: { resolve: () => undefined },
     });
     await expect(service.dispatch(run.id)).rejects.toEqual(
@@ -100,6 +132,7 @@ describe("TaskDispatchService", () => {
     const markRunning = vi.fn();
     const service = new TaskDispatchService({
       store: { prepare: async () => prepared, markRunning },
+      contextPacks,
       adapters: {
         resolve: () => ({
           kind: "OPENCLAW",
@@ -129,6 +162,7 @@ describe("TaskDispatchService", () => {
         prepare: async () => ({ kind: "ALREADY_DISPATCHED" as const, run: running }),
         markRunning: vi.fn(),
       },
+      contextPacks,
       adapters: { resolve: () => ({ kind: "OPENCLAW", executeTask }) },
     });
     await expect(service.dispatch(run.id)).resolves.toEqual({ outcome: "REPLAYED", run: running });
@@ -157,6 +191,7 @@ describe("TaskDispatchService", () => {
         markRunning: vi.fn(),
         markTerminal,
       },
+      contextPacks,
       adapters: {
         resolve: () => ({ kind: "OPENCLAW", executeTask: vi.fn(), waitForTask }),
       },

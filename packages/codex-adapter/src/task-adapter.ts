@@ -3,6 +3,7 @@ import {
   AccountIdSchema,
   AgentIdSchema,
   BindingIdSchema,
+  ContextPackSchema,
   IdempotencyKeySchema,
   OpaqueExternalIdSchema,
   RouteIdSchema,
@@ -20,18 +21,29 @@ import {
   CodexExecutionRequestSchema,
 } from "./contract.js";
 
-const TaskExecutionInputSchema = z.strictObject({
-  runId: RunIdSchema,
-  taskId: TaskIdSchema,
-  agentId: AgentIdSchema,
-  bindingId: BindingIdSchema,
-  sessionId: SessionIdSchema,
-  externalAgentId: OpaqueExternalIdSchema,
-  externalSessionRef: OpaqueExternalIdSchema,
-  title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1).max(20_000).optional(),
-  idempotencyKey: IdempotencyKeySchema,
-});
+const TaskExecutionInputSchema = z
+  .strictObject({
+    runId: RunIdSchema,
+    taskId: TaskIdSchema,
+    agentId: AgentIdSchema,
+    bindingId: BindingIdSchema,
+    sessionId: SessionIdSchema,
+    externalAgentId: OpaqueExternalIdSchema,
+    externalSessionRef: OpaqueExternalIdSchema,
+    title: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(1).max(20_000).optional(),
+    idempotencyKey: IdempotencyKeySchema,
+    contextPack: ContextPackSchema,
+  })
+  .superRefine((input, context) => {
+    if (
+      input.contextPack.runId !== input.runId ||
+      input.contextPack.taskId !== input.taskId ||
+      input.contextPack.agentId !== input.agentId
+    ) {
+      context.addIssue({ code: "custom", message: "ContextPack execution identity mismatch" });
+    }
+  });
 
 const BindingResolutionSchema = z.strictObject({
   routeId: RouteIdSchema,
@@ -103,6 +115,9 @@ export class CodexTaskExecutionAdapter implements TaskExecutionAdapter {
     }
     const resolution = BindingResolutionSchema.safeParse(resolutionValue);
     if (!resolution.success) throw new CodexExecutionError("POLICY_VIOLATION");
+    if (input.contextPack.routeId !== resolution.data.routeId) {
+      throw new CodexExecutionError("POLICY_VIOLATION");
+    }
     const request = CodexExecutionRequestSchema.parse({
       schemaVersion: 1,
       runId: input.runId,
@@ -114,7 +129,7 @@ export class CodexTaskExecutionAdapter implements TaskExecutionAdapter {
       sessionId: input.sessionId,
       codexThreadId: input.externalSessionRef,
       idempotencyKey: input.idempotencyKey,
-      prompt: input.description ? `${input.title}\n\n${input.description}` : input.title,
+      prompt: input.contextPack.rendered,
       policy: resolution.data.policy,
     });
     try {

@@ -12,6 +12,34 @@ const task = {
   title: "Verify the contracts",
   description: "Run the narrow validation suite.",
   idempotencyKey: "codex:run-1",
+  contextPack: {
+    schemaVersion: 1,
+    compilerVersion: "1.0.0",
+    id: "context_pack_88888888-8888-8888-8888-888888888888",
+    runId: "run_11111111-1111-1111-1111-111111111111",
+    taskId: "task_22222222-2222-2222-2222-222222222222",
+    agentId: "agent_33333333-3333-3333-3333-333333333333",
+    projectId: "project_99999999-9999-9999-9999-999999999999",
+    routeId: "route_77777777-7777-7777-7777-777777777777",
+    tokenBudget: 1_000,
+    estimatedTokens: 20,
+    contentHash: "a".repeat(64),
+    compiledAt: "2026-08-13T11:59:00.000Z",
+    sections: [
+      "GOAL",
+      "CURRENT_PROJECT_STATE",
+      "RELEVANT_DECISIONS",
+      "RELEVANT_MEMORY",
+      "RELEVANT_FINDINGS",
+      "REQUIRED_SKILLS",
+      "AVAILABLE_TOOLS",
+      "ARTIFACT_REFERENCES",
+      "EXPECTED_OUTPUT",
+      "HANDOFF_CONTRACT",
+    ].map((name) => ({ name, content: "" })),
+    rendered: "## GOAL\nVerify the contracts\n\n## RELEVANT_MEMORY\nCanonical evidence.",
+    evidence: [],
+  },
 } as const;
 
 const binding = {
@@ -63,7 +91,7 @@ describe("CodexTaskExecutionAdapter", () => {
       sessionId: task.sessionId,
       codexThreadId: task.externalSessionRef,
       idempotencyKey: task.idempotencyKey,
-      prompt: "Verify the contracts\n\nRun the narrow validation suite.",
+      prompt: task.contextPack.rendered,
       policy: binding.policy,
     });
   });

@@ -18,6 +18,7 @@ export * from "./native-chat-resource-reader.js";
 export * from "./openclaw-configuration-reader.js";
 export * from "./owner-session-store.js";
 export * from "./resource-broker-store.js";
+export * from "./run-context-pack-provider.js";
 export * from "./run-dispatch-store.js";
 export * from "./run-provenance-reader.js";
 export * from "./runtime-message-store.js";
