@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { CodexTaskExecutionAdapter } from "@agent-world/codex-adapter";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
 import { ContextItemIdSchema, EventIdSchema, RunIdSchema } from "@agent-world/domain";
+import { GraphitiMemoryAdapter, HttpGraphitiMcpTransport } from "@agent-world/graphiti-adapter";
 import { LiteLlmModelGateway, LiteLlmProjectionReconciler } from "@agent-world/model-gateway";
 import {
   type OpenClawCredential,
@@ -11,6 +12,7 @@ import {
 import {
   applyMigrations,
   discoverMigrations,
+  MemoryGraphProjector,
   PostgresAgentConversationReader,
   PostgresApprovalRunStore,
   PostgresCodexBindingResolver,
@@ -23,6 +25,7 @@ import {
   PostgresHubReader,
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
+  PostgresMemoryProjectionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -40,6 +43,7 @@ import {
 import { ModelRouteCheckResponseSchema } from "@agent-world/read-model";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
+import { MemoryProjectionSupervisor } from "./memory-projection-supervisor";
 import { OwnerSessionManager } from "./owner-session";
 import { TaskRunSupervisor } from "./task-run-supervisor";
 
@@ -173,6 +177,7 @@ export async function createProductionRuntime(
   let readAdapter: OpenClawReadAdapter | undefined;
   let writeAdapter: OpenClawWriteAdapter | undefined;
   let taskRunSupervisor: TaskRunSupervisor | undefined;
+  let memoryProjectionSupervisor: MemoryProjectionSupervisor | undefined;
   try {
     const migrationClient = await pool.connect();
     try {
@@ -201,6 +206,35 @@ export async function createProductionRuntime(
       contextItemId: () => ContextItemIdSchema.parse(`context_item_${randomUUID()}`),
       eventId: () => EventIdSchema.parse(`event_${randomUUID()}`),
     });
+    const graphitiEndpoint = environment.AGENT_WORLD_GRAPHITI_MCP_URL?.trim();
+    if (graphitiEndpoint) {
+      try {
+        const pollMs = Number(environment.AGENT_WORLD_GRAPHITI_POLL_MS ?? "5000");
+        const adapter = new GraphitiMemoryAdapter(
+          new HttpGraphitiMcpTransport({
+            endpoint: graphitiEndpoint,
+            ...(environment.AGENT_WORLD_GRAPHITI_PLAINTEXT_ACK
+              ? {
+                  plaintextPrivateNetworkAck: environment.AGENT_WORLD_GRAPHITI_PLAINTEXT_ACK,
+                }
+              : {}),
+          }),
+        );
+        const projector = new MemoryGraphProjector(
+          new PostgresMemoryProjectionStore(pool),
+          adapter,
+          { projectionName: "graphiti-memory-v1" },
+        );
+        memoryProjectionSupervisor = new MemoryProjectionSupervisor({
+          projector,
+          intervalMs: pollMs,
+          record: (event) => record("memory-projection-supervisor", event),
+        });
+        memoryProjectionSupervisor.start();
+      } catch {
+        record("memory-projection-supervisor", { event: "configuration_rejected" });
+      }
+    }
     const secretStore = new PostgresEncryptedSecretStore(pool, parseSecretKeyMaterial(environment));
     const routeResolver = new PostgresModelRouteResolver(pool, {
       allowedLocalOrigins: (environment.AGENT_WORLD_LOCAL_MODEL_ORIGINS ?? "")
@@ -451,12 +485,14 @@ export async function createProductionRuntime(
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
         await taskRunSupervisor?.stop();
+        await memoryProjectionSupervisor?.stop();
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
         await pool.end();
       },
     };
   } catch (error) {
     await taskRunSupervisor?.stop();
+    await memoryProjectionSupervisor?.stop();
     await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
     await pool.end().catch(() => undefined);
     throw error;

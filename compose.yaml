@@ -53,6 +53,9 @@ services:
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_DEVICE_TOKEN: ${OPENCLAW_GATEWAY_DEVICE_TOKEN:-}
+      AGENT_WORLD_GRAPHITI_MCP_URL: ${AGENT_WORLD_GRAPHITI_MCP_URL:-}
+      AGENT_WORLD_GRAPHITI_PLAINTEXT_ACK: ${AGENT_WORLD_GRAPHITI_PLAINTEXT_ACK:-}
+      AGENT_WORLD_GRAPHITI_POLL_MS: ${AGENT_WORLD_GRAPHITI_POLL_MS:-5000}
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -206,6 +209,75 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  falkordb:
+    profiles: ["graph-memory"]
+    image: falkordb/falkordb:v4.20.1@sha256:9042fdc4e53f5390ca5a3993aa71506523970efb40ffb9a98e6a4b1a9a4f8862
+    restart: unless-stopped
+    volumes:
+      - falkordb_data:/var/lib/falkordb/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 9
+      start_period: 20s
+    mem_limit: 1024m
+    cpus: 1.0
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  graphiti:
+    profiles: ["graph-memory"]
+    build:
+      context: .
+      dockerfile: ops/graphiti/Dockerfile
+    image: agent-world-graphiti:0.29.3
+    restart: unless-stopped
+    depends_on:
+      falkordb:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    environment:
+      FALKORDB_URI: redis://falkordb:6379
+      FALKORDB_DATABASE: agent_world_memory
+      OPENAI_API_KEY: ${AGENT_WORLD_LITELLM_MASTER_KEY:?set AGENT_WORLD_LITELLM_MASTER_KEY}
+      OPENAI_API_URL: http://litellm:4000/v1
+      MODEL_NAME: ${AGENT_WORLD_GRAPHITI_MODEL:-gpt-5-mini}
+      EMBEDDER_MODEL: ${AGENT_WORLD_GRAPHITI_EMBEDDER_MODEL:-text-embedding-3-small}
+      EMBEDDER_DIMENSIONS: ${AGENT_WORLD_GRAPHITI_EMBEDDER_DIMENSIONS:-1536}
+      SEMAPHORE_LIMIT: ${AGENT_WORLD_GRAPHITI_CONCURRENCY:-2}
+      GRAPHITI_TELEMETRY_ENABLED: "false"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
+    networks:
+      - data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/app/mcp/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    mem_limit: 1536m
+    cpus: 1.0
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
   caddy:
     image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     restart: unless-stopped
@@ -247,3 +319,4 @@ volumes:
   codex_state:
   caddy_data:
   caddy_config:
+  falkordb_data:
