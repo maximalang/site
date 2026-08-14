@@ -386,6 +386,20 @@ test("ChatGPT OAuth lifecycle survives cached scope omission and application res
     assert.equal(refreshedClaims.iss, ISSUER);
     assert.equal(refreshedClaims.aud, RESOURCE);
     assert.equal(refreshedClaims.sub, ACCOUNT_ID);
+
+    const replayResponse = await refresh(httpClient, clientId, tokens.refresh_token);
+    assert.equal(
+      replayResponse.status,
+      400,
+      "reusing a consumed refresh token must be rejected",
+    );
+
+    const revokedFamilyResponse = await refresh(httpClient, clientId, rotated.refresh_token);
+    assert.equal(
+      revokedFamilyResponse.status,
+      400,
+      "refresh-token replay must revoke the remaining token family",
+    );
   } finally {
     await stop(runtime.server);
     await rm(fixture.dir, { recursive: true, force: true });
