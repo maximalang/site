@@ -213,7 +213,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 20
+    ledger.rows.at(-1)?.version !== 21
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -252,6 +252,7 @@ try {
   );
   const names = tables.rows.map(({ table_name: tableName }) => tableName);
   for (const required of [
+    "artifacts",
     "agents",
     "agent_skills",
     "agent_tools",
@@ -283,6 +284,10 @@ try {
     "owner_sessions",
     "project_agents",
     "providers",
+    "context_items",
+    "rag_document_chunks",
+    "rag_document_sources",
+    "rag_documents",
     "resource_broker_decisions",
     "resource_route_observations",
     "runtime_bindings",
@@ -298,6 +303,21 @@ try {
     if (!names.includes(required)) {
       throw new Error(`Canonical table is missing after migration: ${required}`);
     }
+  }
+  const vectorExtension = await pool.query(
+    "SELECT extversion FROM pg_extension WHERE extname = 'vector'",
+  );
+  if (vectorExtension.rows[0]?.extversion !== "0.8.6") {
+    throw new Error("Canonical PostgreSQL does not expose the pinned pgvector extension");
+  }
+  const vectorIndex = await pool.query(
+    `SELECT indexdef
+       FROM pg_indexes
+      WHERE schemaname = 'agent_world'
+        AND indexname = 'rag_document_chunks_embedding_hnsw'`,
+  );
+  if (!vectorIndex.rows[0]?.indexdef?.includes("USING hnsw (embedding vector_cosine_ops)")) {
+    throw new Error("Shared context does not expose the required cosine HNSW index");
   }
   const oauthTables = await pool.query(
     `SELECT table_name FROM information_schema.tables

@@ -33,6 +33,7 @@ describe("discoverMigrations", () => {
       { version: 18, name: "0018_transport_run_provenance.sql" },
       { version: 19, name: "0019_resource_broker.sql" },
       { version: 20, name: "0020_native_chat_launcher.sql" },
+      { version: 21, name: "0021_shared_context_rag.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -61,6 +62,9 @@ describe("discoverMigrations", () => {
     expect(migrations[18]?.sql).toContain("CREATE TABLE agent_world.resource_broker_decisions");
     expect(migrations[19]?.sql).toContain("CREATE TABLE agent_world.native_chat_browser_profiles");
     expect(migrations[19]?.sql).toContain("native_chat_dispatches_launcher_shape_check");
+    expect(migrations[20]?.sql).toContain("CREATE EXTENSION IF NOT EXISTS vector");
+    expect(migrations[20]?.sql).toContain("CREATE TABLE agent_world.rag_document_chunks");
+    expect(migrations[20]?.sql).toContain("USING hnsw (embedding vector_cosine_ops)");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {
