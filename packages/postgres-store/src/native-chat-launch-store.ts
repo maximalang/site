@@ -6,6 +6,7 @@ import {
   LauncherIdSchema,
   type NativeChatLaunchClaim,
   NativeChatLaunchClaimSchema,
+  NativeChatLaunchUrlSchema,
   type NativeChatSubmissionReceipt,
   NativeChatSubmissionReceiptSchema,
   TimestampSchema,
@@ -17,6 +18,7 @@ import type { TransactionPool } from "./conversation-store.js";
 const ProfileSchema = z.strictObject({
   accountId: AccountIdSchema,
   profileRef: BrowserProfileRefSchema,
+  launchUrl: NativeChatLaunchUrlSchema,
   isEnabled: z.boolean(),
   updatedAt: TimestampSchema,
 });
@@ -53,6 +55,7 @@ type ClaimRow = QueryResultRow & {
   run_id: string;
   account_id: string;
   profile_ref: string;
+  launch_url: string;
   launch_attempt: number;
 };
 
@@ -83,13 +86,20 @@ export class PostgresNativeChatLaunchStore {
     try {
       await client.query(
         `INSERT INTO agent_world.native_chat_browser_profiles
-           (account_id, profile_ref, is_enabled, updated_at)
-         VALUES ($1, $2, $3, $4)
+           (account_id, profile_ref, launch_url, is_enabled, updated_at)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (account_id) DO UPDATE SET
            profile_ref = EXCLUDED.profile_ref,
+           launch_url = EXCLUDED.launch_url,
            is_enabled = EXCLUDED.is_enabled,
            updated_at = EXCLUDED.updated_at`,
-        [profile.accountId, profile.profileRef, profile.isEnabled, profile.updatedAt],
+        [
+          profile.accountId,
+          profile.profileRef,
+          profile.launchUrl,
+          profile.isEnabled,
+          profile.updatedAt,
+        ],
       );
     } catch {
       throw new NativeChatLaunchStoreError("PROFILE_CONFLICT");
@@ -105,6 +115,7 @@ export class PostgresNativeChatLaunchStore {
       await client.query("BEGIN");
       const selected = await client.query<ClaimRow>(
         `SELECT dispatch.id, dispatch.run_id, dispatch.account_id, profile.profile_ref,
+                profile.launch_url,
                 dispatch.launch_attempt
            FROM agent_world.native_chat_dispatches dispatch
            JOIN agent_world.runs run
@@ -146,6 +157,7 @@ export class PostgresNativeChatLaunchStore {
         message: { runId: updated.rows[0].run_id },
         accountId: updated.rows[0].account_id,
         profileRef: row.profile_ref,
+        launchUrl: row.launch_url,
         launcherId: request.launcherId,
         attempt: updated.rows[0].launch_attempt,
         leaseExpiresAt: request.leaseExpiresAt,

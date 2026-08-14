@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "tsBuildInfoFile": "../../.cache/native-chat-launcher.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../../packages/domain" }, { "path": "../../packages/postgres-store" }]
+}

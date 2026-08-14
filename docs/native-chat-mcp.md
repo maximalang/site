@@ -51,6 +51,32 @@ structured results and canonical Control events.
 The server does not read Chat output from the DOM and does not treat a visible
 Chat response as completion evidence.
 
+## Host-local browser launcher
+
+The on-demand launcher runs on the owner's laptop, outside Docker and Timeweb,
+because the authenticated ChatGPT browser profiles remain local. Build and run
+it with:
+
+```powershell
+npm.cmd run build --workspace @agent-world/native-chat-launcher
+npm.cmd start --workspace @agent-world/native-chat-launcher
+```
+
+Configure the launcher with the variables documented in `.env.example`. On the
+first launch, Chrome opens a dedicated directory below
+`AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT`; the owner signs in manually. Use one
+opaque profile alias and directory per ChatGPT Account. AI World never asks for
+or exports passwords, two-factor codes, cookies or browser storage.
+
+`AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL` must point to the AI World GPT/App connected
+to this MCP resource. Its instructions must call `begin_run(run_id)`, pull only
+needed context with `get_run_resources`, emit structured progress events, and
+finish with `commit_result` or `fail_run`. The launcher opens that surface,
+fills only the exact `run_id`, clicks Send and records a versioned submission
+receipt after the new Chat URL is observed. It neither inspects response nodes
+nor waits for the final response. The page remains open for a bounded retention
+window so the native Chat runtime can complete independently through MCP.
+
 ## Fail-closed configuration
 
 All values are required before the routes become discoverable:
@@ -78,9 +104,9 @@ the web resource server.
   endpoint and verify its public discovery/JWKS/DCR contract.
 - Implement the canonical Memory/RAG/Artifact stores so those currently
   unavailable pull classes can return provenance-aware content.
-- Submit queued dispatches through the on-demand launcher and record its exact
-  browser-submission receipt. The queue/lease/receipt store is implemented; the
-  local browser driver still requires a real authenticated-profile E2E.
+- Run the host-local launcher against an owner-authenticated dedicated profile
+  and record a real browser-submission receipt. The queue, driver and receipt
+  path are implemented but still require this live E2E.
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
 

@@ -33,6 +33,7 @@ describe("Native Plus Chat contracts", () => {
       message: { runId: ids.run },
       accountId: ids.account,
       profileRef: "plus-primary",
+      launchUrl: "https://chatgpt.com/g/ai-world-agent",
       launcherId: "launcher_77777777-7777-7777-7777-777777777777",
       attempt: 1,
       leaseExpiresAt: "2026-08-14T10:02:00.000Z",
@@ -41,6 +42,7 @@ describe("Native Plus Chat contracts", () => {
     expect(claim.message).toEqual({ runId: ids.run });
     expect(claim.message).not.toHaveProperty("profileRef");
     expect(claim.message).not.toHaveProperty("accountId");
+    expect(claim.message).not.toHaveProperty("launchUrl");
   });
 
   it("binds dispatch evidence to one Account without claiming a DOM result", () => {

@@ -4,6 +4,10 @@ CREATE TABLE agent_world.native_chat_browser_profiles (
     char_length(profile_ref) BETWEEN 1 AND 100
     AND profile_ref ~ '^[a-z0-9]+([._-][a-z0-9]+)*$'
   ),
+  launch_url text NOT NULL CHECK (
+    char_length(launch_url) BETWEEN 1 AND 2048
+    AND launch_url ~ '^https://chatgpt[.]com(/[^?#]*)?$'
+  ),
   is_enabled boolean NOT NULL DEFAULT true,
   updated_at timestamptz NOT NULL
 );

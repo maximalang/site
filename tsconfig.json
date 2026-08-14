@@ -5,6 +5,9 @@
       "path": "./apps/codex-worker"
     },
     {
+      "path": "./apps/native-chat-launcher"
+    },
+    {
       "path": "./packages/codex-adapter"
     },
     {

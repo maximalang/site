@@ -4,6 +4,7 @@
     "declaration": false,
     "declarationMap": false,
     "noEmit": true,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "paths": {
       "@agent-world/codex-adapter": ["./packages/codex-adapter/src/index.ts"],
       "@agent-world/conversation-service": ["./packages/conversation-service/src/index.ts"],
@@ -14,5 +15,10 @@
     },
     "sourceMap": false
   },
-  "include": ["apps/codex-worker/src/**/*.ts", "packages/**/*.ts", "vitest.config.ts"]
+  "include": [
+    "apps/codex-worker/src/**/*.ts",
+    "apps/native-chat-launcher/src/**/*.ts",
+    "packages/**/*.ts",
+    "vitest.config.ts"
+  ]
 }

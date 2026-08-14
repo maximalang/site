@@ -49,6 +49,7 @@ file does not require install-time scripts for the supported toolchain.
 | `npm run test:openclaw-live` | Verify the pinned real OpenClaw Gateway and transcript round trip (explicit isolated ACK required) |
 | `npm run test:codex-live` | Launch the pinned official Codex SDK/CLI against an isolated deterministic Responses endpoint (explicit ACK required) |
 | `npm run test:compose` | Destructively verify an isolated HTTPS core stack, degradation and backup/restore (explicit ACK required) |
+| `npm start --workspace @agent-world/native-chat-launcher` | Run the host-local Native Plus Chat `run_id` launcher |
 | `npm run clean` | Remove TypeScript project-reference outputs |
 
 Copy `.env.example` into an ignored local environment file and replace every
@@ -87,6 +88,11 @@ npm run dev:web
 
 The provider ignores this fixture switch in production. Install the pinned test
 browser once with `npm exec --workspace @agent-world/web -- playwright install chromium`.
+
+Native Plus Chat uses a separate host-local Chrome launcher and dedicated
+authenticated profiles; it is intentionally not a Compose service. See
+[`docs/native-chat-mcp.md`](docs/native-chat-mcp.md) for its fail-closed setup
+and live activation gate.
 
 ## Architecture
 

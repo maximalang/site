@@ -32,12 +32,21 @@ export const BrowserProfileRefSchema = z
   .max(100)
   .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/);
 
+export const NativeChatLaunchUrlSchema = z
+  .url()
+  .max(2_048)
+  .regex(
+    /^https:\/\/chatgpt[.]com(?:\/[^?#]*)?$/,
+    "Native Chat launch URL must be an exact public chatgpt.com HTTPS path",
+  );
+
 export const NativeChatLaunchClaimSchema = z.strictObject({
   schemaVersion: z.literal(1),
   dispatchId: ChatDispatchIdSchema,
   message: NativeChatLaunchMessageSchema,
   accountId: AccountIdSchema,
   profileRef: BrowserProfileRefSchema,
+  launchUrl: NativeChatLaunchUrlSchema,
   launcherId: LauncherIdSchema,
   attempt: z.number().int().min(1).max(10),
   leaseExpiresAt: TimestampSchema,

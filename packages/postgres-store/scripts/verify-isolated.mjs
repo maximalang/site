@@ -1844,6 +1844,7 @@ try {
   await nativeChatLauncher.configureProfile({
     accountId: codex.account,
     profileRef: "plus-isolated",
+    launchUrl: "https://chatgpt.com/g/ai-world-isolated",
     isEnabled: true,
     updatedAt: "2026-08-13T13:00:04.100Z",
   });
@@ -1857,6 +1858,7 @@ try {
     launchClaim?.dispatchId !== nativeChat.dispatch ||
     launchClaim.message.runId !== nativeChat.run ||
     launchClaim.profileRef !== "plus-isolated" ||
+    launchClaim.launchUrl !== "https://chatgpt.com/g/ai-world-isolated" ||
     Object.keys(launchClaim.message).length !== 1
   ) {
     throw new Error("Native Chat launcher claim leaked context or selected the wrong Account");
