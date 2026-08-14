@@ -4,7 +4,7 @@ import { projectWorldView } from "@agent-world/read-model";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildContractFixture } from "../test-fixtures";
-import { WorldCanvas } from "./world-canvas";
+import { OpenClawOfficeWorld } from "./openclaw-office-world";
 
 afterEach(cleanup);
 
@@ -12,7 +12,7 @@ describe("OpenClaw Office World presentation", () => {
   it("renders canonical agents in one four-zone open floor without a canvas", () => {
     const world = projectWorldView(buildContractFixture());
     const { container } = render(
-      <WorldCanvas
+      <OpenClawOfficeWorld
         world={world}
         selectedAgentId={undefined}
         onSelectAgent={vi.fn()}
@@ -34,7 +34,7 @@ describe("OpenClaw Office World presentation", () => {
     const onSelectAgent = vi.fn();
     const onOpenConversation = vi.fn();
     render(
-      <WorldCanvas
+      <OpenClawOfficeWorld
         world={world}
         selectedAgentId={undefined}
         onSelectAgent={onSelectAgent}

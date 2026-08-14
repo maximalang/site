@@ -11,8 +11,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildContractFixture } from "../test-fixtures";
 import { ControlCenter } from "./control-center";
 
-vi.mock("./world-canvas", () => ({
-  WorldCanvas: () => <div data-testid="world-canvas" />,
+vi.mock("./openclaw-office-world", () => ({
+  OpenClawOfficeWorld: () => <div data-testid="openclaw-office-world" />,
 }));
 
 afterEach(cleanup);
@@ -25,7 +25,7 @@ describe("ControlCenter", () => {
 
     expect(await screen.findByText(/контрактный снимок/i)).not.toBeNull();
     expect(loadReadModel).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("world-canvas")).not.toBeNull();
+    expect(screen.getByTestId("openclaw-office-world")).not.toBeNull();
 
     const researcher = screen.getByRole("button", { name: /Research Lead.*Выполняет/i });
     await user.click(researcher);
@@ -35,7 +35,7 @@ describe("ControlCenter", () => {
     const commandTab = screen.getByRole("tab", { name: "Command" });
     await user.click(commandTab);
     expect(commandTab.getAttribute("aria-selected")).toBe("true");
-    expect(screen.queryByTestId("world-canvas")).toBeNull();
+    expect(screen.queryByTestId("openclaw-office-world")).toBeNull();
     expect(screen.getByRole("heading", { name: "Research Lead" })).not.toBeNull();
     expect(
       screen.getByRole("row", {

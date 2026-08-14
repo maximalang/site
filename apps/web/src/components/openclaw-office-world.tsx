@@ -9,7 +9,7 @@ import {
 } from "../world/openclaw-office-adapter";
 
 type AgentId = WorldView["agents"][number]["core"]["agentId"];
-type WorldCanvasProps = {
+type OpenClawOfficeWorldProps = {
   world: WorldView;
   selectedAgentId: AgentId | undefined;
   onSelectAgent: (id: AgentId) => void;
@@ -53,16 +53,16 @@ function AgentPawn({ agent }: { agent: OfficePresentationAgent }) {
   );
 }
 
-export function WorldCanvas({
+export function OpenClawOfficeWorld({
   world,
   selectedAgentId,
   onSelectAgent,
   onOpenConversation,
-}: WorldCanvasProps) {
+}: OpenClawOfficeWorldProps) {
   const office = createOfficePresentation(world, DEFAULT_OFFICE_SKIN);
   return (
     <div
-      className="world-canvas office-world"
+      className="openclaw-office-world office-world"
       style={{ aspectRatio: `${office.width} / ${office.height}` }}
       data-skin={office.skinId}
     >

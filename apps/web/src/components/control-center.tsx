@@ -18,8 +18,8 @@ import {
 import { loadWorldReadModel } from "../client/world-api";
 import { type ConversationClient, ConversationDrawer } from "./conversation-drawer";
 import { HubPanel } from "./hub-panel";
+import { OpenClawOfficeWorld } from "./openclaw-office-world";
 import { type TaskClient, TaskDrawer } from "./task-drawer";
-import { WorldCanvas } from "./world-canvas";
 
 type Mode = "WORLD" | "COMMAND" | "HUB";
 type LoadReadModel = (attempt: number) => Promise<WorldReadModel>;
@@ -509,7 +509,7 @@ export function ControlCenter({
                 </div>
                 <div className="world-grid">
                   <div className="canvas-frame">
-                    <WorldCanvas
+                    <OpenClawOfficeWorld
                       world={world}
                       onOpenConversation={openConversation}
                       onSelectAgent={selectAgent}
