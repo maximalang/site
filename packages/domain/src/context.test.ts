@@ -3,6 +3,9 @@ import {
   ContextCompilerInputSchema,
   ContextItemSchema,
   ContextPackSchema,
+  RagDocumentChunkWriteSchema,
+  RagDocumentIngestSchema,
+  RagRetrievalRequestSchema,
   StructuredAgentOutputSchema,
 } from "./context.js";
 
@@ -16,9 +19,67 @@ const ids = {
   route: "route_77777777-7777-7777-7777-777777777777",
   run: "run_88888888-8888-8888-8888-888888888888",
   task: "task_99999999-9999-9999-9999-999999999999",
+  document: "document_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  chunk: "document_chunk_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
 } as const;
 
 describe("shared context contracts", () => {
+  it("accepts bounded provenance-aware RAG writes and exact 1536-dimensional retrieval", () => {
+    const document = RagDocumentIngestSchema.parse({
+      schemaVersion: 1,
+      id: ids.document,
+      projectId: ids.project,
+      title: "Architecture decision",
+      contentHash: "c".repeat(64),
+      mimeType: "text/markdown",
+      byteSize: 2048,
+      source: {
+        kind: "PROJECT_FILE",
+        ref: "docs/architecture.md",
+        observedAt: "2026-08-14T10:00:00.000Z",
+      },
+      createdAt: "2026-08-14T10:00:00.000Z",
+    });
+    const embedding = Array.from({ length: 1536 }, (_, index) => (index === 0 ? 1 : 0));
+    const chunk = RagDocumentChunkWriteSchema.parse({
+      schemaVersion: 1,
+      id: ids.chunk,
+      documentId: ids.document,
+      projectId: ids.project,
+      ordinal: 0,
+      content: "PostgreSQL owns canonical state.",
+      contentHash: "d".repeat(64),
+      estimatedTokens: 8,
+      embeddingModel: "text-embedding-3-small",
+      embedding,
+      createdAt: "2026-08-14T10:00:00.000Z",
+    });
+    expect(document.source.kind).toBe("PROJECT_FILE");
+    expect(chunk.embedding).toHaveLength(1536);
+    expect(
+      RagRetrievalRequestSchema.parse({
+        schemaVersion: 1,
+        projectId: ids.project,
+        embedding,
+        maxItems: 10,
+      }).maxItems,
+    ).toBe(10);
+    expect(() => RagDocumentChunkWriteSchema.parse({ ...chunk, embedding: [1, 0] })).toThrow();
+    expect(() =>
+      RagDocumentChunkWriteSchema.parse({
+        ...chunk,
+        embedding: undefined,
+        embeddingModel: "text-embedding-3-small",
+      }),
+    ).toThrow();
+    expect(() =>
+      RagDocumentIngestSchema.parse({
+        ...document,
+        source: { ...document.source, kind: "URL", ref: "http://example.com" },
+      }),
+    ).toThrow();
+  });
+
   it("requires exact provenance and bounded project-scoped context", () => {
     const value = ContextItemSchema.parse({
       schemaVersion: 1,

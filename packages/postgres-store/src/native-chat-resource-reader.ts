@@ -55,6 +55,36 @@ type EventRow = QueryResultRow & {
   occurred_at: Date | string;
 };
 
+type ContextRow = QueryResultRow & {
+  id: string;
+  kind: string;
+  temperature: string;
+  content: string;
+  summary: string | null;
+  importance: number;
+  created_at: Date | string;
+};
+
+type RagRow = QueryResultRow & {
+  id: string;
+  document_id: string;
+  ordinal: number;
+  content: string;
+  title: string;
+  created_at: Date | string;
+};
+
+type ArtifactRow = QueryResultRow & {
+  id: string;
+  run_id: string | null;
+  label: string;
+  content_sha256: string;
+  media_type: string;
+  storage_ref: string;
+  byte_size: string | number;
+  created_at: Date | string;
+};
+
 type ResourceKind = NativeChatPullRequest["resources"][number];
 type Candidate = Omit<NativeChatPullResponse["items"][number], "contentSha256" | "estimatedTokens">;
 
@@ -175,7 +205,7 @@ export class PostgresNativeChatResourceReader {
         if (represented.has(resource)) continue;
         omissions.push({
           resource,
-          reason: ["MEMORY", "RAG", "ARTIFACTS"].includes(resource) ? "UNAVAILABLE" : "NO_MATCH",
+          reason: "NO_MATCH",
         });
       }
 
@@ -316,6 +346,84 @@ export class PostgresNativeChatResourceReader {
               event.occurred_at,
             ),
           ],
+        });
+      }
+    }
+    if (resources.has("MEMORY")) {
+      const memories = await client.query<ContextRow>(
+        `SELECT id, kind, temperature, content, summary, importance, created_at
+           FROM agent_world.context_items
+          WHERE project_id = $1 AND kind = 'MEMORY'
+            AND (valid_until IS NULL OR valid_until > now())
+            AND ($2::text IS NULL OR content ILIKE '%' || $2 || '%'
+                 OR summary ILIKE '%' || $2 || '%')
+          ORDER BY importance DESC, created_at DESC, id
+          LIMIT 101`,
+        [scope.project_id, request.query ?? null],
+      );
+      for (const memory of memories.rows) {
+        result.push({
+          resource: "MEMORY",
+          content: serialize({
+            content: memory.content,
+            summary: memory.summary,
+            temperature: memory.temperature,
+            importance: memory.importance,
+          }),
+          provenance: [provenance("CONTEXT_ITEM", memory.id, memory.created_at)],
+        });
+      }
+    }
+    if (resources.has("RAG")) {
+      const chunks = await client.query<RagRow>(
+        `SELECT c.id, c.document_id, c.ordinal, c.content, d.title, c.created_at
+           FROM agent_world.rag_document_chunks c
+           JOIN agent_world.rag_documents d ON d.id = c.document_id
+          WHERE c.project_id = $1
+            AND ($2::text IS NULL OR c.content ILIKE '%' || $2 || '%'
+                 OR d.title ILIKE '%' || $2 || '%')
+          ORDER BY c.created_at DESC, c.id
+          LIMIT 101`,
+        [scope.project_id, request.query ?? null],
+      );
+      for (const chunk of chunks.rows) {
+        result.push({
+          resource: "RAG",
+          content: serialize({
+            documentId: chunk.document_id,
+            title: chunk.title,
+            ordinal: chunk.ordinal,
+            content: chunk.content,
+          }),
+          provenance: [provenance("DOCUMENT_CHUNK", chunk.id, chunk.created_at)],
+        });
+      }
+    }
+    if (resources.has("ARTIFACTS")) {
+      const artifacts = await client.query<ArtifactRow>(
+        `SELECT id, run_id, label, content_sha256, media_type, storage_ref,
+                byte_size::text, created_at
+           FROM agent_world.artifacts
+          WHERE project_id = $1
+            AND ($2::text IS NULL OR label ILIKE '%' || $2 || '%'
+                 OR storage_ref ILIKE '%' || $2 || '%')
+          ORDER BY created_at DESC, id
+          LIMIT 101`,
+        [scope.project_id, request.query ?? null],
+      );
+      for (const artifact of artifacts.rows) {
+        result.push({
+          resource: "ARTIFACTS",
+          content: serialize({
+            id: artifact.id,
+            runId: artifact.run_id,
+            label: artifact.label,
+            contentSha256: artifact.content_sha256,
+            mediaType: artifact.media_type,
+            storageRef: artifact.storage_ref,
+            byteSize: Number(artifact.byte_size),
+          }),
+          provenance: [provenance("ARTIFACT", artifact.id, artifact.created_at)],
         });
       }
     }

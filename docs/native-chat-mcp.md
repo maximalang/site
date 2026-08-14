@@ -14,9 +14,9 @@ structured results and canonical Control events.
 - Origin allowlist for ChatGPT plus exact same-origin requests.
 - `begin_run`, `emit_run_event`, `commit_result` and `fail_run` tools.
 - `get_run_resources` performs bounded lazy pulls after `begin_run`. TASK,
-  project state, assigned skills and canonical Action history include SHA-256
-  and PostgreSQL provenance; unavailable Memory/RAG/Artifact stores are stated
-  explicitly rather than fabricated.
+  project state, assigned skills, canonical Action history, Memory, RAG chunks
+  and Artifacts include SHA-256 and PostgreSQL provenance. Every data-bearing
+  lookup is constrained to the Run's canonical Project.
 - Every pull records requested resource classes, a query hash, item/token
   limits, actual counts and response hash in PostgreSQL. Raw search text is not
   retained in the receipt.
@@ -46,7 +46,14 @@ structured results and canonical Control events.
   subject is that Account ID; OAuth sessions never create or identify Agents.
 - Renewable sessions remain available when a cached ChatGPT authorization
   request omits `offline_access`, matching the failure mode proven and repaired
-  in the owner's Timeweb MCP bridge.
+  in the owner's Timeweb MCP bridge. The adopted pattern is public-client DCR +
+  PKCE, persistent PostgreSQL grants, rotating refresh tokens, refresh-family
+  revocation on replay, exact audience/resource binding and auditable refresh
+  outcomes; no Recruiter Radar domain or storage code is shared.
+- Canonical RAG documents preserve multiple source aliases and deduplicate by
+  Project/content hash. Chunks support optional 1536-dimensional embeddings,
+  a partial cosine HNSW index and bounded project-filtered retrieval with
+  iterative scan enabled for filtered approximate search.
 
 The server does not read Chat output from the DOM and does not treat a visible
 Chat response as completion evidence.
@@ -109,8 +116,9 @@ the web resource server.
 
 - Deploy the implemented authorization server behind the production HTTPS
   endpoint and verify its public discovery/JWKS/DCR contract.
-- Implement the canonical Memory/RAG/Artifact stores so those currently
-  unavailable pull classes can return provenance-aware content.
+- Connect ingestion/chunking and an embedding adapter to the canonical RAG
+  write store; the schema, idempotent store, retrieval and lazy pull path are
+  implemented, but automated document ingestion is not yet activated.
 - Run the host-local launcher against an owner-authenticated dedicated profile
   and record a real browser-submission receipt. The queue, driver and receipt
   path are implemented but still require this live E2E.

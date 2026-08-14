@@ -6,6 +6,7 @@ import {
   ContextItemIdSchema,
   ContextPackIdSchema,
   DocumentChunkIdSchema,
+  DocumentIdSchema,
   EventIdSchema,
   ExecutionRouteSchema,
   MessageIdSchema,
@@ -20,6 +21,92 @@ import { TaskIntentSchema } from "./workflow.js";
 
 const ContentHashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const BoundedLineSchema = z.string().trim().min(1).max(4_000);
+const hasNoControlCharacters = (value: string) =>
+  [...value].every((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint > 31 && codePoint !== 127;
+  });
+const EmbeddingSchema = z
+  .array(z.number().finite())
+  .length(1536)
+  .refine((embedding) => embedding.some((value) => value !== 0), "Embedding must be nonzero");
+
+export const RagDocumentSourceSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.enum(["PROJECT_FILE", "UPLOAD", "ARTIFACT"]),
+    ref: z.string().trim().min(1).max(2_048).refine(hasNoControlCharacters),
+    observedAt: TimestampSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("URL"),
+    ref: z
+      .string()
+      .url()
+      .max(2_048)
+      .regex(/^https:\/\/[^\s/@]+(?:[/:?#]|$)/)
+      .refine((value) => !/^https:\/\/[^/\s]+@/.test(value)),
+    observedAt: TimestampSchema,
+  }),
+]);
+export type RagDocumentSource = z.infer<typeof RagDocumentSourceSchema>;
+
+export const RagDocumentIngestSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  id: DocumentIdSchema,
+  projectId: ProjectIdSchema,
+  title: z.string().trim().min(1).max(500),
+  contentHash: ContentHashSchema,
+  mimeType: z
+    .string()
+    .regex(/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/)
+    .max(200),
+  byteSize: z.number().int().positive().max(1_000_000_000),
+  source: RagDocumentSourceSchema,
+  createdAt: TimestampSchema,
+});
+export type RagDocumentIngest = z.infer<typeof RagDocumentIngestSchema>;
+
+export const RagDocumentChunkWriteSchema = z
+  .strictObject({
+    schemaVersion: z.literal(1),
+    id: DocumentChunkIdSchema,
+    documentId: DocumentIdSchema,
+    projectId: ProjectIdSchema,
+    ordinal: z.number().int().min(0).max(1_000_000),
+    content: z.string().trim().min(1).max(200_000),
+    contentHash: ContentHashSchema,
+    estimatedTokens: z.number().int().positive().max(100_000),
+    embeddingModel: z.string().trim().min(1).max(200).optional(),
+    embedding: EmbeddingSchema.optional(),
+    createdAt: TimestampSchema,
+  })
+  .refine((value) => (value.embedding === undefined) === (value.embeddingModel === undefined), {
+    message: "Embedding and embedding model must be provided together",
+  });
+export type RagDocumentChunkWrite = z.infer<typeof RagDocumentChunkWriteSchema>;
+
+export const RagRetrievalRequestSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  projectId: ProjectIdSchema,
+  embedding: EmbeddingSchema,
+  maxItems: z.number().int().min(1).max(100),
+  maxDistance: z.number().min(0).max(2).optional(),
+});
+export type RagRetrievalRequest = z.infer<typeof RagRetrievalRequestSchema>;
+
+export const RagRetrievalResultSchema = z.strictObject({
+  chunkId: DocumentChunkIdSchema,
+  documentId: DocumentIdSchema,
+  projectId: ProjectIdSchema,
+  ordinal: z.number().int().nonnegative(),
+  content: z.string().min(1).max(200_000),
+  contentHash: ContentHashSchema,
+  estimatedTokens: z.number().int().positive().max(100_000),
+  embeddingModel: z.string().trim().min(1).max(200),
+  distance: z.number().min(0).max(2),
+  createdAt: TimestampSchema,
+});
+export type RagRetrievalResult = z.infer<typeof RagRetrievalResultSchema>;
 
 export const ContextTemperatureSchema = z.enum(["HOT", "WARM", "COLD"]);
 export type ContextTemperature = z.infer<typeof ContextTemperatureSchema>;

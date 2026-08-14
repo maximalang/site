@@ -11,6 +11,10 @@ const ids = {
   route: "route_77777777-7777-7777-7777-777777777777",
   pull: "resource_pull_88888888-8888-8888-8888-888888888888",
   skill: "skill_99999999-9999-9999-9999-999999999999",
+  context: "context_item_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  document: "document_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  chunk: "document_chunk_cccccccc-cccc-cccc-cccc-cccccccccccc",
+  artifact: "artifact_dddddddd-dddd-dddd-dddd-dddddddddddd",
 };
 
 const occurredAt = "2026-08-14T19:00:00.000Z";
@@ -73,6 +77,51 @@ function harness(scopeOverride: Partial<typeof scope> = {}) {
         ],
         rowCount: 1,
       };
+    if (sql.includes("FROM agent_world.context_items"))
+      return {
+        rows: [
+          {
+            id: ids.context,
+            kind: "MEMORY",
+            temperature: "WARM",
+            content: "Canonical memory",
+            summary: null,
+            importance: 0.9,
+            created_at: occurredAt,
+          },
+        ],
+        rowCount: 1,
+      };
+    if (sql.includes("FROM agent_world.rag_document_chunks"))
+      return {
+        rows: [
+          {
+            id: ids.chunk,
+            document_id: ids.document,
+            ordinal: 0,
+            content: "Canonical RAG evidence",
+            title: "Architecture",
+            created_at: occurredAt,
+          },
+        ],
+        rowCount: 1,
+      };
+    if (sql.includes("FROM agent_world.artifacts"))
+      return {
+        rows: [
+          {
+            id: ids.artifact,
+            run_id: ids.run,
+            label: "Verifier",
+            content_sha256: "c".repeat(64),
+            media_type: "application/json",
+            storage_ref: "artifacts/verifier.json",
+            byte_size: "120",
+            created_at: occurredAt,
+          },
+        ],
+        rowCount: 1,
+      };
     if (sql.includes("INSERT INTO agent_world.native_chat_resource_pulls"))
       return { rows: [], rowCount: 1 };
     throw new Error(`Unexpected query: ${sql}`);
@@ -94,7 +143,15 @@ describe("PostgresNativeChatResourceReader", () => {
     const response = await reader.pull(ids.account, {
       schemaVersion: 1,
       runId: ids.run,
-      resources: ["TASK", "PROJECT_STATE", "SKILLS", "ACTION_HISTORY", "MEMORY"],
+      resources: [
+        "TASK",
+        "PROJECT_STATE",
+        "SKILLS",
+        "ACTION_HISTORY",
+        "MEMORY",
+        "RAG",
+        "ARTIFACTS",
+      ],
       maxItems: 10,
       maxTokens: 4_000,
     });
@@ -103,15 +160,18 @@ describe("PostgresNativeChatResourceReader", () => {
       "PROJECT_STATE",
       "SKILLS",
       "ACTION_HISTORY",
+      "MEMORY",
+      "RAG",
+      "ARTIFACTS",
     ]);
     expect(response.items.every((item) => item.contentSha256.length === 64)).toBe(true);
-    expect(response.omissions).toContainEqual({ resource: "MEMORY", reason: "UNAVAILABLE" });
+    expect(response.omissions).toEqual([]);
     expect(response.estimatedTokens).toBeLessThanOrEqual(response.maxTokens);
     const insert = query.mock.calls.find(([sql]) =>
       String(sql).includes("native_chat_resource_pulls"),
     );
     expect(insert?.[1]).toEqual(
-      expect.arrayContaining([ids.pull, ids.run, ids.account, 10, 4_000, 4]),
+      expect.arrayContaining([ids.pull, ids.run, ids.account, 10, 4_000, 7]),
     );
   });
 

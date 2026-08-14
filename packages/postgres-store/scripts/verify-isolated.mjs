@@ -34,6 +34,7 @@ import {
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
+  PostgresSharedContextStore,
   PostgresWorldProjectionStore,
 } from "../dist/index.js";
 
@@ -470,6 +471,115 @@ try {
     "protocol-project",
     "Protocol project",
   ]);
+  const contextIds = {
+    otherProject: "project_56565656-5656-5656-5656-565656565656",
+    document: "document_57575757-5757-5757-5757-575757575757",
+    duplicateDocument: "document_58585858-5858-5858-5858-585858585858",
+    otherDocument: "document_59595959-5959-5959-5959-595959595959",
+    chunk: "document_chunk_60606060-6060-6060-6060-606060606060",
+    duplicateChunk: "document_chunk_61616161-6161-6161-6161-616161616161",
+    otherChunk: "document_chunk_62626262-6262-6262-6262-626262626262",
+  };
+  await pool.query("INSERT INTO agent_world.projects (id, slug, name) VALUES ($1, $2, $3)", [
+    contextIds.otherProject,
+    "isolated-other-project",
+    "Isolated other project",
+  ]);
+  const contextStore = new PostgresSharedContextStore(pool);
+  const contextTimestamp = "2026-08-13T08:30:00.000Z";
+  const vectorA = Array.from({ length: 1536 }, (_, index) => (index === 0 ? 1 : 0));
+  const vectorB = Array.from({ length: 1536 }, (_, index) => (index === 1 ? 1 : 0));
+  const documentReceipt = await contextStore.ingestDocument({
+    schemaVersion: 1,
+    id: contextIds.document,
+    projectId: ids.project,
+    title: "Canonical project evidence",
+    contentHash: "d".repeat(64),
+    mimeType: "text/markdown",
+    byteSize: 128,
+    source: { kind: "PROJECT_FILE", ref: "docs/evidence.md", observedAt: contextTimestamp },
+    createdAt: contextTimestamp,
+  });
+  const duplicateDocumentReceipt = await contextStore.ingestDocument({
+    schemaVersion: 1,
+    id: contextIds.duplicateDocument,
+    projectId: ids.project,
+    title: "Canonical project evidence duplicate",
+    contentHash: "d".repeat(64),
+    mimeType: "text/markdown",
+    byteSize: 128,
+    source: { kind: "UPLOAD", ref: "evidence.md", observedAt: contextTimestamp },
+    createdAt: contextTimestamp,
+  });
+  await contextStore.ingestDocument({
+    schemaVersion: 1,
+    id: contextIds.otherDocument,
+    projectId: contextIds.otherProject,
+    title: "Other project evidence",
+    contentHash: "e".repeat(64),
+    mimeType: "text/plain",
+    byteSize: 64,
+    source: { kind: "UPLOAD", ref: "other.txt", observedAt: contextTimestamp },
+    createdAt: contextTimestamp,
+  });
+  const chunkReceipt = await contextStore.writeChunk({
+    schemaVersion: 1,
+    id: contextIds.chunk,
+    documentId: contextIds.document,
+    projectId: ids.project,
+    ordinal: 0,
+    content: "PostgreSQL is canonical.",
+    contentHash: "f".repeat(64),
+    estimatedTokens: 6,
+    embeddingModel: "isolated-1536",
+    embedding: vectorA,
+    createdAt: contextTimestamp,
+  });
+  const duplicateChunkReceipt = await contextStore.writeChunk({
+    schemaVersion: 1,
+    id: contextIds.duplicateChunk,
+    documentId: contextIds.document,
+    projectId: ids.project,
+    ordinal: 1,
+    content: "PostgreSQL is canonical.",
+    contentHash: "f".repeat(64),
+    estimatedTokens: 6,
+    embeddingModel: "isolated-1536",
+    embedding: vectorA,
+    createdAt: contextTimestamp,
+  });
+  await contextStore.writeChunk({
+    schemaVersion: 1,
+    id: contextIds.otherChunk,
+    documentId: contextIds.otherDocument,
+    projectId: contextIds.otherProject,
+    ordinal: 0,
+    content: "This closer evidence belongs to another project.",
+    contentHash: "0".repeat(64),
+    estimatedTokens: 10,
+    embeddingModel: "isolated-1536",
+    embedding: vectorB,
+    createdAt: contextTimestamp,
+  });
+  const retrievedContext = await contextStore.retrieve({
+    schemaVersion: 1,
+    projectId: ids.project,
+    embedding: vectorB,
+    maxItems: 5,
+  });
+  if (
+    documentReceipt.outcome !== "CREATED" ||
+    duplicateDocumentReceipt.outcome !== "DEDUPLICATED" ||
+    duplicateDocumentReceipt.documentId !== contextIds.document ||
+    chunkReceipt.outcome !== "CREATED" ||
+    duplicateChunkReceipt.outcome !== "DEDUPLICATED" ||
+    duplicateChunkReceipt.chunkId !== contextIds.chunk ||
+    retrievedContext.length !== 1 ||
+    retrievedContext[0]?.projectId !== ids.project ||
+    retrievedContext[0]?.chunkId !== contextIds.chunk
+  ) {
+    throw new Error("Shared context idempotency, retrieval, or project isolation drifted");
+  }
   await pool.query(
     `INSERT INTO agent_world.agents
        (id, slug, display_name, role, instructions)
@@ -1958,6 +2068,33 @@ try {
     payload: { statement: "PostgreSQL is canonical.", confidence: 1 },
   };
   await nativeChatStore.append(codex.account, findingEvent);
+  await pool.query(
+    `INSERT INTO agent_world.artifacts
+       (id, project_id, run_id, label, content_sha256, media_type, storage_ref, byte_size, created_at)
+     VALUES ($1, $2, $3, 'Native Chat verifier', $4, 'application/json',
+             'artifacts/native-chat-verifier.json', 128, $5)`,
+    [
+      "artifact_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
+      ids.project,
+      nativeChat.run,
+      "6".repeat(64),
+      "2026-08-13T13:01:02.100Z",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.context_items
+       (id, project_id, kind, temperature, content, summary, content_sha256,
+        estimated_tokens, importance, provenance_kind, run_id, created_at)
+     VALUES ($1, $2, 'MEMORY', 'WARM', 'Native Chat commits through canonical events.',
+             'Canonical Native Chat memory.', $3, 9, 0.95, 'RUN', $4, $5)`,
+    [
+      "context_item_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
+      ids.project,
+      "7".repeat(64),
+      nativeChat.run,
+      "2026-08-13T13:01:02.200Z",
+    ],
+  );
   const nativeChatResourceReader = new PostgresNativeChatResourceReader(pool, {
     pullId: () => "resource_pull_c7c7c7c7-c7c7-c7c7-c7c7-c7c7c7c7c7c7",
     now: () => new Date("2026-08-13T13:01:03.000Z"),
@@ -1965,17 +2102,18 @@ try {
   const nativeChatPull = await nativeChatResourceReader.pull(codex.account, {
     schemaVersion: 1,
     runId: nativeChat.run,
-    resources: ["TASK", "PROJECT_STATE", "ACTION_HISTORY", "MEMORY"],
+    resources: ["TASK", "PROJECT_STATE", "ACTION_HISTORY", "MEMORY", "RAG", "SKILLS", "ARTIFACTS"],
     maxItems: 10,
     maxTokens: 2_000,
   });
   if (
-    nativeChatPull.items.length !== 4 ||
-    nativeChatPull.omissions.length !== 1 ||
-    nativeChatPull.omissions[0]?.resource !== "MEMORY" ||
-    nativeChatPull.omissions[0]?.reason !== "UNAVAILABLE"
+    nativeChatPull.items.length !== 8 ||
+    nativeChatPull.omissions.length !== 0 ||
+    new Set(nativeChatPull.items.map((item) => item.resource)).size !== 7
   ) {
-    throw new Error("Native Chat lazy pull did not return exact bounded canonical resources");
+    throw new Error(
+      `Native Chat lazy pull did not return exact bounded canonical resources: ${JSON.stringify(nativeChatPull)}`,
+    );
   }
   await expectRejected(
     nativeChatResourceReader.pull(legacy.account, {
@@ -2052,7 +2190,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 7, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
