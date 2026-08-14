@@ -24,6 +24,9 @@ export const DocumentChunkIdSchema = canonicalId("document_chunk", "DocumentChun
 export const EventIdSchema = canonicalId("event", "EventId");
 export const HubCommandIdSchema = canonicalId("hub_command", "HubCommandId");
 export const LauncherIdSchema = canonicalId("launcher", "LauncherId");
+export const MissionIdSchema = canonicalId("mission", "MissionId");
+export const MissionCriterionIdSchema = canonicalId("mission_criterion", "MissionCriterionId");
+export const AgentTemplateIdSchema = canonicalId("agent_template", "AgentTemplateId");
 export const MessageIdSchema = canonicalId("message", "MessageId");
 export const MemoryDecisionIdSchema = canonicalId("memory_decision", "MemoryDecisionId");
 export const MemoryProposalIdSchema = canonicalId("memory_proposal", "MemoryProposalId");
@@ -53,6 +56,9 @@ export type DocumentChunkId = z.infer<typeof DocumentChunkIdSchema>;
 export type EventId = z.infer<typeof EventIdSchema>;
 export type HubCommandId = z.infer<typeof HubCommandIdSchema>;
 export type LauncherId = z.infer<typeof LauncherIdSchema>;
+export type MissionId = z.infer<typeof MissionIdSchema>;
+export type MissionCriterionId = z.infer<typeof MissionCriterionIdSchema>;
+export type AgentTemplateId = z.infer<typeof AgentTemplateIdSchema>;
 export type MessageId = z.infer<typeof MessageIdSchema>;
 export type MemoryDecisionId = z.infer<typeof MemoryDecisionIdSchema>;
 export type MemoryProposalId = z.infer<typeof MemoryProposalIdSchema>;
@@ -80,20 +86,31 @@ export const ExecutionAdapterKindSchema = z.enum([
 ]);
 export type ExecutionAdapterKind = z.infer<typeof ExecutionAdapterKindSchema>;
 
-export const AgentSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  id: AgentIdSchema,
-  slug: z
-    .string()
-    .min(1)
-    .max(63)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  displayName: z.string().trim().min(1).max(100),
-  role: z.string().trim().min(1).max(160),
-  instructions: z.string().trim().min(1).max(32_000),
-  preferredRouteId: RouteIdSchema.optional(),
-  isEnabled: z.boolean(),
-});
+export const AgentSchema = z
+  .strictObject({
+    schemaVersion: z.literal(1),
+    id: AgentIdSchema,
+    slug: z
+      .string()
+      .min(1)
+      .max(63)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    displayName: z.string().trim().min(1).max(100),
+    role: z.string().trim().min(1).max(160),
+    instructions: z.string().trim().min(1).max(32_000),
+    templateId: AgentTemplateIdSchema.optional(),
+    templateVersion: z.number().int().positive().max(1_000_000).optional(),
+    preferredRouteId: RouteIdSchema.optional(),
+    isEnabled: z.boolean(),
+  })
+  .superRefine((agent, context) => {
+    if ((agent.templateId === undefined) !== (agent.templateVersion === undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "Agent template ID and version must be set together",
+      });
+    }
+  });
 export type Agent = z.infer<typeof AgentSchema>;
 
 export const AccountRefSchema = z.strictObject({

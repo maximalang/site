@@ -90,7 +90,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
       `commit_result`/`fail` with no post-terminal writes.
 - [x] Keep CHAT experimental and non-selectable until implementation and live
       evidence exist; never label manual relay as the primary transport.
-- [ ] Define additive Mission, AgentTemplate/Instance and Resource Broker
+- [x] Define additive Mission, AgentTemplate/Instance and Resource Broker
       contracts without breaking existing Agent/Task records.
 
 ## Slice 2: Canonical event and Control API
