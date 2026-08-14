@@ -109,6 +109,7 @@ export function OpenClawOfficeWorld({
         <button
           aria-label={`${agent.displayName}: ${agent.statusLabel}. Открыть карточку агента`}
           className={`office-agent office-agent-${agent.visualStatus.toLowerCase()}${selectedAgentId === agent.agentId ? " is-selected" : ""}`}
+          data-action-cue={agent.actionCue}
           key={agent.agentId}
           onClick={() => onSelectAgent(agent.agentId)}
           onDoubleClick={() => onOpenConversation(agent.agentId)}

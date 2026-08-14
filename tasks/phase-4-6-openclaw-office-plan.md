@@ -39,18 +39,22 @@ presentation port while preserving the existing PostgreSQL, Event Stream,
 
 - [x] Keep Memory, Models, Accounts, MCP, Servers, Codex and Settings in native
       panels/drawers/terminals above World, not spatial rooms.
-- [ ] Drive work, handoff, review and structured-meeting cues only from
+- [x] Drive work, handoff, review and structured-meeting cues only from
       canonical events; define truthful fallback when an event type is not yet
       available.
-- [ ] Ensure animation state cannot invoke commands or mutate canonical state.
+- [x] Ensure animation state cannot invoke commands or mutate canonical state.
+
+The truthful fallback for handoff or meeting activity without a canonical World
+event is `NONE`: the renderer shows no action cue. `WORK` and `REVIEW` are pure
+status-derived presentation values; neither can dispatch a command.
 
 ## Slice 4: Parity, cleanup and release evidence
 
 - [x] Verify desktop and authenticated mobile layouts, keyboard selection,
       reduced motion, touch targets and screen-reader alternative list.
-- [ ] Verify restart/replay produces the same semantic Agent/status/Task state;
+- [x] Verify restart/replay produces the same semantic Agent/status/Task state;
       pixel positions may animate but cannot change truth.
 - [x] Remove the Agent Town port and notice only after parity passes; add the
       OpenClaw Office MIT text and pinned SHA to shipped notices/SBOM.
-- [ ] Run unit, type, lint, build, browser and isolated runtime gates before the
+- [x] Run unit, type, lint, build, browser and isolated runtime gates before the
       renderer becomes the production default.

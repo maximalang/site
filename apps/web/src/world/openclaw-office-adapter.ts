@@ -16,6 +16,7 @@ export type OfficeVisualStatus =
   | "BLOCKED"
   | "ERROR"
   | "OFFLINE";
+export type OfficeActionCue = "NONE" | "WORK" | "REVIEW";
 
 export type OfficeSkinZone = {
   id: OfficeZone;
@@ -51,6 +52,7 @@ export type OfficePresentationAgent = {
   role: string;
   isEnabled: boolean;
   visualStatus: OfficeVisualStatus;
+  actionCue: OfficeActionCue;
   statusLabel: string;
   zone: OfficeZone;
   x: number;
@@ -72,19 +74,35 @@ export type OfficePresentationModel = {
 
 const STATUS_PRESENTATION: Record<
   AgentProjectionCore["status"],
-  { visualStatus: OfficeVisualStatus; zone: OfficeZone; label: string }
+  {
+    visualStatus: OfficeVisualStatus;
+    actionCue: OfficeActionCue;
+    zone: OfficeZone;
+    label: string;
+  }
 > = {
-  IDLE: { visualStatus: "IDLE", zone: "COMMONS", label: "Свободен" },
-  QUEUED: { visualStatus: "QUEUED", zone: "FOCUS", label: "В очереди" },
-  RUNNING: { visualStatus: "WORKING", zone: "FOCUS", label: "Работает" },
+  IDLE: { visualStatus: "IDLE", actionCue: "NONE", zone: "COMMONS", label: "Свободен" },
+  QUEUED: { visualStatus: "QUEUED", actionCue: "NONE", zone: "FOCUS", label: "В очереди" },
+  RUNNING: { visualStatus: "WORKING", actionCue: "WORK", zone: "FOCUS", label: "Работает" },
   WAITING_APPROVAL: {
     visualStatus: "REVIEWING",
+    actionCue: "REVIEW",
     zone: "REVIEW_OPS",
     label: "Ждёт решения",
   },
-  BLOCKED: { visualStatus: "BLOCKED", zone: "REVIEW_OPS", label: "Заблокирован" },
-  FAILED: { visualStatus: "ERROR", zone: "REVIEW_OPS", label: "Ошибка" },
-  OFFLINE: { visualStatus: "OFFLINE", zone: "COMMONS", label: "Не в сети" },
+  BLOCKED: {
+    visualStatus: "BLOCKED",
+    actionCue: "NONE",
+    zone: "REVIEW_OPS",
+    label: "Заблокирован",
+  },
+  FAILED: { visualStatus: "ERROR", actionCue: "NONE", zone: "REVIEW_OPS", label: "Ошибка" },
+  OFFLINE: {
+    visualStatus: "OFFLINE",
+    actionCue: "NONE",
+    zone: "COMMONS",
+    label: "Не в сети",
+  },
 };
 
 function validateSkin(skin: OfficeSkin): Map<OfficeZone, OfficeSkinZone> {
@@ -157,6 +175,7 @@ export function createOfficePresentation(
         role: agent.core.role,
         isEnabled: agent.core.isEnabled,
         visualStatus: presentation.visualStatus,
+        actionCue: presentation.actionCue,
         statusLabel: presentation.label,
         zone: presentation.zone,
         x: position.x,

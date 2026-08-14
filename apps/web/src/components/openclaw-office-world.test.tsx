@@ -47,4 +47,22 @@ describe("OpenClaw Office World presentation", () => {
     expect(onSelectAgent).toHaveBeenCalledWith(first.core.agentId);
     expect(onOpenConversation).toHaveBeenCalledWith(first.core.agentId);
   });
+
+  it("renders only canonical action cues and keeps them inert", () => {
+    const world = projectWorldView(buildContractFixture());
+    const { container } = render(
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+      />,
+    );
+    const cues = [...container.querySelectorAll("[data-action-cue]")].map((element) =>
+      element.getAttribute("data-action-cue"),
+    );
+    expect(cues.every((cue) => ["NONE", "WORK", "REVIEW"].includes(cue ?? ""))).toBe(true);
+    expect(container.querySelector("[data-action-cue='HANDOFF']")).toBeNull();
+    expect(container.querySelector("[data-action-cue='MEETING']")).toBeNull();
+  });
 });

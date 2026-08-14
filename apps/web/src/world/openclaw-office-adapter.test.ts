@@ -34,21 +34,23 @@ describe("OpenClaw Office presentation adapter", () => {
     if (!fixtureAgent) return;
 
     const cases = [
-      ["IDLE", "IDLE", "COMMONS"],
-      ["OFFLINE", "OFFLINE", "COMMONS"],
-      ["QUEUED", "QUEUED", "FOCUS"],
-      ["RUNNING", "WORKING", "FOCUS"],
-      ["WAITING_APPROVAL", "REVIEWING", "REVIEW_OPS"],
-      ["BLOCKED", "BLOCKED", "REVIEW_OPS"],
-      ["FAILED", "ERROR", "REVIEW_OPS"],
+      ["IDLE", "IDLE", "COMMONS", "NONE"],
+      ["OFFLINE", "OFFLINE", "COMMONS", "NONE"],
+      ["QUEUED", "QUEUED", "FOCUS", "NONE"],
+      ["RUNNING", "WORKING", "FOCUS", "WORK"],
+      ["WAITING_APPROVAL", "REVIEWING", "REVIEW_OPS", "REVIEW"],
+      ["BLOCKED", "BLOCKED", "REVIEW_OPS", "NONE"],
+      ["FAILED", "ERROR", "REVIEW_OPS", "NONE"],
     ] as const;
 
-    for (const [status, visualStatus, zone] of cases) {
+    for (const [status, visualStatus, zone, actionCue] of cases) {
       const presentation = createOfficePresentation(
         { ...world, agents: [{ ...fixtureAgent, core: { ...fixtureAgent.core, status } }] },
         DEFAULT_OFFICE_SKIN,
       );
-      expect(presentation.agents[0]).toEqual(expect.objectContaining({ visualStatus, zone }));
+      expect(presentation.agents[0]).toEqual(
+        expect.objectContaining({ visualStatus, zone, actionCue }),
+      );
     }
 
     expect(DEFAULT_OFFICE_SKIN.zones).toHaveLength(4);
@@ -73,15 +75,17 @@ describe("OpenClaw Office presentation adapter", () => {
 
     expect(roomyView.skinId).toBe("roomy-test");
     expect(
-      roomyView.agents.map(({ agentId, visualStatus, zone }) => ({
+      roomyView.agents.map(({ agentId, visualStatus, actionCue, zone }) => ({
         agentId,
         visualStatus,
+        actionCue,
         zone,
       })),
     ).toEqual(
-      defaultView.agents.map(({ agentId, visualStatus, zone }) => ({
+      defaultView.agents.map(({ agentId, visualStatus, actionCue, zone }) => ({
         agentId,
         visualStatus,
+        actionCue,
         zone,
       })),
     );
