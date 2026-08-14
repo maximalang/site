@@ -104,7 +104,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
       and the cached-request-without-`offline_access` compatibility path.
 - [x] Update Task/Run, Action Graph, World projections and Memory Inbox from the
       same committed transaction/outbox boundary.
-- [ ] Reconcile restart, late/duplicate calls, missing commit and expired
+- [x] Reconcile restart, late/duplicate calls, missing commit and expired
       capabilities deterministically.
 
 ## Slice 3: Plus launcher and MCP/App adapter

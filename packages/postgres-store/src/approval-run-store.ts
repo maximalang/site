@@ -402,8 +402,9 @@ export class PostgresApprovalRunStore {
           );
           await client.query(
             `INSERT INTO agent_world.native_chat_dispatches
-               (id, run_id, task_id, agent_id, account_id, route_id, state, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, 'QUEUED', $7)`,
+               (id, run_id, task_id, agent_id, account_id, route_id, state,
+                created_at, begin_deadline_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 'QUEUED', $7, $8)`,
             [
               ChatDispatchIdSchema.parse(`chat_dispatch_${decision.taskId.slice("task_".length)}`),
               run.id,
@@ -412,6 +413,7 @@ export class PostgresApprovalRunStore {
               run.accountId,
               run.routeId,
               run.createdAt,
+              new Date(Date.parse(run.createdAt) + 30 * 60_000).toISOString(),
             ],
           );
         } else {

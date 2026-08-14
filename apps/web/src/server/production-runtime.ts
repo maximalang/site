@@ -44,6 +44,7 @@ import { ModelRouteCheckResponseSchema } from "@agent-world/read-model";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
 import { MemoryProjectionSupervisor } from "./memory-projection-supervisor";
+import { NativeChatReconciliationSupervisor } from "./native-chat-reconciliation-supervisor";
 import { OwnerSessionManager } from "./owner-session";
 import { TaskRunSupervisor } from "./task-run-supervisor";
 
@@ -178,6 +179,7 @@ export async function createProductionRuntime(
   let writeAdapter: OpenClawWriteAdapter | undefined;
   let taskRunSupervisor: TaskRunSupervisor | undefined;
   let memoryProjectionSupervisor: MemoryProjectionSupervisor | undefined;
+  let nativeChatReconciliationSupervisor: NativeChatReconciliationSupervisor | undefined;
   try {
     const migrationClient = await pool.connect();
     try {
@@ -304,6 +306,11 @@ export async function createProductionRuntime(
       memoryProposalId: () => `memory_proposal_${randomUUID()}`,
       memoryEventId: () => `event_${randomUUID()}`,
     });
+    nativeChatReconciliationSupervisor = new NativeChatReconciliationSupervisor({
+      store: nativeChatControlStore,
+      record: (event) => record("native-chat-reconciliation-supervisor", event),
+    });
+    nativeChatReconciliationSupervisor.start();
     const nativeChatLaunchStore = new PostgresNativeChatLaunchStore(pool);
     const nativeChatResourceReader = new PostgresNativeChatResourceReader(pool, {
       pullId: () => `resource_pull_${randomUUID()}`,
@@ -489,6 +496,7 @@ export async function createProductionRuntime(
       stop: async () => {
         await taskRunSupervisor?.stop();
         await memoryProjectionSupervisor?.stop();
+        await nativeChatReconciliationSupervisor?.stop();
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
         await pool.end();
       },
@@ -496,6 +504,7 @@ export async function createProductionRuntime(
   } catch (error) {
     await taskRunSupervisor?.stop();
     await memoryProjectionSupervisor?.stop();
+    await nativeChatReconciliationSupervisor?.stop();
     await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
     await pool.end().catch(() => undefined);
     throw error;

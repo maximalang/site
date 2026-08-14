@@ -144,7 +144,7 @@ export const NativeChatDispatchSchema = z
         message: "Attached dispatch requires submit and attach evidence",
       });
     }
-    if (dispatch.state === "FAILED" && (!dispatch.failedAt || !dispatch.failureCode || attached)) {
+    if (dispatch.state === "FAILED" && (!dispatch.failedAt || !dispatch.failureCode)) {
       context.addIssue({
         code: "custom",
         message: "Failed dispatch requires bounded failure evidence",
@@ -315,7 +315,11 @@ export function applyNativeChatControlEvent(
   }
   if (event.sequence !== state.lastSequence + 1)
     throw new Error("Control event sequence is not contiguous");
-  if (state.status === "AWAITING_BEGIN" && event.eventType !== "BEGIN_RUN") {
+  if (
+    state.status === "AWAITING_BEGIN" &&
+    event.eventType !== "BEGIN_RUN" &&
+    event.eventType !== "FAIL"
+  ) {
     throw new Error("begin_run is required before other Control events");
   }
   if (state.status === "RUNNING" && event.eventType === "BEGIN_RUN") {

@@ -39,6 +39,11 @@ structured results and canonical Control events.
   versioned SHA-256 receipt, while duplicate or expired claims fail closed.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
+- Every dispatch persists a 30-minute attach deadline and, after `begin_run`, a
+  four-hour completion deadline. A restart-safe supervisor reconciles missing
+  begin/commit and terminal launcher failures into one idempotent `FAIL` Control
+  event, failed Run and failed World projection. Calls arriving at or after the
+  deadline fail closed; exact replays remain deterministic.
 - The same `commit_result` transaction materializes an `AGENT_RESULT` shared
   context item, creates provenance-linked pending Memory Inbox proposals for
   declared memory candidates, appends their replayable memory events, completes

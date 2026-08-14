@@ -214,4 +214,24 @@ describe("Native Plus Chat contracts", () => {
     });
     expect(() => applyNativeChatControlEvent(state, skipped)).toThrow(/sequence/i);
   });
+
+  it("allows a terminal system failure when begin_run never arrives", () => {
+    expect(
+      applyNativeChatControlEvent(
+        initialNativeChatRunControlState(ids.run),
+        NativeChatControlEventInputSchema.parse({
+          schemaVersion: 1,
+          runId: ids.run,
+          sequence: 1,
+          idempotencyKey: "native-chat:begin-timeout:1",
+          eventType: "FAIL",
+          payload: {
+            failureCode: "NATIVE_CHAT_BEGIN_TIMEOUT",
+            message: "Native Chat did not attach before its canonical deadline.",
+            retryable: true,
+          },
+        }),
+      ),
+    ).toEqual({ runId: ids.run, status: "FAILED", lastSequence: 1 });
+  });
 });

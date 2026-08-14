@@ -28,6 +28,8 @@ const dispatchRow = {
   attached_at: null,
   failed_at: null,
   failure_code: null,
+  begin_deadline_at: "2026-08-14T10:30:00.000Z",
+  completion_deadline_at: null,
   run_status: "DISPATCH_PENDING",
   adapter_kind: "NATIVE_CHATGPT",
   run_created_at: "2026-08-14T10:00:00.000Z",
@@ -151,6 +153,26 @@ describe("PostgresNativeChatControlStore", () => {
         payload: { progress: "Too late" },
       }),
     ).rejects.toEqual(new NativeChatControlStoreError("RUN_TERMINAL"));
+
+    const expired = pool([
+      [],
+      [],
+      [],
+      [{ ...dispatchRow, begin_deadline_at: "2026-08-14T10:01:00.000Z" }],
+      [],
+    ]);
+    await expect(
+      new PostgresNativeChatControlStore(expired.value, {
+        now: () => new Date("2026-08-14T10:02:00.000Z"),
+      }).append(ids.account, {
+        schemaVersion: 1,
+        runId: ids.run,
+        sequence: 1,
+        idempotencyKey: "chat:expired:1",
+        eventType: "BEGIN_RUN",
+        payload: {},
+      }),
+    ).rejects.toEqual(new NativeChatControlStoreError("CAPABILITY_EXPIRED"));
   });
 
   it("materializes the committed result and Memory Inbox proposals in the same transaction", async () => {
@@ -219,5 +241,52 @@ describe("PostgresNativeChatControlStore", () => {
       ]),
     );
     expect(query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
+  it("reconciles a missing begin into one canonical terminal event", async () => {
+    const expired = {
+      ...dispatchRow,
+      begin_deadline_at: "2026-08-14T10:05:00.000Z",
+    };
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("SELECT d.run_id, d.account_id, d.state")) {
+        return {
+          rows: [
+            {
+              run_id: ids.run,
+              account_id: ids.account,
+              state: "BROWSER_SUBMITTED",
+              last_sequence: 0,
+            },
+          ],
+        };
+      }
+      if (sql.includes("FROM agent_world.native_chat_control_events")) return { rows: [] };
+      if (sql.includes("SELECT d.id, d.run_id")) return { rows: [expired] };
+      if (sql.includes("UPDATE agent_world.world_event_stream")) {
+        return { rows: [{ last_sequence: "14" }] };
+      }
+      return { rows: [] };
+    });
+    const transactionPool = {
+      connect: vi.fn(async () => ({ query, release: vi.fn() })),
+    } as unknown as TransactionPool;
+
+    await expect(
+      new PostgresNativeChatControlStore(transactionPool, {
+        eventId: () => "event_77777777-7777-7777-7777-777777777777",
+        now: () => new Date("2026-08-14T10:06:00.000Z"),
+      }).reconcileExpired(10),
+    ).resolves.toMatchObject({ candidates: 1, reconciled: 1, raced: 0 });
+
+    const statements = query.mock.calls.map(([sql]) => String(sql));
+    expect(statements).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("native_chat_control_events"),
+        expect.stringContaining("GREATEST(attempt, 1)"),
+        expect.stringContaining("AGENT_STATUS_CHANGED"),
+      ]),
+    );
+    expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(1);
   });
 });

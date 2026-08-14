@@ -15,6 +15,7 @@ import {
   TimestampSchema,
 } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
+import * as z from "zod";
 import type { TransactionPool } from "./conversation-store.js";
 
 type ExistingEventRow = QueryResultRow & {
@@ -41,6 +42,8 @@ type ControlRow = QueryResultRow & {
   attached_at: Date | string | null;
   failed_at: Date | string | null;
   failure_code: string | null;
+  begin_deadline_at: Date | string;
+  completion_deadline_at: Date | string | null;
   run_status: string;
   adapter_kind: string;
   run_created_at: Date | string;
@@ -58,6 +61,7 @@ export type NativeChatControlStoreErrorCode =
   | "SEQUENCE_CONFLICT"
   | "IDEMPOTENCY_CONFLICT"
   | "RUN_TERMINAL"
+  | "CAPABILITY_EXPIRED"
   | "RUN_STATE_CONFLICT";
 
 export class NativeChatControlStoreError extends Error {
@@ -97,7 +101,8 @@ function stateFromRow(row: ControlRow): NativeChatRunControlState {
 
 const SELECT_CONTROL = `SELECT d.id, d.run_id, d.task_id, d.agent_id, d.account_id,
        d.route_id, d.state, d.last_sequence, d.created_at, d.submitted_at,
-       d.attached_at, d.failed_at, d.failure_code, r.status AS run_status,
+       d.attached_at, d.failed_at, d.failure_code, d.begin_deadline_at,
+       d.completion_deadline_at, r.status AS run_status,
        r.adapter_kind, r.created_at AS run_created_at, t.project_id
   FROM agent_world.native_chat_dispatches d
   JOIN agent_world.runs r ON r.id = d.run_id
@@ -145,6 +150,10 @@ export class PostgresNativeChatControlStore {
   }
 
   async append(accountIdInput: unknown, eventInput: unknown) {
+    return this.appendEvent(accountIdInput, eventInput, false);
+  }
+
+  private async appendEvent(accountIdInput: unknown, eventInput: unknown, allowExpired: boolean) {
     const accountId = AccountIdSchema.parse(accountIdInput);
     const event = NativeChatControlEventInputSchema.parse(eventInput);
     const eventHash = this.hashEvent(event);
@@ -183,7 +192,7 @@ export class PostgresNativeChatControlStore {
         throw new Error("Native Chat control cardinality is invalid");
       }
       const row = selected.rows[0];
-      this.assertAuthorizedState(accountId, event, row);
+      this.assertAuthorizedState(accountId, event, row, occurredAt, allowExpired);
       const current = stateFromRow(row);
       let next: NativeChatRunControlState;
       try {
@@ -212,9 +221,15 @@ export class PostgresNativeChatControlStore {
       if (event.eventType === "BEGIN_RUN") {
         await client.query(
           `UPDATE agent_world.native_chat_dispatches
-              SET state = 'ATTACHED', attached_at = $2, last_sequence = $3
+              SET state = 'ATTACHED', attached_at = $2, last_sequence = $3,
+                  completion_deadline_at = $4
             WHERE run_id = $1`,
-          [event.runId, occurredAt, event.sequence],
+          [
+            event.runId,
+            occurredAt,
+            event.sequence,
+            new Date(Date.parse(occurredAt) + 4 * 60 * 60_000).toISOString(),
+          ],
         );
         await client.query(
           `UPDATE agent_world.runs
@@ -244,12 +259,16 @@ export class PostgresNativeChatControlStore {
         await this.appendWorldStatus(client, row, "IDLE", event.idempotencyKey, occurredAt);
       } else if (event.eventType === "FAIL") {
         await client.query(
-          `UPDATE agent_world.native_chat_dispatches SET last_sequence = $2 WHERE run_id = $1`,
-          [event.runId, event.sequence],
+          `UPDATE agent_world.native_chat_dispatches
+              SET state = 'FAILED', last_sequence = $2, failed_at = $3, failure_code = $4,
+                  lease_owner = NULL, lease_expires_at = NULL
+            WHERE run_id = $1`,
+          [event.runId, event.sequence, occurredAt, event.payload.failureCode],
         );
         await client.query(
           `UPDATE agent_world.runs
-              SET status = 'FAILED', completed_at = $2, failure_code = $3
+              SET status = 'FAILED', attempt = GREATEST(attempt, 1),
+                  completed_at = $2, failure_code = $3
             WHERE id = $1`,
           [event.runId, occurredAt, event.payload.failureCode],
         );
@@ -273,6 +292,69 @@ export class PostgresNativeChatControlStore {
     } finally {
       client.release();
     }
+  }
+
+  async reconcileExpired(limitInput = 50) {
+    const limit = z.number().int().min(1).max(500).parse(limitInput);
+    const reconciledAt = TimestampSchema.parse(this.now().toISOString());
+    const client = await this.pool.connect();
+    let rows: Array<Pick<ControlRow, "run_id" | "account_id" | "state" | "last_sequence">>;
+    try {
+      const result = await client.query<ControlRow>(
+        `SELECT d.run_id, d.account_id, d.state, d.last_sequence
+           FROM agent_world.native_chat_dispatches d
+           JOIN agent_world.runs r ON r.id = d.run_id
+          WHERE r.status IN ('DISPATCH_PENDING', 'RUNNING')
+            AND (
+              (d.state IN ('QUEUED', 'BROWSER_SUBMITTED', 'FAILED')
+                AND (d.state = 'FAILED' OR d.begin_deadline_at <= $1))
+              OR
+              (d.state = 'ATTACHED' AND d.completion_deadline_at <= $1)
+            )
+          ORDER BY COALESCE(d.completion_deadline_at, d.begin_deadline_at), d.id
+          LIMIT $2`,
+        [reconciledAt, limit],
+      );
+      rows = result.rows;
+    } finally {
+      client.release();
+    }
+
+    let reconciled = 0;
+    let raced = 0;
+    for (const row of rows) {
+      const waitingForCommit = row.state === "ATTACHED";
+      const failureCode = waitingForCommit
+        ? "NATIVE_CHAT_COMMIT_TIMEOUT"
+        : row.state === "FAILED"
+          ? "NATIVE_CHAT_LAUNCH_FAILED"
+          : "NATIVE_CHAT_BEGIN_TIMEOUT";
+      try {
+        await this.appendEvent(
+          row.account_id,
+          {
+            schemaVersion: 1,
+            runId: row.run_id,
+            sequence: row.last_sequence + 1,
+            idempotencyKey: `native-chat:reconcile:${row.run_id.slice("run_".length)}`,
+            eventType: "FAIL",
+            payload: {
+              failureCode,
+              message: waitingForCommit
+                ? "Native Chat did not commit a result before its canonical deadline."
+                : "Native Chat did not attach before its canonical deadline.",
+              retryable: true,
+            },
+          },
+          true,
+        );
+        reconciled += 1;
+      } catch (error) {
+        if (isNativeChatControlStoreError(error)) raced += 1;
+        else throw error;
+      }
+    }
+    return { candidates: rows.length, reconciled, raced, reconciledAt };
   }
 
   private async materializeCommittedResult(
@@ -369,6 +451,8 @@ export class PostgresNativeChatControlStore {
     accountId: AccountId,
     event: NativeChatControlEventInput,
     row: ControlRow,
+    occurredAt: string,
+    allowExpired: boolean,
   ) {
     if (row.account_id !== accountId) throw new NativeChatControlStoreError("ACCOUNT_MISMATCH");
     if (row.adapter_kind !== "NATIVE_CHATGPT") {
@@ -384,7 +468,21 @@ export class PostgresNativeChatControlStore {
     if (event.eventType === "BEGIN_RUN" && row.state !== "BROWSER_SUBMITTED") {
       throw new NativeChatControlStoreError("DISPATCH_NOT_SUBMITTED");
     }
-    if (event.eventType !== "BEGIN_RUN" && row.run_status !== "RUNNING") {
+    if (
+      !allowExpired &&
+      ((event.eventType === "BEGIN_RUN" &&
+        Date.parse(occurredAt) >= Date.parse(String(row.begin_deadline_at))) ||
+        (row.run_status === "RUNNING" &&
+          row.completion_deadline_at !== null &&
+          Date.parse(occurredAt) >= Date.parse(String(row.completion_deadline_at))))
+    ) {
+      throw new NativeChatControlStoreError("CAPABILITY_EXPIRED");
+    }
+    if (
+      event.eventType !== "BEGIN_RUN" &&
+      !(event.eventType === "FAIL" && row.run_status === "DISPATCH_PENDING") &&
+      row.run_status !== "RUNNING"
+    ) {
       throw new NativeChatControlStoreError("BEGIN_REQUIRED");
     }
   }
