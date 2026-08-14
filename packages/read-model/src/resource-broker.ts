@@ -91,7 +91,7 @@ export const ResourceBrokerDecisionSchema = z.strictObject({
   schemaVersion: z.literal(1),
   policy: ResourceBrokerPolicySchema,
   decidedAt: TimestampSchema,
-  evaluations: z.array(ResourceBrokerEvaluationSchema).min(1).max(1_000),
+  evaluations: z.array(ResourceBrokerEvaluationSchema).max(1_000),
   selected: ResourceRouteCandidateSchema.optional(),
 });
 export type ResourceBrokerDecision = z.infer<typeof ResourceBrokerDecisionSchema>;
@@ -99,7 +99,7 @@ export type ResourceBrokerDecision = z.infer<typeof ResourceBrokerDecisionSchema
 const SelectionInputSchema = z.strictObject({
   policy: ResourceBrokerPolicySchema,
   now: TimestampSchema,
-  candidates: z.array(ResourceRouteCandidateSchema).min(1).max(1_000),
+  candidates: z.array(ResourceRouteCandidateSchema).max(1_000),
 });
 
 function roundedScore(

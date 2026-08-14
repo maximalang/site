@@ -11,6 +11,20 @@ const observedAt = "2026-08-14T10:00:00.000Z";
 const expiresAt = "2026-08-14T10:05:00.000Z";
 
 describe("selectResourceRoute", () => {
+  it("returns an explicit empty decision when no observed route is eligible", () => {
+    const decision = selectResourceRoute({
+      policy: {
+        version: "resource-broker-v1",
+        weights: { quality: 0.2, remainingLimits: 0.2, cost: 0.2, speed: 0.2, load: 0.2 },
+      },
+      now: "2026-08-14T10:01:00.000Z",
+      candidates: [],
+    });
+
+    expect(decision.evaluations).toEqual([]);
+    expect(decision.selected).toBeUndefined();
+  });
+
   it("selects by explicit normalized policy and records every scored input", () => {
     const decision = selectResourceRoute({
       policy: {

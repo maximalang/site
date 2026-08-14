@@ -28,6 +28,7 @@ import {
   PostgresNativeChatControlStore,
   PostgresNativeChatResourceReader,
   PostgresOwnerSessionStore,
+  PostgresResourceBrokerStore,
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
@@ -210,7 +211,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 18
+    ledger.rows.at(-1)?.version !== 19
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -1694,6 +1695,59 @@ try {
              'task:native-chat-control', $5)`,
     [nativeChat.task, nativeChat.conversation, ids.project, ids.agent, "2026-08-13T13:00:02.000Z"],
   );
+  const resourceBroker = new PostgresResourceBrokerStore(pool);
+  await resourceBroker.recordObservation({
+    routeId: nativeChat.route,
+    observedAt: "2026-08-13T13:00:02.100Z",
+    expiresAt: "2026-08-13T13:05:02.100Z",
+    isAvailable: true,
+    quality: 0.95,
+    remainingLimits: 0.8,
+    cost: 1,
+    speed: 0.7,
+    load: 0.9,
+    sourceKind: "AUTH",
+    sourceRef: "oauth-grant:native-chat-isolated",
+  });
+  const brokerRequest = {
+    decisionId: "broker_decision_c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0",
+    taskId: nativeChat.task,
+    policy: {
+      version: "resource-broker-v1",
+      weights: { quality: 0.4, remainingLimits: 0.3, cost: 0.1, speed: 0.1, load: 0.1 },
+    },
+    decidedAt: "2026-08-13T13:00:03.000Z",
+    allowedModes: ["CHAT"],
+  };
+  const brokerDecision = await resourceBroker.decide(brokerRequest);
+  const brokerReplay = await resourceBroker.decide(brokerRequest);
+  if (
+    brokerDecision.selected?.routeId !== nativeChat.route ||
+    brokerDecision.selected.accountId !== codex.account ||
+    brokerReplay.selected?.routeId !== nativeChat.route
+  ) {
+    throw new Error("Resource Broker did not persist and replay the selected Native Chat route");
+  }
+  await expectRejected(
+    resourceBroker.decide({ ...brokerRequest, decidedAt: "2026-08-13T13:00:03.001Z" }),
+    "Resource Broker accepted conflicting decision idempotency input",
+  );
+  const brokerEvidence = await pool.query(
+    `SELECT decision_sha256, selected_route_id, selected_account_id, selected_score,
+            fallback_reason
+       FROM agent_world.resource_broker_decisions
+      WHERE id = $1`,
+    [brokerRequest.decisionId],
+  );
+  if (
+    brokerEvidence.rows.length !== 1 ||
+    !/^[a-f0-9]{64}$/.test(brokerEvidence.rows[0]?.decision_sha256 ?? "") ||
+    brokerEvidence.rows[0]?.selected_route_id !== nativeChat.route ||
+    brokerEvidence.rows[0]?.selected_account_id !== codex.account ||
+    brokerEvidence.rows[0]?.fallback_reason !== null
+  ) {
+    throw new Error("Resource Broker decision evidence was not canonical and attributable");
+  }
   await pool.query(
     `INSERT INTO agent_world.approvals
        (id, task_id, state, requested_at, expires_at, decided_at, decision_command_id)
@@ -1892,7 +1946,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 4, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

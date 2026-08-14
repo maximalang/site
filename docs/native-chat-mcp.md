@@ -25,6 +25,10 @@ structured results and canonical Control events.
 - Canonical Native Chat Runs store `route_id`, `account_id` and `CHAT` mode
   directly. They cannot contain a fabricated runtime binding or conversation
   session; OpenClaw/Codex Runs retain their required binding/session shape.
+- Resource Broker observations and decisions are append-only PostgreSQL
+  evidence. Decisions record policy version, normalized candidate inputs,
+  scores, exclusions, selected route/account and a content hash. Missing or
+  expired observations never silently become availability.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
 - Isolated PostgreSQL-backed OAuth provider under `/oauth` with public-client
@@ -66,8 +70,8 @@ the web resource server.
   endpoint and verify its public discovery/JWKS/DCR contract.
 - Implement the canonical Memory/RAG/Artifact stores so those currently
   unavailable pull classes can return provenance-aware content.
-- Create these transport-valid Runs and dispatches through the Resource Broker
-  and on-demand launcher (the schema/store boundary is ready; selection is not).
+- Create these transport-valid Runs and dispatches atomically from the persisted
+  Resource Broker decision and submit them through the on-demand launcher.
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
 

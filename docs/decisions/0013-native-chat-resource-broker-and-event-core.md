@@ -35,6 +35,9 @@ Account/Chat/Work/Codex/API/Local candidates. It consumes normalized evidence
 for quality, remaining limits, marginal cost, latency and load, then records the
 inputs, policy version, decision and fallback reason. It owns policy, not
 provider execution; every transport remains replaceable behind its adapter.
+Observations expire explicitly and decisions are append-only PostgreSQL rows
+containing the complete normalized evaluation and SHA-256 evidence. Unknown or
+stale limits fail closed rather than being guessed from Chat UI state.
 
 `Mission` sits above Tasks and stores a user goal plus success criteria.
 Reusable `AgentTemplate` behavior is separate from project/Mission-bound
