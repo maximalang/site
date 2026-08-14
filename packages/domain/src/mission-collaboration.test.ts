@@ -9,6 +9,7 @@ const ids = {
   agentA: "agent_55555555-5555-5555-5555-555555555555",
   agentB: "agent_66666666-6666-6666-6666-666666666666",
   event: "event_77777777-7777-7777-7777-777777777777",
+  criterion: "mission_criterion_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   taskA: "task_88888888-8888-8888-8888-888888888888",
   taskB: "task_99999999-9999-9999-9999-999999999999",
 };
@@ -90,6 +91,9 @@ describe("Mission collaboration contracts", () => {
         transcript: ["Agent A said..."],
         synthesis: "Review first, then ship.",
         decision: "Run the production gate before release.",
+        criterionAssessments: [
+          { criterionId: ids.criterion, status: "PASSED", evidenceRefs: [ids.event] },
+        ],
         sourceEventIds: [ids.event],
         decidedAt: "2026-08-15T10:05:00.000Z",
       }),
@@ -110,6 +114,9 @@ describe("Mission collaboration contracts", () => {
         ],
         synthesis: "Review first, then ship.",
         decision: "Run the production gate before release.",
+        criterionAssessments: [
+          { criterionId: ids.criterion, status: "PASSED", evidenceRefs: [ids.event] },
+        ],
         sourceEventIds: [],
         decidedAt: "2026-08-15T10:05:00.000Z",
       }),

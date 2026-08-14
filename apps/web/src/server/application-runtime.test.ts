@@ -15,6 +15,8 @@ function runtime() {
     sendConversation: vi.fn(),
     assignTask: vi.fn(),
     advanceMissionWorkflow: vi.fn(),
+    createMissionDecomposition: vi.fn(),
+    recordMissionMeeting: vi.fn(),
     decideApproval: vi.fn(),
     appendNativeChatControl: vi.fn(),
     pullNativeChatResources: vi.fn(),

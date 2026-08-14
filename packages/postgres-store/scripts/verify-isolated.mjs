@@ -222,7 +222,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 30
+    ledger.rows.at(-1)?.version !== 31
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -323,6 +323,7 @@ try {
     "skills",
     "structured_meetings",
     "structured_meeting_agents",
+    "structured_meeting_criterion_assessments",
     "structured_meeting_sources",
     "tasks",
     "tools",
@@ -1335,6 +1336,13 @@ try {
     ],
     synthesis: "Implement first, then require independent review.",
     decision: "Release only after the independent review passes.",
+    criterionAssessments: [
+      {
+        criterionId: mission.successCriteria[0].id,
+        status: "PASSED",
+        evidenceRefs: [sourceEvents.rows[0].id],
+      },
+    ],
     sourceEventIds: sourceEvents.rows.map(({ id }) => id).sort(),
     decidedAt: "2026-08-13T09:19:00.000Z",
   };
@@ -1357,6 +1365,21 @@ try {
     collaborationEvidence.rows[1]?.event_type !== "MEETING_DECIDED"
   ) {
     throw new Error("Mission collaboration events are not complete and replayable");
+  }
+  const criterionEvidence = await pool.query(
+    `SELECT criterion.status, criterion.evidence_refs, assessment.meeting_id
+       FROM agent_world.mission_success_criteria criterion
+       JOIN agent_world.structured_meeting_criterion_assessments assessment
+         ON assessment.criterion_id = criterion.id
+      WHERE criterion.id = $1`,
+    [mission.successCriteria[0].id],
+  );
+  if (
+    criterionEvidence.rows[0]?.status !== "PASSED" ||
+    criterionEvidence.rows[0]?.meeting_id !== meeting.id ||
+    criterionEvidence.rows[0]?.evidence_refs?.[0] !== sourceEvents.rows[0].id
+  ) {
+    throw new Error("Structured meeting did not preserve success-criterion evidence");
   }
   await pool.query(
     `INSERT INTO agent_world.conversations
@@ -2738,7 +2761,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 16, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 17, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

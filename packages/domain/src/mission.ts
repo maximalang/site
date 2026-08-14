@@ -173,6 +173,12 @@ const MeetingPositionSchema = z.strictObject({
   evidenceRefs: z.array(z.string().trim().min(1).max(512)).max(100),
 });
 
+const MissionCriterionAssessmentSchema = z.strictObject({
+  criterionId: MissionCriterionIdSchema,
+  status: z.enum(["PASSED", "FAILED"]),
+  evidenceRefs: z.array(z.string().trim().min(1).max(512)).min(1).max(100),
+});
+
 export const StructuredMeetingSchema = z.strictObject({
   schemaVersion: z.literal(1),
   id: StructuredMeetingIdSchema,
@@ -193,6 +199,19 @@ export const StructuredMeetingSchema = z.strictObject({
     ),
   synthesis: z.string().trim().min(1).max(20_000),
   decision: z.string().trim().min(1).max(8_000),
+  criterionAssessments: z
+    .array(MissionCriterionAssessmentSchema)
+    .min(1)
+    .max(100)
+    .refine(
+      (assessments) =>
+        assessments.every(
+          (assessment, index) =>
+            index === 0 ||
+            String(assessments[index - 1]?.criterionId) < String(assessment.criterionId),
+        ),
+      "Criterion assessments must be unique and sorted",
+    ),
   sourceEventIds: sortedUniqueIds(EventIdSchema).refine(
     (ids) => ids.length > 0,
     "A meeting decision requires canonical source Events",

@@ -41,6 +41,16 @@ export const applicationMissionWorkflowDependencies = {
     runtime().advanceMissionWorkflow(missionId),
 };
 
+export const applicationMissionCollaborationDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  createDecomposition: (
+    input: Parameters<ReturnType<typeof runtime>["createMissionDecomposition"]>[0],
+    materializedAt: string,
+  ) => runtime().createMissionDecomposition(input, materializedAt),
+  recordMeeting: (input: Parameters<ReturnType<typeof runtime>["recordMissionMeeting"]>[0]) =>
+    runtime().recordMissionMeeting(input),
+};
+
 export const applicationApprovalDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   decide: (input: Parameters<ReturnType<typeof runtime>["decideApproval"]>[0]) =>

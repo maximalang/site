@@ -542,6 +542,40 @@ export class PostgresMissionStore {
             throw new MissionStoreError("MEETING_CONFLICT");
           }
         }
+        for (const [position, assessment] of meeting.criterionAssessments.entries()) {
+          const assessed = await client.query(
+            `INSERT INTO agent_world.structured_meeting_criterion_assessments
+               (meeting_id, criterion_id, assessment_position, status, evidence_refs)
+             SELECT $1, criterion.id, $3, $4, $5::jsonb
+               FROM agent_world.structured_meetings meeting
+               JOIN agent_world.mission_success_criteria criterion
+                 ON criterion.mission_id = meeting.mission_id
+                AND criterion.id = $2
+              WHERE meeting.id = $1
+             RETURNING criterion_id`,
+            [
+              meeting.id,
+              assessment.criterionId,
+              position,
+              assessment.status,
+              JSON.stringify(assessment.evidenceRefs),
+            ],
+          );
+          if (assessed.rows.length !== 1) throw new MissionStoreError("MEETING_CONFLICT");
+          const updated = await client.query(
+            `UPDATE agent_world.mission_success_criteria
+                SET status = $3, evidence_refs = $4::jsonb
+              WHERE id = $1 AND mission_id = $2
+            RETURNING id`,
+            [
+              assessment.criterionId,
+              meeting.missionId,
+              assessment.status,
+              JSON.stringify(assessment.evidenceRefs),
+            ],
+          );
+          if (updated.rows.length !== 1) throw new MissionStoreError("MEETING_CONFLICT");
+        }
         await this.appendCollaborationEvent(client, {
           eventType: "MEETING_DECIDED",
           missionId: meeting.missionId,

@@ -446,6 +446,15 @@ export async function createProductionRuntime(
       sendConversation: (input) => sender.send(input),
       assignTask: (input) => worldStore.assignTask(input),
       advanceMissionWorkflow: (missionId) => activeMissionWorkflow.advance(missionId),
+      createMissionDecomposition: async (input, materializedAt) => {
+        const proposal = await missionStore.createDecomposition(input);
+        const materialization = await missionStore.materializeDecomposition(
+          input.id,
+          materializedAt,
+        );
+        return { proposal: proposal.outcome, materialization };
+      },
+      recordMissionMeeting: (input) => missionStore.recordMeeting(input),
       decideApproval: async (input) => {
         const decision = await approvalStore.decide(input);
         if (decision.approval.type !== "APPROVED") {

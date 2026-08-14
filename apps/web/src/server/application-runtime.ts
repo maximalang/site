@@ -3,6 +3,7 @@ import type {
   AccountId,
   AgentId,
   MemoryCurationDecision,
+  MissionDecomposition,
   MissionId,
   ModelRouteId,
   NativeChatBrowserProfileConfiguration,
@@ -12,6 +13,7 @@ import type {
   NativeChatPullRequest,
   NativeChatPullResponse,
   SendMessageIntent,
+  StructuredMeeting,
 } from "@agent-world/domain";
 import type { ProductionMissionWorkflowResult } from "@agent-world/orchestration";
 import type {
@@ -41,6 +43,8 @@ export type ApplicationRuntime = {
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;
   assignTask(input: AssignTaskInput): Promise<unknown>;
   advanceMissionWorkflow(missionId: MissionId): Promise<ProductionMissionWorkflowResult>;
+  createMissionDecomposition(input: MissionDecomposition, materializedAt: string): Promise<unknown>;
+  recordMissionMeeting(input: StructuredMeeting): Promise<unknown>;
   decideApproval(input: ApprovalDecisionInput): Promise<unknown>;
   appendNativeChatControl(
     accountId: AccountId,

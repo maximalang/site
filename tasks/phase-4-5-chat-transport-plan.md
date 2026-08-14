@@ -128,7 +128,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
       candidate, score inputs, policy version and fallback reason as events.
 - [x] LangGraph checkpoints reference canonical Mission/Task/Run/Event IDs and
       resume without duplicating side effects.
-- [ ] Mission decomposition and structured meetings produce bounded Tasks,
+- [x] Mission decomposition and structured meetings produce bounded Tasks,
       synthesis, decision and success-criteria evidence.
 
 ## Verification gate
