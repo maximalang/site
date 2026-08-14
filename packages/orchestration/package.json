@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./mission-workflow": {
+      "types": "./dist/mission-workflow.d.ts",
+      "import": "./dist/mission-workflow.js"
     }
   },
   "scripts": {
@@ -23,6 +27,7 @@
     "@langchain/langgraph": "1.4.8",
     "@langchain/langgraph-checkpoint": "1.1.3",
     "@langchain/langgraph-checkpoint-postgres": "1.0.4",
+    "pg": "8.23.0",
     "zod": "4.4.3"
   }
 }

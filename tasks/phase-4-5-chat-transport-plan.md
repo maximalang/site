@@ -126,7 +126,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
       quality, remaining limits, marginal cost, latency and load observations.
 - [x] Fail closed on stale quota/auth/capability evidence; record the selected
       candidate, score inputs, policy version and fallback reason as events.
-- [ ] LangGraph checkpoints reference canonical Mission/Task/Run/Event IDs and
+- [x] LangGraph checkpoints reference canonical Mission/Task/Run/Event IDs and
       resume without duplicating side effects.
 - [ ] Mission decomposition and structured meetings produce bounded Tasks,
       synthesis, decision and success-criteria evidence.

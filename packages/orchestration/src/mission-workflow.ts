@@ -2,6 +2,7 @@ import { EventIdSchema, MissionIdSchema, RunIdSchema, TaskIdSchema } from "@agen
 import { END, START, StateGraph, StateSchema } from "@langchain/langgraph";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
+import type pg from "pg";
 import * as z from "zod";
 
 export const MissionWorkflowPhaseSchema = z.enum([
@@ -35,6 +36,14 @@ export const MissionWorkflowInputSchema = z.strictObject({
   reviewRequired: z.boolean(),
 });
 export type MissionWorkflowInput = z.infer<typeof MissionWorkflowInputSchema>;
+export const MissionWorkflowResultSchema = MissionWorkflowInputSchema.extend({
+  pendingAction: MissionWorkflowActionSchema.optional(),
+});
+export type MissionWorkflowResult = z.infer<typeof MissionWorkflowResultSchema>;
+
+export type MissionWorkflowStateReader = {
+  readWorkflowState(missionId: z.infer<typeof MissionIdSchema>): Promise<MissionWorkflowInput>;
+};
 
 const MissionWorkflowState = new StateSchema({
   schemaVersion: z.literal(1),
@@ -89,10 +98,44 @@ export function createMissionWorkflow(checkpointer: BaseCheckpointSaver) {
     .compile({ checkpointer });
 }
 
+export class MissionWorkflowService {
+  private readonly graph;
+
+  constructor(
+    checkpointer: BaseCheckpointSaver,
+    private readonly stateReader: MissionWorkflowStateReader,
+  ) {
+    this.graph = createMissionWorkflow(checkpointer);
+  }
+
+  async advance(missionIdInput: unknown): Promise<MissionWorkflowResult> {
+    const missionId = MissionIdSchema.parse(missionIdInput);
+    const canonicalState = MissionWorkflowInputSchema.parse(
+      await this.stateReader.readWorkflowState(missionId),
+    );
+    if (canonicalState.missionId !== missionId) {
+      throw new Error("Mission workflow reader returned a different canonical Mission");
+    }
+    return MissionWorkflowResultSchema.parse(
+      await this.graph.invoke(canonicalState, {
+        configurable: { thread_id: missionId },
+      }),
+    );
+  }
+}
+
 export async function createPostgresMissionCheckpointer(connectionString: string) {
   const parsed = new URL(connectionString);
   if (!parsed.protocol.startsWith("postgres")) throw new Error("PostgreSQL connection is required");
   const checkpointer = PostgresSaver.fromConnString(connectionString, {
+    schema: "agent_world_langgraph",
+  });
+  await checkpointer.setup();
+  return checkpointer;
+}
+
+export async function createPostgresMissionCheckpointerFromPool(pool: pg.Pool) {
+  const checkpointer = new PostgresSaver(pool, undefined, {
     schema: "agent_world_langgraph",
   });
   await checkpointer.setup();

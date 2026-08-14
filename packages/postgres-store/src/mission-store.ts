@@ -8,6 +8,7 @@ import {
   type Mission,
   type MissionDecomposition,
   MissionDecompositionSchema,
+  MissionIdSchema,
   MissionSchema,
   type StructuredMeeting,
   StructuredMeetingSchema,
@@ -17,6 +18,7 @@ import type { TransactionPool } from "./conversation-store.js";
 
 export type MissionStoreErrorCode =
   | "MISSION_CONFLICT"
+  | "MISSION_NOT_FOUND"
   | "TEMPLATE_CONFLICT"
   | "ASSIGNMENT_CONFLICT"
   | "DECOMPOSITION_CONFLICT"
@@ -71,6 +73,17 @@ type AssignmentRow = QueryResultRow & {
   project_id: string;
   mission_id: string | null;
   created_at: Date | string;
+};
+
+type WorkflowRow = QueryResultRow & {
+  mission_status: string;
+  pending_criteria: number;
+  task_ids: unknown;
+  run_ids: unknown;
+  completed_task_ids: unknown;
+  failed_task_ids: unknown;
+  retry_count: number;
+  last_event_id: string | null;
 };
 
 function missionFromRow(row: MissionRow): Mission {
@@ -307,6 +320,87 @@ export class PostgresMissionStore {
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async readWorkflowState(missionIdInput: unknown) {
+    const missionId = MissionIdSchema.parse(missionIdInput);
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<WorkflowRow>(
+        `SELECT mission.status AS mission_status,
+              (SELECT count(*)::integer
+                 FROM agent_world.mission_success_criteria criterion
+                WHERE criterion.mission_id = mission.id
+                  AND criterion.status = 'PENDING') AS pending_criteria,
+              COALESCE((SELECT jsonb_agg(task.id ORDER BY task.id)
+                          FROM agent_world.tasks task
+                         WHERE task.mission_id = mission.id), '[]'::jsonb) AS task_ids,
+              COALESCE((SELECT jsonb_agg(run.id ORDER BY run.id)
+                          FROM agent_world.runs run
+                          JOIN agent_world.tasks task ON task.id = run.task_id
+                         WHERE task.mission_id = mission.id), '[]'::jsonb) AS run_ids,
+              COALESCE((SELECT jsonb_agg(task.id ORDER BY task.id)
+                          FROM agent_world.tasks task
+                          JOIN agent_world.runs run ON run.task_id = task.id
+                         WHERE task.mission_id = mission.id
+                           AND run.status = 'COMPLETED'), '[]'::jsonb) AS completed_task_ids,
+              COALESCE((SELECT jsonb_agg(task.id ORDER BY task.id)
+                          FROM agent_world.tasks task
+                          JOIN agent_world.runs run ON run.task_id = task.id
+                         WHERE task.mission_id = mission.id
+                           AND run.status = 'FAILED'), '[]'::jsonb) AS failed_task_ids,
+              COALESCE((SELECT greatest(max(run.attempt) - 1, 0)::integer
+                          FROM agent_world.runs run
+                          JOIN agent_world.tasks task ON task.id = run.task_id
+                         WHERE task.mission_id = mission.id), 0) AS retry_count,
+              (SELECT event.id
+                 FROM (
+                   SELECT world.id, world.occurred_at
+                     FROM agent_world.world_events world
+                     JOIN agent_world.tasks task ON task.id = world.task_id
+                    WHERE task.mission_id = mission.id
+                   UNION ALL
+                   SELECT collaboration.id, collaboration.occurred_at
+                     FROM agent_world.mission_collaboration_events collaboration
+                    WHERE collaboration.mission_id = mission.id
+                 ) event
+                ORDER BY event.occurred_at DESC, event.id DESC
+                LIMIT 1) AS last_event_id
+         FROM agent_world.missions mission
+        WHERE mission.id = $1`,
+        [missionId],
+      );
+      const row = result.rows[0];
+      if (!row || result.rows.length !== 1) throw new MissionStoreError("MISSION_NOT_FOUND");
+      const taskIds = Array.isArray(row.task_ids) ? row.task_ids : [];
+      const completedTaskIds = Array.isArray(row.completed_task_ids) ? row.completed_task_ids : [];
+      const failedTaskIds = Array.isArray(row.failed_task_ids) ? row.failed_task_ids : [];
+      const phase =
+        row.mission_status === "SUCCEEDED"
+          ? "COMPLETED"
+          : row.mission_status === "FAILED" || row.mission_status === "CANCELLED"
+            ? "FAILED"
+            : taskIds.length === 0
+              ? "PLANNING"
+              : completedTaskIds.length + failedTaskIds.length === taskIds.length
+                ? "REVIEWING"
+                : "EXECUTING";
+      return {
+        schemaVersion: 1 as const,
+        missionId,
+        taskIds,
+        runIds: Array.isArray(row.run_ids) ? row.run_ids : [],
+        completedTaskIds,
+        failedTaskIds,
+        ...(row.last_event_id === null ? {} : { lastEventId: row.last_event_id }),
+        phase,
+        retryCount: row.retry_count,
+        maxRetries: 2,
+        reviewRequired: row.pending_criteria > 0,
+      };
     } finally {
       client.release();
     }

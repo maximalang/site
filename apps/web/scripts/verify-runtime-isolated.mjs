@@ -210,6 +210,15 @@ try {
       `Anonymous Native Chat profile request returned ${anonymousNativeChatProfiles.status}`,
     );
   }
+  const missionId = "mission_12121212-1212-1212-1212-121212121212";
+  const anonymousMissionWorkflow = await fetch(`${baseUrl}/api/missions/workflow`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: JSON.stringify({ missionId }),
+  });
+  if (anonymousMissionWorkflow.status !== 401) {
+    throw new Error(`Anonymous Mission workflow returned ${anonymousMissionWorkflow.status}`);
+  }
   const hubCommandBody = {
     schemaVersion: 1,
     commandId: "hub_command_55555555-5555-5555-5555-555555555555",
@@ -246,6 +255,48 @@ try {
   }
   const session = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie } });
   if (session.status !== 200) throw new Error(`Authenticated session returned ${session.status}`);
+  database = new Pool({
+    connectionString: databaseUrl,
+    ssl: false,
+    max: 1,
+    connectionTimeoutMillis: 5_000,
+  });
+  await database.query(
+    `INSERT INTO agent_world.projects (id, slug, name)
+     VALUES ($1, 'runtime-mission-project', 'Runtime Mission Project')`,
+    ["project_12121212-1212-1212-1212-121212121212"],
+  );
+  await database.query(
+    `INSERT INTO agent_world.missions
+       (id, project_id, title, goal, status, created_at, updated_at)
+     VALUES ($1, $2, 'Runtime workflow', 'Prove durable production orchestration.',
+             'ACTIVE', $3, $3)`,
+    [missionId, "project_12121212-1212-1212-1212-121212121212", "2026-08-15T00:00:00.000Z"],
+  );
+  await database.query(
+    `INSERT INTO agent_world.mission_success_criteria
+       (id, mission_id, criterion_position, statement, verification, status, evidence_refs)
+     VALUES ($1, $2, 0, 'Workflow checkpoint is durable.', 'TEST', 'PENDING', '[]'::jsonb)`,
+    ["mission_criterion_13131313-1313-1313-1313-131313131313", missionId],
+  );
+  const missionWorkflow = await fetch(`${baseUrl}/api/missions/workflow`, {
+    method: "POST",
+    headers: {
+      cookie,
+      "content-type": "application/json",
+      origin: baseUrl,
+      "x-agent-world-csrf": loginBody.csrfToken,
+    },
+    body: JSON.stringify({ missionId }),
+  });
+  const missionWorkflowBody = await missionWorkflow.json();
+  if (
+    missionWorkflow.status !== 200 ||
+    missionWorkflowBody.missionId !== missionId ||
+    missionWorkflowBody.pendingAction !== "DECOMPOSE_MISSION"
+  ) {
+    throw new Error("Production Mission workflow did not checkpoint its canonical planning state");
+  }
   const world = await fetch(`${baseUrl}/api/world`, { headers: { cookie } });
   const worldBody = await world.json();
   if (world.status !== 200 || worldBody.source !== "UNAVAILABLE") {
@@ -488,23 +539,24 @@ try {
     throw new Error("Revoked owner session became authorized after restart");
   }
 
-  database = new Pool({
-    connectionString: databaseUrl,
-    ssl: false,
-    max: 1,
-    connectionTimeoutMillis: 5_000,
-  });
   const evidence = await database.query(
     `SELECT
        (SELECT count(*)::integer FROM agent_world.schema_migrations) AS migrations,
-       (SELECT count(*)::integer FROM agent_world.owner_sessions WHERE revoked_at IS NOT NULL) AS revoked_sessions`,
+       (SELECT count(*)::integer FROM agent_world.owner_sessions WHERE revoked_at IS NOT NULL) AS revoked_sessions,
+       (SELECT count(*)::integer FROM agent_world_langgraph.checkpoints
+         WHERE thread_id = $1) AS mission_checkpoints`,
+    [missionId],
   );
-  if (evidence.rows[0]?.migrations !== 29 || evidence.rows[0]?.revoked_sessions !== 1) {
+  if (
+    evidence.rows[0]?.migrations !== 29 ||
+    evidence.rows[0]?.revoked_sessions !== 1 ||
+    evidence.rows[0]?.mission_checkpoints < 1
+  ) {
     throw new Error("Standalone runtime did not preserve migration or revocation evidence");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 29, authLifecycle: true, worldAuth: true, hubAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 29, authLifecycle: true, worldAuth: true, hubAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

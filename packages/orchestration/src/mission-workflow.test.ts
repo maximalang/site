@@ -1,6 +1,10 @@
 import { MemorySaver } from "@langchain/langgraph";
 import { describe, expect, it } from "vitest";
-import { createMissionWorkflow, MissionWorkflowInputSchema } from "./mission-workflow.js";
+import {
+  createMissionWorkflow,
+  MissionWorkflowInputSchema,
+  MissionWorkflowService,
+} from "./mission-workflow.js";
 
 const ids = {
   mission: "mission_11111111-1111-1111-1111-111111111111",
@@ -73,5 +77,28 @@ describe("Mission LangGraph workflow", () => {
         { configurable: { thread_id: ids.mission } },
       ),
     ).resolves.toMatchObject({ phase: "COMPLETED", pendingAction: "RECORD_SUCCESS" });
+  });
+
+  it("advances from canonical storage instead of trusting caller-supplied workflow state", async () => {
+    const service = new MissionWorkflowService(new MemorySaver(), {
+      readWorkflowState: async (missionId) => ({
+        schemaVersion: 1,
+        missionId,
+        taskIds: [],
+        runIds: [],
+        completedTaskIds: [],
+        failedTaskIds: [],
+        phase: "PLANNING",
+        retryCount: 0,
+        maxRetries: 2,
+        reviewRequired: true,
+      }),
+    });
+
+    await expect(service.advance(ids.mission)).resolves.toMatchObject({
+      missionId: ids.mission,
+      pendingAction: "DECOMPOSE_MISSION",
+    });
+    await expect(service.advance("mission_not-canonical")).rejects.toThrow();
   });
 });

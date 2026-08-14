@@ -10,6 +10,10 @@ import {
   OpenClawWriteAdapter,
 } from "@agent-world/openclaw-adapter";
 import {
+  createProductionMissionWorkflow,
+  type ProductionMissionWorkflow,
+} from "@agent-world/orchestration";
+import {
   applyMigrations,
   discoverMigrations,
   MemoryGraphProjector,
@@ -26,6 +30,7 @@ import {
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
   PostgresMemoryProjectionStore,
+  PostgresMissionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -180,6 +185,8 @@ export async function createProductionRuntime(
   let taskRunSupervisor: TaskRunSupervisor | undefined;
   let memoryProjectionSupervisor: MemoryProjectionSupervisor | undefined;
   let nativeChatReconciliationSupervisor: NativeChatReconciliationSupervisor | undefined;
+  let missionCheckpointPool: Pool | undefined;
+  let missionWorkflow: ProductionMissionWorkflow | undefined;
   try {
     const migrationClient = await pool.connect();
     try {
@@ -201,6 +208,16 @@ export async function createProductionRuntime(
     const agentConversationReader = new PostgresAgentConversationReader(pool);
     const conversationReader = new PostgresConversationReader(pool);
     const conversationStore = new PostgresConversationStore(pool);
+    const missionStore = new PostgresMissionStore(pool, {
+      eventId: () => EventIdSchema.parse(`event_${randomUUID()}`),
+    });
+    missionCheckpointPool = new Pool({
+      ...parseDatabasePoolConfig(environment),
+      application_name: "agent-world-langgraph",
+      max: 4,
+    });
+    missionWorkflow = await createProductionMissionWorkflow(missionCheckpointPool, missionStore);
+    const activeMissionWorkflow = missionWorkflow;
     const hubReader = new PostgresHubReader(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
     const memoryReader = new PostgresMemoryCenterReader(pool);
@@ -428,6 +445,7 @@ export async function createProductionRuntime(
       readConversation: (input) => conversationReader.read(input),
       sendConversation: (input) => sender.send(input),
       assignTask: (input) => worldStore.assignTask(input),
+      advanceMissionWorkflow: (missionId) => activeMissionWorkflow.advance(missionId),
       decideApproval: async (input) => {
         const decision = await approvalStore.decide(input);
         if (decision.approval.type !== "APPROVED") {
@@ -497,6 +515,7 @@ export async function createProductionRuntime(
         await taskRunSupervisor?.stop();
         await memoryProjectionSupervisor?.stop();
         await nativeChatReconciliationSupervisor?.stop();
+        await missionWorkflow?.stop();
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
         await pool.end();
       },
@@ -505,6 +524,11 @@ export async function createProductionRuntime(
     await taskRunSupervisor?.stop();
     await memoryProjectionSupervisor?.stop();
     await nativeChatReconciliationSupervisor?.stop();
+    if (missionWorkflow) {
+      await missionWorkflow.stop().catch(() => undefined);
+    } else {
+      await missionCheckpointPool?.end().catch(() => undefined);
+    }
     await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
     await pool.end().catch(() => undefined);
     throw error;

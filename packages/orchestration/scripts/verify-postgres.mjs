@@ -2,7 +2,10 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";
-import { createMissionWorkflow, createPostgresMissionCheckpointer } from "../dist/index.js";
+import {
+  createMissionWorkflow,
+  createPostgresMissionCheckpointer,
+} from "../dist/mission-workflow.js";
 
 const exec = promisify(execFile);
 const ACK = "AGENT_WORLD_LANGGRAPH_TEST_ACK";

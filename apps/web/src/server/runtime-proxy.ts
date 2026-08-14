@@ -35,6 +35,12 @@ export const applicationTaskDependencies = {
     runtime().assignTask(input),
 };
 
+export const applicationMissionWorkflowDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  advance: (missionId: Parameters<ReturnType<typeof runtime>["advanceMissionWorkflow"]>[0]) =>
+    runtime().advanceMissionWorkflow(missionId),
+};
+
 export const applicationApprovalDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   decide: (input: Parameters<ReturnType<typeof runtime>["decideApproval"]>[0]) =>
