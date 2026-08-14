@@ -25,6 +25,7 @@ import {
   PostgresHubCommandStore,
   PostgresHubReader,
   PostgresModelRouteResolver,
+  PostgresNativeChatControlStore,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
@@ -208,7 +209,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 14
+    ledger.rows.at(-1)?.version !== 15
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -269,6 +270,9 @@ try {
     "model_route_modalities",
     "model_route_reasoning_efforts",
     "model_route_tools",
+    "native_chat_control_events",
+    "native_chat_dispatches",
+    "native_chat_results",
     "owner_auth_throttle",
     "owner_sessions",
     "project_agents",
@@ -1119,7 +1123,7 @@ try {
     throw new Error("Codex binding resolver did not restore exact safe route provenance");
   }
   await pool.query(
-    "UPDATE agent_world.codex_worker_readiness SET checked_at = clock_timestamp() - interval '2 minutes', authenticated_at = clock_timestamp() - interval '2 minutes', updated_at = clock_timestamp() - interval '2 minutes' WHERE account_id = $1",
+    "UPDATE agent_world.codex_worker_readiness SET checked_at = statement_timestamp() - interval '2 minutes', authenticated_at = statement_timestamp() - interval '2 minutes', updated_at = statement_timestamp() - interval '2 minutes' WHERE account_id = $1",
     [codex.account],
   );
   await expectRejected(
@@ -1132,7 +1136,7 @@ try {
     "Codex binding resolver accepted a stale worker heartbeat",
   );
   await pool.query(
-    "UPDATE agent_world.codex_worker_readiness SET checked_at = clock_timestamp(), authenticated_at = clock_timestamp(), updated_at = clock_timestamp() WHERE account_id = $1",
+    "UPDATE agent_world.codex_worker_readiness SET checked_at = statement_timestamp(), authenticated_at = statement_timestamp(), updated_at = statement_timestamp() WHERE account_id = $1",
     [codex.account],
   );
   const codexProvenance = await new PostgresRunProvenanceReader(pool).read(codex.run);
@@ -1645,8 +1649,201 @@ try {
     }
   }
 
+  const nativeChat = {
+    route: "route_c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1",
+    binding: "binding_c2c2c2c2-c2c2-c2c2-c2c2-c2c2c2c2c2c2",
+    conversation: "conversation_c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3",
+    session: "session_c4c4c4c4-c4c4-c4c4-c4c4-c4c4c4c4c4c4",
+    task: "task_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
+    approval: "approval_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
+    run: "run_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
+    dispatch: "chat_dispatch_c7c7c7c7-c7c7-c7c7-c7c7-c7c7c7c7c7c7",
+  };
+  await pool.query(
+    "INSERT INTO agent_world.account_surfaces (account_id, surface) VALUES ($1, 'CHAT') ON CONFLICT DO NOTHING",
+    [codex.account],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.execution_routes
+       (id, label, mode, adapter_kind, account_id)
+     VALUES ($1, 'Native Plus Chat MCP', 'CHAT', 'NATIVE_CHATGPT', $2)`,
+    [nativeChat.route, codex.account],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runtime_bindings
+       (id, agent_id, route_id, adapter_kind, external_agent_id)
+     VALUES ($1, $2, $3, 'NATIVE_CHATGPT', 'ai-world-mcp:researcher')`,
+    [nativeChat.binding, ids.agent, nativeChat.route],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.conversations
+       (id, agent_id, project_id, title, created_at)
+     VALUES ($1, $2, $3, 'Native Plus Chat verification', $4)`,
+    [nativeChat.conversation, ids.agent, ids.project, "2026-08-13T13:00:00.000Z"],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.conversation_sessions
+       (id, conversation_id, agent_id, binding_id, adapter_kind,
+        external_session_ref, started_at)
+     VALUES ($1, $2, $3, $4, 'NATIVE_CHATGPT', 'native-chat:pending', $5)`,
+    [
+      nativeChat.session,
+      nativeChat.conversation,
+      ids.agent,
+      nativeChat.binding,
+      "2026-08-13T13:00:01.000Z",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.tasks
+       (id, conversation_id, project_id, assignee_agent_id, title, description,
+        approval_requirement, idempotency_key, created_at)
+     VALUES ($1, $2, $3, $4, 'Verify Native Chat commit',
+             'Commit through the canonical Control event stream.', 'REQUIRED',
+             'task:native-chat-control', $5)`,
+    [nativeChat.task, nativeChat.conversation, ids.project, ids.agent, "2026-08-13T13:00:02.000Z"],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.approvals
+       (id, task_id, state, requested_at, expires_at, decided_at, decision_command_id)
+     VALUES ($1, $2, 'APPROVED', $3, $4, $5, 'approve:native-chat-control')`,
+    [
+      nativeChat.approval,
+      nativeChat.task,
+      "2026-08-13T13:00:02.000Z",
+      "2026-08-14T13:00:02.000Z",
+      "2026-08-13T13:00:03.000Z",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runs
+       (id, task_id, conversation_id, agent_id, approval_id, adapter_kind,
+        binding_id, session_id, status, dispatch_idempotency_key, created_at)
+     VALUES ($1, $2, $3, $4, $5, 'NATIVE_CHATGPT', $6, $7,
+             'DISPATCH_PENDING', 'run:native-chat-control', $8)`,
+    [
+      nativeChat.run,
+      nativeChat.task,
+      nativeChat.conversation,
+      ids.agent,
+      nativeChat.approval,
+      nativeChat.binding,
+      nativeChat.session,
+      "2026-08-13T13:00:04.000Z",
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.native_chat_dispatches
+       (id, run_id, task_id, agent_id, account_id, route_id, state,
+        created_at, submitted_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'BROWSER_SUBMITTED', $7, $8)`,
+    [
+      nativeChat.dispatch,
+      nativeChat.run,
+      nativeChat.task,
+      ids.agent,
+      codex.account,
+      nativeChat.route,
+      "2026-08-13T13:00:04.000Z",
+      "2026-08-13T13:00:05.000Z",
+    ],
+  );
+  const nativeChatEventIds = [
+    "event_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8",
+    "event_c9c9c9c9-c9c9-c9c9-c9c9-c9c9c9c9c9c9",
+  ];
+  let nativeChatNow = 0;
+  const nativeChatStore = new PostgresNativeChatControlStore(pool, {
+    eventId: () => {
+      const eventId = nativeChatEventIds.shift();
+      if (!eventId) throw new Error("Isolated Native Chat event identities were exhausted");
+      return eventId;
+    },
+    now: () => new Date(`2026-08-13T13:01:0${nativeChatNow++}.000Z`),
+  });
+  const beginEvent = {
+    schemaVersion: 1,
+    runId: nativeChat.run,
+    sequence: 1,
+    idempotencyKey: "native-chat:begin:isolated",
+    eventType: "BEGIN_RUN",
+    payload: {},
+  };
+  if ((await nativeChatStore.append(codex.account, beginEvent)).outcome !== "APPENDED") {
+    throw new Error("Native Chat begin_run was not appended");
+  }
+  const findingEvent = {
+    schemaVersion: 1,
+    runId: nativeChat.run,
+    sequence: 2,
+    idempotencyKey: "native-chat:finding:isolated",
+    eventType: "FINDING",
+    payload: { statement: "PostgreSQL is canonical.", confidence: 1 },
+  };
+  await nativeChatStore.append(codex.account, findingEvent);
+  const commitEvent = {
+    schemaVersion: 1,
+    runId: nativeChat.run,
+    sequence: 3,
+    idempotencyKey: "native-chat:commit:isolated",
+    eventType: "COMMIT_RESULT",
+    payload: {
+      result: {
+        schemaVersion: 1,
+        fullOutput: "Native Chat result committed without DOM capture.",
+        summary: "Canonical commit succeeded.",
+        findings: ["PostgreSQL is canonical."],
+        decisions: [],
+        actions: [],
+        artifacts: [],
+        openQuestions: [],
+        nextActions: [],
+        memoryCandidates: [
+          { statement: "Native Chat commits through Control API.", confidence: 1, importance: 0.9 },
+        ],
+        confidence: 1,
+      },
+    },
+  };
+  if ((await nativeChatStore.append(codex.account, commitEvent)).outcome !== "APPENDED") {
+    throw new Error("Native Chat commit_result was not appended");
+  }
+  if ((await nativeChatStore.append(codex.account, commitEvent)).outcome !== "REPLAY") {
+    throw new Error("Native Chat exact commit_result did not replay");
+  }
+  await expectRejected(
+    nativeChatStore.append(codex.account, {
+      ...findingEvent,
+      payload: { statement: "Conflicting replay.", confidence: 0 },
+    }),
+    "Native Chat accepted a conflicting idempotency replay",
+  );
+  const nativeChatEvidence = await pool.query(
+    `SELECT r.status, d.state, d.last_sequence,
+            (SELECT count(*)::integer FROM agent_world.native_chat_control_events e
+              WHERE e.run_id = r.id) AS events,
+            (SELECT count(*)::integer FROM agent_world.native_chat_results x
+              WHERE x.run_id = r.id) AS results,
+            s.status AS world_status
+       FROM agent_world.runs r
+       JOIN agent_world.native_chat_dispatches d ON d.run_id = r.id
+       JOIN agent_world.world_agent_status s ON s.agent_id = r.agent_id
+      WHERE r.id = $1`,
+    [nativeChat.run],
+  );
+  if (
+    nativeChatEvidence.rows[0]?.status !== "COMPLETED" ||
+    nativeChatEvidence.rows[0]?.state !== "ATTACHED" ||
+    nativeChatEvidence.rows[0]?.last_sequence !== 3 ||
+    nativeChatEvidence.rows[0]?.events !== 3 ||
+    nativeChatEvidence.rows[0]?.results !== 1 ||
+    nativeChatEvidence.rows[0]?.world_status !== "IDLE"
+  ) {
+    throw new Error("Native Chat Control events did not project one exact terminal result");
+  }
+
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
