@@ -1,15 +1,14 @@
 # Third-party notices
 
-## rafapetter/agent-town
+## WW-AI-Lab/openclaw-office
 
-- Repository: <https://github.com/rafapetter/agent-town>
-- Audited commit: `78e8e91b9c2620ff8048377f12048412ed603028`
+- Repository: <https://github.com/WW-AI-Lab/openclaw-office>
+- Audited commit: `def631a4533df2b0c8bb6aa19ef3e07c81f4fbc6`
 - License: MIT; full text in
-  [`third-party/rafapetter-agent-town-LICENSE.txt`](third-party/rafapetter-agent-town-LICENSE.txt)
+  [`third-party/WW-AI-Lab-openclaw-office-LICENSE.txt`](third-party/WW-AI-Lab-openclaw-office-LICENSE.txt)
 
-The World viewport narrowly adapts the upstream Canvas lifecycle, device-pixel
-resize, centered world-coordinate and pointer hit-testing patterns. The product
-domain, semantic rooms, status projection, drawing code and React UI are
-rewritten around `@agent-world/read-model`. Upstream in-memory Agent/Task stores,
-random idle simulation, generated dialogue and direct runtime/session identity
-are not used.
+The production World presentation narrowly ports the upstream React/SVG floor,
+Pawn/avatar, furniture and position-transition concepts into one open four-zone
+office. Canonical Agent status and coordinates come only from `WorldView`.
+Upstream Gateway, authentication, Zustand stores, persistence, mock simulation,
+chat, console and token/runtime state are not used.

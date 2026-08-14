@@ -18,26 +18,26 @@ presentation port while preserving the existing PostgreSQL, Event Stream,
 
 ## Slice 1: Pure renderer adapter
 
-- [ ] Define a renderer-only `OfficePresentationModel` with canonical Agent ID,
+- [x] Define a renderer-only `OfficePresentationModel` with canonical Agent ID,
       display text, visual status, destination zone and optional Action cue.
-- [ ] Map existing `WorldView` statuses and placements without changing domain
+- [x] Map existing `WorldView` statuses and placements without changing domain
       or read-model schemas.
-- [ ] Prove stable output for replay, reordered input and skin/map changes.
-- [ ] Reject unknown/duplicate identities and never map Account/session IDs.
+- [x] Prove stable output for replay, reordered input and skin/map changes.
+- [x] Reject unknown/duplicate identities and never map Account/session IDs.
 
 ## Slice 2: Attributed OpenClaw Office component port
 
-- [ ] Port the minimum SVG floor, furniture, avatar/Pawn and movement primitives
+- [x] Port the minimum SVG floor, furniture, avatar/Pawn and movement primitives
       from pinned upstream with its MIT notice.
-- [ ] Use one open floor with four zones: Commons, Focus, Collaboration and
+- [x] Use one open floor with four zones: Commons, Focus, Collaboration and
       Review/Ops; remove upstream partition walls and doors.
-- [ ] Render real status/movement only; omit upstream Zustand, Gateway, auth,
+- [x] Render real status/movement only; omit upstream Zustand, Gateway, auth,
       persistence, mock data, chat, console and token stores.
-- [ ] Preserve selected-Agent click and double-click conversation behavior.
+- [x] Preserve selected-Agent click and double-click conversation behavior.
 
 ## Slice 3: Native overlays and event cues
 
-- [ ] Keep Memory, Models, Accounts, MCP, Servers, Codex and Settings in native
+- [x] Keep Memory, Models, Accounts, MCP, Servers, Codex and Settings in native
       panels/drawers/terminals above World, not spatial rooms.
 - [ ] Drive work, handoff, review and structured-meeting cues only from
       canonical events; define truthful fallback when an event type is not yet
@@ -46,11 +46,11 @@ presentation port while preserving the existing PostgreSQL, Event Stream,
 
 ## Slice 4: Parity, cleanup and release evidence
 
-- [ ] Verify desktop and authenticated mobile layouts, keyboard selection,
+- [x] Verify desktop and authenticated mobile layouts, keyboard selection,
       reduced motion, touch targets and screen-reader alternative list.
 - [ ] Verify restart/replay produces the same semantic Agent/status/Task state;
       pixel positions may animate but cannot change truth.
-- [ ] Remove the Agent Town port and notice only after parity passes; add the
+- [x] Remove the Agent Town port and notice only after parity passes; add the
       OpenClaw Office MIT text and pinned SHA to shipped notices/SBOM.
 - [ ] Run unit, type, lint, build, browser and isolated runtime gates before the
       renderer becomes the production default.

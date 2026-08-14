@@ -335,7 +335,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await page.keyboard.press("Enter");
   await expect(page.locator("main")).toBeFocused();
 
-  const worldAgent = page.getByRole("button", { name: new RegExp(fixtureAgent) });
+  const worldAgent = page
+    .locator('[data-skin="openclaw-office-open-floor-v1"]')
+    .getByRole("button", { name: new RegExp(fixtureAgent) });
   await worldAgent.click();
   const inspector = page.getByRole("region", { name: fixtureAgent });
   await expect(inspector.getByRole("heading", { level: 2, name: fixtureAgent })).toBeVisible();

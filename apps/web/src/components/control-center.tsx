@@ -510,7 +510,7 @@ export function ControlCenter({
                 <div className="world-grid">
                   <div className="canvas-frame">
                     <WorldCanvas
-                      agents={world.agents}
+                      world={world}
                       onOpenConversation={openConversation}
                       onSelectAgent={selectAgent}
                       selectedAgentId={selectedAgentId}

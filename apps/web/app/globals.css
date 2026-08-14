@@ -330,12 +330,10 @@ main {
 .world-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 17rem;
-  min-height: 36rem;
 }
 
 .canvas-frame {
   min-width: 0;
-  min-height: 36rem;
   padding: var(--space-3);
   border-right: 1px solid var(--border);
   background: #0d1513;
@@ -344,10 +342,150 @@ main {
 .world-canvas {
   display: block;
   width: 100%;
-  height: 100%;
-  min-height: 34.5rem;
+  height: auto;
   border-radius: var(--radius-sm);
-  image-rendering: pixelated;
+}
+
+.office-world {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: #16211e;
+}
+
+.office-floor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: #d9e5d8;
+}
+
+.office-floor-base {
+  fill: #1c2a26;
+}
+.office-floor-grid {
+  fill: url("#office-grid");
+}
+.office-zone {
+  stroke: rgb(255 255 255 / 9%);
+  stroke-width: 2;
+}
+.office-zone-commons {
+  fill: #2b3b35;
+}
+.office-zone-focus {
+  fill: #263934;
+}
+.office-zone-collaboration {
+  fill: #303a32;
+}
+.office-zone-review_ops {
+  fill: #3b332d;
+}
+
+.office-zone-label {
+  fill: rgb(232 242 236 / 72%);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.office-furniture {
+  fill: #897a63;
+  stroke: #ad9c7e;
+  stroke-width: 3;
+}
+.office-furniture circle {
+  fill: #756553;
+}
+.office-furniture .office-plant {
+  fill: #43866b;
+  stroke: #75b294;
+}
+
+.office-agent {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 5.25rem;
+  min-height: 5.25rem;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  transform: translate(-50%, -55%);
+  transition:
+    left 520ms ease,
+    top 520ms ease,
+    filter 160ms ease;
+  cursor: pointer;
+}
+
+.office-agent:hover {
+  filter: brightness(1.12);
+}
+.office-agent:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.office-pawn {
+  width: 4rem;
+  height: 4.875rem;
+  margin: 0 auto;
+  overflow: visible;
+}
+.office-pawn-shadow {
+  fill: rgb(0 0 0 / 28%);
+}
+
+.office-agent-error .office-pawn,
+.office-agent-blocked .office-pawn {
+  filter: saturate(0.75);
+}
+
+.office-agent-offline {
+  opacity: 0.58;
+}
+
+.office-agent.is-selected .office-pawn {
+  filter: drop-shadow(0 0 7px var(--accent));
+}
+
+.office-agent-name {
+  overflow: hidden;
+  max-width: 5.25rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 999px;
+  background: rgb(10 16 14 / 82%);
+  font-size: 0.66rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-agent-status {
+  position: absolute;
+  top: 0;
+  right: 0.25rem;
+  display: grid;
+  width: 1.4rem;
+  height: 1.4rem;
+  place-items: center;
+  border: 2px solid #16211e;
+  border-radius: 50%;
+  color: #13201c;
+  background: var(--accent);
+  font-weight: 900;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-agent {
+    transition: none;
+  }
 }
 
 .world-roster {
@@ -1269,11 +1407,6 @@ button:disabled {
     border-bottom: 1px solid var(--border);
   }
 
-  .world-canvas,
-  .canvas-frame {
-    min-height: 30rem;
-  }
-
   .workspace-intro {
     align-items: flex-start;
     flex-direction: column;
@@ -1342,11 +1475,6 @@ button:disabled {
 
   .workspace-intro > p {
     font-size: 0.8rem;
-  }
-
-  .canvas-frame,
-  .world-canvas {
-    min-height: 25rem;
   }
 
   .command-panel {
