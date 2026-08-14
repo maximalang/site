@@ -31,6 +31,7 @@ import {
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
   PostgresMemoryProjectionStore,
+  PostgresMissionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -221,7 +222,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 25
+    ledger.rows.at(-1)?.version !== 26
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -263,6 +264,10 @@ try {
     "artifacts",
     "agents",
     "agent_skills",
+    "agent_templates",
+    "agent_template_skills",
+    "agent_template_tools",
+    "agent_instance_assignments",
     "agent_tools",
     "account_surfaces",
     "canonical_models",
@@ -299,6 +304,8 @@ try {
     "memory_events",
     "memory_projection_checkpoints",
     "memory_proposals",
+    "missions",
+    "mission_success_criteria",
     "rag_document_chunks",
     "rag_document_sources",
     "rag_documents",
@@ -1180,6 +1187,65 @@ try {
     `INSERT INTO agent_world.project_agents (project_id, agent_id, created_at)
      VALUES ($1, $2, $3)`,
     [ids.project, ids.agent, "2026-08-13T08:59:00.000Z"],
+  );
+  const missionStore = new PostgresMissionStore(pool);
+  const mission = {
+    schemaVersion: 1,
+    id: "mission_19191919-1919-1919-1919-191919191919",
+    projectId: ids.project,
+    title: "Verify the canonical protocol",
+    goal: "Complete protocol verification with replayable evidence.",
+    status: "ACTIVE",
+    successCriteria: [
+      {
+        id: "mission_criterion_20202020-2020-2020-2020-202020202020",
+        statement: "The isolated verifier passes.",
+        verification: "TEST",
+        status: "PENDING",
+        evidenceRefs: [],
+      },
+    ],
+    createdAt: "2026-08-13T08:57:00.000Z",
+    updatedAt: "2026-08-13T08:57:00.000Z",
+  };
+  const template = {
+    schemaVersion: 1,
+    id: "agent_template_21212121-2121-2121-2121-212121212121",
+    version: 1,
+    slug: "protocol-researcher",
+    displayName: "Protocol Researcher",
+    role: "Evidence-first protocol verification",
+    instructions: "Verify canonical contracts and preserve evidence.",
+    skillIds: [],
+    toolIds: [],
+    createdAt: "2026-08-13T08:58:00.000Z",
+  };
+  if (
+    (await missionStore.createMission(mission)).outcome !== "CREATED" ||
+    (await missionStore.createMission(mission)).outcome !== "REPLAY" ||
+    (await missionStore.createTemplate(template)).outcome !== "CREATED" ||
+    (await missionStore.createTemplate(template)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Mission or Agent Template idempotency drifted");
+  }
+  const assignment = {
+    schemaVersion: 1,
+    agentId: ids.agent,
+    templateId: template.id,
+    templateVersion: template.version,
+    projectId: ids.project,
+    missionId: mission.id,
+    createdAt: "2026-08-13T08:59:00.000Z",
+  };
+  if (
+    (await missionStore.assignAgent(assignment)).outcome !== "CREATED" ||
+    (await missionStore.assignAgent(assignment)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Agent Instance assignment idempotency drifted");
+  }
+  await expectRejected(
+    missionStore.createMission({ ...mission, goal: "Conflicting goal." }),
+    "Mission store accepted conflicting identity replay",
   );
   await pool.query(
     `INSERT INTO agent_world.conversations
@@ -2513,7 +2579,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 7, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

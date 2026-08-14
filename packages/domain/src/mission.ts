@@ -16,6 +16,16 @@ const SlugSchema = z
   .max(63)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
+function sortedUniqueIds<T extends z.ZodType>(schema: T) {
+  return z
+    .array(schema)
+    .max(500)
+    .refine(
+      (ids) => ids.every((id, index) => index === 0 || String(ids[index - 1]) < String(id)),
+      "Identifiers must be unique and sorted",
+    );
+}
+
 export const MissionSuccessCriterionSchema = z.strictObject({
   id: MissionCriterionIdSchema,
   statement: z.string().trim().min(1).max(2_000),
@@ -65,8 +75,8 @@ export const AgentTemplateSchema = z.strictObject({
   displayName: z.string().trim().min(1).max(100),
   role: z.string().trim().min(1).max(160),
   instructions: z.string().trim().min(1).max(32_000),
-  skillIds: z.array(SkillIdSchema).max(500),
-  toolIds: z.array(ToolIdSchema).max(500),
+  skillIds: sortedUniqueIds(SkillIdSchema),
+  toolIds: sortedUniqueIds(ToolIdSchema),
   createdAt: TimestampSchema,
 });
 export type AgentTemplate = z.infer<typeof AgentTemplateSchema>;

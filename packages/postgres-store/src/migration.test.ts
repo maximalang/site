@@ -38,6 +38,7 @@ describe("discoverMigrations", () => {
       { version: 23, name: "0023_structured_codex_results.sql" },
       { version: 24, name: "0024_memory_curation.sql" },
       { version: 25, name: "0025_memory_event_stream.sql" },
+      { version: 26, name: "0026_missions_agent_templates.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -76,6 +77,8 @@ describe("discoverMigrations", () => {
     expect(migrations[23]?.sql).toContain("CREATE TABLE agent_world.memory_curation_decisions");
     expect(migrations[24]?.sql).toContain("CREATE TABLE agent_world.memory_events");
     expect(migrations[24]?.sql).toContain("CREATE TABLE agent_world.memory_projection_checkpoints");
+    expect(migrations[25]?.sql).toContain("CREATE TABLE agent_world.missions");
+    expect(migrations[25]?.sql).toContain("CREATE TABLE agent_world.agent_templates");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {

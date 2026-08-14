@@ -100,5 +100,22 @@ describe("Mission and Agent Template contracts", () => {
         isEnabled: true,
       }).success,
     ).toBe(false);
+    expect(
+      AgentTemplateSchema.safeParse({
+        schemaVersion: 1,
+        id: ids.template,
+        version: 1,
+        slug: "research-lead",
+        displayName: "Research Lead",
+        role: "Evidence-first research",
+        instructions: "Use primary sources.",
+        skillIds: [
+          "skill_66666666-6666-6666-6666-666666666666",
+          "skill_66666666-6666-6666-6666-666666666666",
+        ],
+        toolIds: [],
+        createdAt: "2026-08-15T00:00:00.000Z",
+      }).success,
+    ).toBe(false);
   });
 });
