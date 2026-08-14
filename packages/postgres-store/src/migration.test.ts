@@ -34,6 +34,7 @@ describe("discoverMigrations", () => {
       { version: 19, name: "0019_resource_broker.sql" },
       { version: 20, name: "0020_native_chat_launcher.sql" },
       { version: 21, name: "0021_shared_context_rag.sql" },
+      { version: 22, name: "0022_context_packs.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -65,6 +66,8 @@ describe("discoverMigrations", () => {
     expect(migrations[20]?.sql).toContain("CREATE EXTENSION IF NOT EXISTS vector");
     expect(migrations[20]?.sql).toContain("CREATE TABLE agent_world.rag_document_chunks");
     expect(migrations[20]?.sql).toContain("USING hnsw (embedding vector_cosine_ops)");
+    expect(migrations[21]?.sql).toContain("CREATE TABLE agent_world.context_packs");
+    expect(migrations[21]?.sql).toContain("CREATE TABLE agent_world.context_pack_evidence");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {

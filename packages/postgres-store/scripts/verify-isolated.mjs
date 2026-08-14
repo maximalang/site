@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { compileContextPack } from "@agent-world/conversation-service";
 import {
   AgentIdSchema,
   AgentSchema,
@@ -19,6 +20,7 @@ import {
   PostgresCodexBindingResolver,
   PostgresCodexExecutionStore,
   PostgresCodexWorkerReadinessStore,
+  PostgresContextPackStore,
   PostgresConversationReader,
   PostgresConversationStore,
   PostgresEncryptedSecretStore,
@@ -214,7 +216,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 21
+    ledger.rows.at(-1)?.version !== 22
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -286,6 +288,8 @@ try {
     "project_agents",
     "providers",
     "context_items",
+    "context_pack_evidence",
+    "context_packs",
     "rag_document_chunks",
     "rag_document_sources",
     "rag_documents",
@@ -2095,6 +2099,74 @@ try {
       "2026-08-13T13:01:02.200Z",
     ],
   );
+  const contextPackStore = new PostgresContextPackStore(pool);
+  const compiledContextPack = compileContextPack(
+    {
+      schemaVersion: 1,
+      packId: "context_pack_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
+      runId: nativeChat.run,
+      task: {
+        schemaVersion: 1,
+        id: nativeChat.task,
+        projectId: ids.project,
+        assigneeAgentId: ids.agent,
+        title: "Verify Native Chat commit",
+        description: "Commit through the canonical Control event stream.",
+        approvalRequirement: "REQUIRED",
+        idempotencyKey: "task:native-chat-control",
+        createdAt: "2026-08-13T13:00:02.000Z",
+      },
+      agent: worldAgent,
+      project: {
+        id: ids.project,
+        name: "Protocol project",
+        state: "Native Chat verification is active.",
+      },
+      route: {
+        schemaVersion: 1,
+        id: nativeChat.route,
+        label: "Native Plus Chat MCP",
+        mode: "CHAT",
+        adapterKind: "NATIVE_CHATGPT",
+        accountId: codex.account,
+        isEnabled: true,
+      },
+      tokenBudget: 1_000,
+      expectedOutput: "A structured canonical result.",
+      handoffContract: "Commit exactly one terminal result.",
+      availableTools: ["get_run_resources", "commit_result"],
+    },
+    [
+      {
+        item: {
+          schemaVersion: 1,
+          id: "context_item_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
+          projectId: ids.project,
+          kind: "MEMORY",
+          temperature: "WARM",
+          content: "Native Chat commits through canonical events.",
+          summary: "Canonical Native Chat memory.",
+          contentHash: "7".repeat(64),
+          estimatedTokens: 9,
+          importance: 0.95,
+          provenance: { kind: "RUN", runId: nativeChat.run },
+          createdAt: "2026-08-13T13:01:02.200Z",
+        },
+        relevance: 1,
+      },
+    ],
+    "2026-08-13T13:01:02.300Z",
+  );
+  const persistedContextPack = await contextPackStore.persist(compiledContextPack);
+  const replayedContextPack = await contextPackStore.persist(compiledContextPack);
+  const recoveredContextPack = await new PostgresContextPackStore(pool).readByRun(nativeChat.run);
+  if (
+    persistedContextPack.outcome !== "CREATED" ||
+    replayedContextPack.outcome !== "REPLAY" ||
+    JSON.stringify(recoveredContextPack) !== JSON.stringify(compiledContextPack)
+  ) {
+    throw new Error("ContextPack was not persisted, replayed, and recovered exactly");
+  }
   const nativeChatResourceReader = new PostgresNativeChatResourceReader(pool, {
     pullId: () => "resource_pull_c7c7c7c7-c7c7-c7c7-c7c7-c7c7c7c7c7c7",
     now: () => new Date("2026-08-13T13:01:03.000Z"),
@@ -2190,7 +2262,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 7, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 10, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
