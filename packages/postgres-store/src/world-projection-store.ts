@@ -69,8 +69,9 @@ type EventRow = QueryResultRow & {
 type SequenceRow = QueryResultRow & { last_sequence: string | number };
 type TaskRow = QueryResultRow & {
   id: string;
-  conversation_id: string;
+  conversation_id: string | null;
   project_id: string;
+  mission_id: string | null;
   assignee_agent_id: string;
   title: string;
   description: string | null;
@@ -125,6 +126,7 @@ function parseTask(row: TaskRow) {
     schemaVersion: 1,
     id: row.id,
     projectId: row.project_id,
+    ...(row.mission_id === null ? {} : { missionId: row.mission_id }),
     assigneeAgentId: row.assignee_agent_id,
     title: row.title,
     ...(row.description === null ? {} : { description: row.description }),
@@ -244,7 +246,7 @@ export class PostgresWorldProjectionStore {
         "agent_world:world_projection",
       ]);
       const existing = await client.query<TaskRow>(
-        `SELECT id, conversation_id, project_id, assignee_agent_id, title, description,
+        `SELECT id, conversation_id, project_id, mission_id, assignee_agent_id, title, description,
                 approval_requirement, idempotency_key, created_at
            FROM agent_world.tasks
           WHERE id = $1 OR idempotency_key = $2
@@ -399,7 +401,7 @@ export class PostgresWorldProjectionStore {
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
       const tasks = await client.query<TaskRow>(
-        `SELECT id, conversation_id, project_id, assignee_agent_id, title, description,
+        `SELECT id, conversation_id, project_id, mission_id, assignee_agent_id, title, description,
                   approval_requirement, idempotency_key, created_at
              FROM agent_world.tasks
             ORDER BY created_at, id

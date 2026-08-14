@@ -9,6 +9,7 @@ import {
   ProjectIdSchema,
   SkillIdSchema,
   StructuredMeetingIdSchema,
+  TaskIdSchema,
   ToolIdSchema,
 } from "./identity.js";
 import { TimestampSchema } from "./primitives.js";
@@ -102,6 +103,7 @@ const DecompositionTaskKeySchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
 const MissionTaskProposalSchema = z.strictObject({
+  taskId: TaskIdSchema,
   key: DecompositionTaskKeySchema,
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(20_000).optional(),
@@ -131,6 +133,10 @@ export const MissionDecompositionSchema = z
     if (tasks.size !== decomposition.tasks.length) {
       context.addIssue({ code: "custom", message: "Decomposition Task keys must be unique" });
       return;
+    }
+    const taskIds = decomposition.tasks.map((task) => task.taskId);
+    if (new Set(taskIds).size !== taskIds.length) {
+      context.addIssue({ code: "custom", message: "Decomposition Task IDs must be unique" });
     }
     for (const task of decomposition.tasks) {
       if (task.dependsOn.includes(task.key)) {

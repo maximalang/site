@@ -222,7 +222,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 29
+    ledger.rows.at(-1)?.version !== 30
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -306,9 +306,11 @@ try {
     "memory_proposals",
     "missions",
     "mission_collaboration_events",
+    "mission_decomposition_dependencies",
     "mission_decompositions",
     "mission_decomposition_tasks",
     "mission_success_criteria",
+    "mission_task_dependencies",
     "rag_document_chunks",
     "rag_document_sources",
     "rag_documents",
@@ -1198,6 +1200,10 @@ try {
   const collaborationEventIds = [
     "event_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
     "event_a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
+    "event_a6a6a6a6-a6a6-a6a6-a6a6-a6a6a6a6a6a6",
+    "event_a7a7a7a7-a7a7-a7a7-a7a7-a7a7a7a7a7a7",
+    "event_a8a8a8a8-a8a8-a8a8-a8a8-a8a8a8a8a8a8",
+    "event_a9a9a9a9-a9a9-a9a9-a9a9-a9a9a9a9a9a9",
   ];
   const missionStore = new PostgresMissionStore(pool, {
     eventId: () => {
@@ -1279,12 +1285,14 @@ try {
     rationale: "Separate implementation from independent review.",
     tasks: [
       {
+        taskId: "task_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
         key: "implement",
         title: "Implement the canonical protocol",
         assigneeAgentId: ids.agent,
         dependsOn: [],
       },
       {
+        taskId: "task_a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
         key: "review",
         title: "Review the canonical protocol",
         assigneeAgentId: hub.secondaryAgent,
@@ -2700,8 +2708,37 @@ try {
     throw new Error("Native Chat Control events did not project one exact terminal result");
   }
 
+  if (
+    (await missionStore.materializeDecomposition(decomposition.id, "2026-08-13T09:20:00.000Z"))
+      .outcome !== "CREATED" ||
+    (await missionStore.materializeDecomposition(decomposition.id, "2026-08-13T09:21:00.000Z"))
+      .outcome !== "REPLAY"
+  ) {
+    throw new Error("Mission Task materialization idempotency drifted");
+  }
+  const materializedTasks = await pool.query(
+    `SELECT task.id, task.conversation_id, task.mission_id, approval.state,
+            dependency.depends_on_task_id
+       FROM agent_world.tasks task
+       JOIN agent_world.approvals approval ON approval.task_id = task.id
+       LEFT JOIN agent_world.mission_task_dependencies dependency ON dependency.task_id = task.id
+      WHERE task.mission_id = $1
+      ORDER BY task.id`,
+    [mission.id],
+  );
+  if (
+    materializedTasks.rows.length !== 2 ||
+    materializedTasks.rows.some(
+      ({ conversation_id, mission_id, state }) =>
+        conversation_id !== null || mission_id !== mission.id || state !== "PENDING",
+    ) ||
+    materializedTasks.rows[1]?.depends_on_task_id !== decomposition.tasks[0].taskId
+  ) {
+    throw new Error("Mission decomposition did not create transport-neutral dependent Tasks");
+  }
+
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 13, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 16, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

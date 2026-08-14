@@ -4,14 +4,18 @@ import {
   AgentInstanceAssignmentSchema,
   type AgentTemplate,
   AgentTemplateSchema,
+  ApprovalIdSchema,
   EventIdSchema,
+  IdempotencyKeySchema,
   type Mission,
   type MissionDecomposition,
+  MissionDecompositionIdSchema,
   MissionDecompositionSchema,
   MissionIdSchema,
   MissionSchema,
   type StructuredMeeting,
   StructuredMeetingSchema,
+  TimestampSchema,
 } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
@@ -22,7 +26,8 @@ export type MissionStoreErrorCode =
   | "TEMPLATE_CONFLICT"
   | "ASSIGNMENT_CONFLICT"
   | "DECOMPOSITION_CONFLICT"
-  | "MEETING_CONFLICT";
+  | "MEETING_CONFLICT"
+  | "MATERIALIZATION_CONFLICT";
 
 export class MissionStoreError extends Error {
   constructor(readonly code: MissionStoreErrorCode) {
@@ -440,18 +445,28 @@ export class PostgresMissionStore {
         for (const [position, task] of decomposition.tasks.entries()) {
           const taskInserted = await client.query(
             `INSERT INTO agent_world.mission_decomposition_tasks
-               (decomposition_id, task_key, task_position, assignee_agent_id)
-             SELECT $1, $2, $3, membership.agent_id
+               (decomposition_id, task_key, task_position, assignee_agent_id, task_id)
+             SELECT $1, $2, $3, membership.agent_id, $5
                FROM agent_world.mission_decompositions decomposition
                JOIN agent_world.project_agents membership
                  ON membership.project_id = decomposition.project_id
                 AND membership.agent_id = $4
               WHERE decomposition.id = $1
              RETURNING decomposition_id`,
-            [decomposition.id, task.key, position, task.assigneeAgentId],
+            [decomposition.id, task.key, position, task.assigneeAgentId, task.taskId],
           );
           if (taskInserted.rows.length !== 1) {
             throw new MissionStoreError("DECOMPOSITION_CONFLICT");
+          }
+        }
+        for (const task of decomposition.tasks) {
+          for (const dependency of task.dependsOn) {
+            await client.query(
+              `INSERT INTO agent_world.mission_decomposition_dependencies
+                 (decomposition_id, task_key, depends_on_task_key)
+               VALUES ($1, $2, $3)`,
+              [decomposition.id, task.key, dependency],
+            );
           }
         }
         await this.appendCollaborationEvent(client, {
@@ -535,6 +550,199 @@ export class PostgresMissionStore {
           occurredAt: meeting.decidedAt,
         });
       },
+    );
+  }
+
+  async materializeDecomposition(decompositionIdInput: unknown, materializedAtInput: unknown) {
+    const decompositionId = MissionDecompositionIdSchema.parse(decompositionIdInput);
+    const materializedAt = TimestampSchema.parse(materializedAtInput);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        `agent_world:mission_materialization:${decompositionId}`,
+      ]);
+      const found = await client.query<
+        QueryResultRow & { payload: unknown; materialized_at: Date | string | null }
+      >(
+        `SELECT decomposition.payload, decomposition.materialized_at
+           FROM agent_world.mission_decompositions decomposition
+           JOIN agent_world.missions mission ON mission.id = decomposition.mission_id
+          WHERE decomposition.id = $1 AND mission.status = 'ACTIVE'
+          FOR UPDATE OF decomposition`,
+        [decompositionId],
+      );
+      const row = found.rows[0];
+      if (!row || found.rows.length !== 1) {
+        throw new MissionStoreError("MATERIALIZATION_CONFLICT");
+      }
+      const decomposition = MissionDecompositionSchema.parse(row.payload);
+      if (row.materialized_at !== null) {
+        await client.query("COMMIT");
+        return {
+          outcome: "REPLAY" as const,
+          missionId: decomposition.missionId,
+          taskIds: decomposition.tasks.map(({ taskId }) => taskId),
+        };
+      }
+      if (Date.parse(materializedAt) < Date.parse(decomposition.createdAt)) {
+        throw new MissionStoreError("MATERIALIZATION_CONFLICT");
+      }
+      const taskByKey = new Map(decomposition.tasks.map((task) => [task.key, task]));
+      for (const taskProposal of decomposition.tasks) {
+        const idempotencyKey = IdempotencyKeySchema.parse(
+          `mission-task:${taskProposal.taskId.slice("task_".length)}`,
+        );
+        const inserted = await client.query(
+          `INSERT INTO agent_world.tasks
+             (id, conversation_id, project_id, mission_id, assignee_agent_id,
+              title, description, approval_requirement, idempotency_key, created_at)
+           SELECT $1, NULL, $2, $3, membership.agent_id, $5, $6, 'REQUIRED', $7, $8
+             FROM agent_world.project_agents membership
+            WHERE membership.project_id = $2 AND membership.agent_id = $4
+           RETURNING id`,
+          [
+            taskProposal.taskId,
+            decomposition.projectId,
+            decomposition.missionId,
+            taskProposal.assigneeAgentId,
+            taskProposal.title,
+            taskProposal.description ?? null,
+            idempotencyKey,
+            materializedAt,
+          ],
+        );
+        if (inserted.rows.length !== 1) {
+          throw new MissionStoreError("MATERIALIZATION_CONFLICT");
+        }
+        const approvalId = ApprovalIdSchema.parse(
+          `approval_${taskProposal.taskId.slice("task_".length)}`,
+        );
+        const expiresAt = new Date(Date.parse(materializedAt) + 15 * 60 * 1_000).toISOString();
+        await client.query(
+          `INSERT INTO agent_world.approvals
+             (id, task_id, state, requested_at, expires_at)
+           VALUES ($1, $2, 'PENDING', $3, $4)`,
+          [approvalId, taskProposal.taskId, materializedAt, expiresAt],
+        );
+        await this.appendWorldTaskEvent(client, {
+          eventType: "TASK_ASSIGNED",
+          occurredAt: materializedAt,
+          commandId: idempotencyKey,
+          agentId: taskProposal.assigneeAgentId,
+          taskId: taskProposal.taskId,
+        });
+        await this.appendWorldTaskEvent(client, {
+          eventType: "APPROVAL_STATE_CHANGED",
+          occurredAt: materializedAt,
+          commandId: idempotencyKey,
+          agentId: taskProposal.assigneeAgentId,
+          taskId: taskProposal.taskId,
+          approvalId,
+          expiresAt,
+        });
+      }
+      for (const taskProposal of decomposition.tasks) {
+        for (const dependencyKey of taskProposal.dependsOn) {
+          const dependency = taskByKey.get(dependencyKey);
+          if (!dependency) throw new MissionStoreError("MATERIALIZATION_CONFLICT");
+          await client.query(
+            `INSERT INTO agent_world.mission_task_dependencies
+               (mission_id, task_id, depends_on_task_id)
+             VALUES ($1, $2, $3)`,
+            [decomposition.missionId, taskProposal.taskId, dependency.taskId],
+          );
+        }
+      }
+      const updated = await client.query(
+        `UPDATE agent_world.mission_decompositions
+            SET materialized_at = $2
+          WHERE id = $1 AND materialized_at IS NULL
+        RETURNING id`,
+        [decompositionId, materializedAt],
+      );
+      if (updated.rows.length !== 1) throw new MissionStoreError("MATERIALIZATION_CONFLICT");
+      await client.query("COMMIT");
+      return {
+        outcome: "CREATED" as const,
+        missionId: decomposition.missionId,
+        taskIds: decomposition.tasks.map(({ taskId }) => taskId),
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async appendWorldTaskEvent(
+    client: Awaited<ReturnType<TransactionPool["connect"]>>,
+    input:
+      | {
+          eventType: "TASK_ASSIGNED";
+          occurredAt: string;
+          commandId: string;
+          agentId: string;
+          taskId: string;
+        }
+      | {
+          eventType: "APPROVAL_STATE_CHANGED";
+          occurredAt: string;
+          commandId: string;
+          agentId: string;
+          taskId: string;
+          approvalId: string;
+          expiresAt: string;
+        },
+  ) {
+    const sequence = await client.query(
+      `UPDATE agent_world.world_event_stream
+          SET last_sequence = last_sequence + 1
+        WHERE singleton = true
+      RETURNING last_sequence`,
+    );
+    if (sequence.rows.length !== 1 || !sequence.rows[0]) {
+      throw new MissionStoreError("MATERIALIZATION_CONFLICT");
+    }
+    const eventId = EventIdSchema.parse(
+      this.identities.eventId?.() ??
+        (() => {
+          throw new Error("A production Mission collaboration Event identity is required");
+        })(),
+    );
+    await client.query(
+      input.eventType === "TASK_ASSIGNED"
+        ? `INSERT INTO agent_world.world_events
+             (sequence, id, occurred_at, source_kind, source_actor, command_id,
+              event_type, agent_id, task_id)
+           VALUES ($1, $2, $3, 'DOMAIN', 'SYSTEM_POLICY', $4,
+                   'TASK_ASSIGNED', $5, $6)`
+        : `INSERT INTO agent_world.world_events
+             (sequence, id, occurred_at, source_kind, source_actor, command_id,
+              event_type, agent_id, task_id, approval_id, approval_state,
+              approval_requested_at, approval_expires_at)
+           VALUES ($1, $2, $3, 'DOMAIN', 'SYSTEM_POLICY', $4,
+                   'APPROVAL_STATE_CHANGED', $5, $6, $7, 'PENDING', $3, $8)`,
+      input.eventType === "TASK_ASSIGNED"
+        ? [
+            sequence.rows[0].last_sequence,
+            eventId,
+            input.occurredAt,
+            input.commandId,
+            input.agentId,
+            input.taskId,
+          ]
+        : [
+            sequence.rows[0].last_sequence,
+            eventId,
+            input.occurredAt,
+            input.commandId,
+            input.agentId,
+            input.taskId,
+            input.approvalId,
+            input.expiresAt,
+          ],
     );
   }
 

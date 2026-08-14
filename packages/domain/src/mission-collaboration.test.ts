@@ -9,6 +9,8 @@ const ids = {
   agentA: "agent_55555555-5555-5555-5555-555555555555",
   agentB: "agent_66666666-6666-6666-6666-666666666666",
   event: "event_77777777-7777-7777-7777-777777777777",
+  taskA: "task_88888888-8888-8888-8888-888888888888",
+  taskB: "task_99999999-9999-9999-9999-999999999999",
 };
 
 describe("Mission collaboration contracts", () => {
@@ -22,6 +24,7 @@ describe("Mission collaboration contracts", () => {
       rationale: "Split implementation from review.",
       tasks: [
         {
+          taskId: ids.taskA,
           key: "implement",
           title: "Implement the change",
           description: "Produce the canonical implementation.",
@@ -29,6 +32,7 @@ describe("Mission collaboration contracts", () => {
           dependsOn: [],
         },
         {
+          taskId: ids.taskB,
           key: "review",
           title: "Review the change",
           description: "Verify the implementation against success criteria.",
@@ -53,8 +57,20 @@ describe("Mission collaboration contracts", () => {
         sourceEventId: ids.event,
         rationale: "Invalid cycle.",
         tasks: [
-          { key: "a", title: "A", assigneeAgentId: ids.agentA, dependsOn: ["b"] },
-          { key: "b", title: "B", assigneeAgentId: ids.agentB, dependsOn: ["a"] },
+          {
+            taskId: ids.taskA,
+            key: "a",
+            title: "A",
+            assigneeAgentId: ids.agentA,
+            dependsOn: ["b"],
+          },
+          {
+            taskId: ids.taskB,
+            key: "b",
+            title: "B",
+            assigneeAgentId: ids.agentB,
+            dependsOn: ["a"],
+          },
         ],
         createdAt: "2026-08-15T10:00:00.000Z",
       }),
