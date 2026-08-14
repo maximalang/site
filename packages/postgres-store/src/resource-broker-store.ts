@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import {
+  AccountIdSchema,
   BrokerDecisionIdSchema,
+  ExecutionAdapterKindSchema,
   ExecutionModeSchema,
   RouteIdSchema,
   TaskIdSchema,
@@ -15,7 +17,7 @@ import {
 } from "@agent-world/read-model";
 import type { QueryResultRow } from "pg";
 import * as z from "zod";
-import type { TransactionPool } from "./conversation-store.js";
+import type { TransactionClient, TransactionPool } from "./conversation-store.js";
 
 const ObservationSchema = z.strictObject({
   routeId: RouteIdSchema,
@@ -37,7 +39,10 @@ const DecideSchema = z.strictObject({
   policy: ResourceBrokerPolicySchema,
   decidedAt: TimestampSchema,
   allowedModes: z.array(ExecutionModeSchema).min(1).max(5).optional(),
+  allowedAdapterKinds: z.array(ExecutionAdapterKindSchema).min(1).max(6).optional(),
+  allowedAccountId: AccountIdSchema.optional(),
 });
+export type ResourceBrokerDecisionInput = z.input<typeof DecideSchema>;
 
 type CandidateRow = QueryResultRow & {
   route_id: string;
@@ -83,6 +88,105 @@ function sha256(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
 }
 
+export async function decideResourceRouteInTransaction(
+  client: TransactionClient,
+  input: ResourceBrokerDecisionInput,
+): Promise<ResourceBrokerDecision> {
+  const request = DecideSchema.parse(input);
+  const requestHash = sha256(request);
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+    `agent_world:resource_broker:${request.decisionId}`,
+  ]);
+  const existing = await client.query<ExistingDecisionRow>(
+    "SELECT task_id, request_sha256, decision FROM agent_world.resource_broker_decisions WHERE id = $1",
+    [request.decisionId],
+  );
+  if (existing.rows[0]) {
+    if (
+      existing.rows.length !== 1 ||
+      existing.rows[0].task_id !== request.taskId ||
+      existing.rows[0].request_sha256 !== requestHash
+    ) {
+      throw new ResourceBrokerStoreError("DECISION_CONFLICT");
+    }
+    return ResourceBrokerDecisionSchema.parse(existing.rows[0].decision);
+  }
+
+  const candidates = await client.query<CandidateRow>(
+    `SELECT DISTINCT ON (route.id)
+            route.id AS route_id, route.account_id, route.mode, route.adapter_kind,
+            route.is_enabled AS route_enabled,
+            account.is_enabled AS account_enabled, account.health AS account_health,
+            observation.observed_at, observation.expires_at, observation.is_available,
+            observation.quality, observation.remaining_limits, observation.cost,
+            observation.speed, observation.load
+       FROM agent_world.execution_routes route
+       JOIN agent_world.resource_route_observations observation
+         ON observation.route_id = route.id
+       LEFT JOIN agent_world.accounts account ON account.id = route.account_id
+      WHERE ($1::text[] IS NULL OR route.mode = ANY($1::text[]))
+        AND ($2::text[] IS NULL OR route.adapter_kind = ANY($2::text[]))
+        AND ($3::text IS NULL OR route.account_id = $3)
+      ORDER BY route.id, observation.observed_at DESC`,
+    [
+      request.allowedModes ?? null,
+      request.allowedAdapterKinds ?? null,
+      request.allowedAccountId ?? null,
+    ],
+  );
+  const decision = selectResourceRoute({
+    policy: request.policy,
+    now: request.decidedAt,
+    candidates: candidates.rows.map((row) =>
+      ResourceRouteCandidateSchema.parse({
+        routeId: row.route_id,
+        ...(row.account_id === null ? {} : { accountId: row.account_id }),
+        mode: row.mode,
+        adapterKind: row.adapter_kind,
+        isAvailable:
+          row.is_available &&
+          row.route_enabled &&
+          (row.account_id === null ||
+            (row.account_enabled === true &&
+              ["ACTIVE", "DEGRADED"].includes(row.account_health ?? ""))),
+        quality: Number(row.quality),
+        remainingLimits: Number(row.remaining_limits),
+        cost: Number(row.cost),
+        speed: Number(row.speed),
+        load: Number(row.load),
+        observedAt: iso(row.observed_at),
+        expiresAt: iso(row.expires_at),
+      }),
+    ),
+  });
+  const selectedEvaluation = decision.selected
+    ? decision.evaluations.find(({ candidate }) => candidate.routeId === decision.selected?.routeId)
+    : undefined;
+  await client.query(
+    `INSERT INTO agent_world.resource_broker_decisions
+       (id, task_id, request_sha256, policy_version, decision, decision_sha256,
+        selected_route_id, selected_account_id, selected_adapter_kind,
+        selected_mode, selected_score, fallback_reason, decided_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [
+      request.decisionId,
+      request.taskId,
+      requestHash,
+      request.policy.version,
+      JSON.stringify(decision),
+      sha256(decision),
+      decision.selected?.routeId ?? null,
+      decision.selected?.accountId ?? null,
+      decision.selected?.adapterKind ?? null,
+      decision.selected?.mode ?? null,
+      selectedEvaluation?.score ?? null,
+      decision.selected ? null : "NO_ELIGIBLE_ROUTE",
+      request.decidedAt,
+    ],
+  );
+  return decision;
+}
+
 export class PostgresResourceBrokerStore {
   constructor(private readonly pool: TransactionPool) {}
 
@@ -126,101 +230,11 @@ export class PostgresResourceBrokerStore {
     }
   }
 
-  async decide(input: z.input<typeof DecideSchema>): Promise<ResourceBrokerDecision> {
-    const request = DecideSchema.parse(input);
-    const requestHash = sha256(request);
+  async decide(input: ResourceBrokerDecisionInput): Promise<ResourceBrokerDecision> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-        `agent_world:resource_broker:${request.decisionId}`,
-      ]);
-      const existing = await client.query<ExistingDecisionRow>(
-        "SELECT task_id, request_sha256, decision FROM agent_world.resource_broker_decisions WHERE id = $1",
-        [request.decisionId],
-      );
-      if (existing.rows[0]) {
-        if (
-          existing.rows.length !== 1 ||
-          existing.rows[0].task_id !== request.taskId ||
-          existing.rows[0].request_sha256 !== requestHash
-        ) {
-          throw new ResourceBrokerStoreError("DECISION_CONFLICT");
-        }
-        const decision = ResourceBrokerDecisionSchema.parse(existing.rows[0].decision);
-        await client.query("COMMIT");
-        return decision;
-      }
-
-      const candidates = await client.query<CandidateRow>(
-        `SELECT DISTINCT ON (route.id)
-                route.id AS route_id, route.account_id, route.mode, route.adapter_kind,
-                route.is_enabled AS route_enabled,
-                account.is_enabled AS account_enabled, account.health AS account_health,
-                observation.observed_at, observation.expires_at, observation.is_available,
-                observation.quality, observation.remaining_limits, observation.cost,
-                observation.speed, observation.load
-           FROM agent_world.execution_routes route
-           JOIN agent_world.resource_route_observations observation
-             ON observation.route_id = route.id
-           LEFT JOIN agent_world.accounts account ON account.id = route.account_id
-          WHERE ($1::text[] IS NULL OR route.mode = ANY($1::text[]))
-          ORDER BY route.id, observation.observed_at DESC`,
-        [request.allowedModes ?? null],
-      );
-      const decision = selectResourceRoute({
-        policy: request.policy,
-        now: request.decidedAt,
-        candidates: candidates.rows.map((row) =>
-          ResourceRouteCandidateSchema.parse({
-            routeId: row.route_id,
-            ...(row.account_id === null ? {} : { accountId: row.account_id }),
-            mode: row.mode,
-            adapterKind: row.adapter_kind,
-            isAvailable:
-              row.is_available &&
-              row.route_enabled &&
-              (row.account_id === null ||
-                (row.account_enabled === true &&
-                  ["ACTIVE", "DEGRADED"].includes(row.account_health ?? ""))),
-            quality: Number(row.quality),
-            remainingLimits: Number(row.remaining_limits),
-            cost: Number(row.cost),
-            speed: Number(row.speed),
-            load: Number(row.load),
-            observedAt: iso(row.observed_at),
-            expiresAt: iso(row.expires_at),
-          }),
-        ),
-      });
-      const selectedEvaluation = decision.selected
-        ? decision.evaluations.find(
-            ({ candidate }) => candidate.routeId === decision.selected?.routeId,
-          )
-        : undefined;
-      const payloadHash = sha256(decision);
-      await client.query(
-        `INSERT INTO agent_world.resource_broker_decisions
-           (id, task_id, request_sha256, policy_version, decision, decision_sha256,
-            selected_route_id, selected_account_id, selected_adapter_kind,
-            selected_mode, selected_score, fallback_reason, decided_at)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        [
-          request.decisionId,
-          request.taskId,
-          requestHash,
-          request.policy.version,
-          JSON.stringify(decision),
-          payloadHash,
-          decision.selected?.routeId ?? null,
-          decision.selected?.accountId ?? null,
-          decision.selected?.adapterKind ?? null,
-          decision.selected?.mode ?? null,
-          selectedEvaluation?.score ?? null,
-          decision.selected ? null : "NO_ELIGIBLE_ROUTE",
-          request.decidedAt,
-        ],
-      );
+      const decision = await decideResourceRouteInTransaction(client, input);
       await client.query("COMMIT");
       return decision;
     } catch (error) {

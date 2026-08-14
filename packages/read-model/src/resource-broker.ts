@@ -35,13 +35,13 @@ export const ResourceBrokerPolicySchema = z.strictObject({
   weights: ResourceBrokerWeightsSchema,
 });
 
-const validTransportPair = {
-  OPENCLAW: "WORK",
-  CODEX: "CODEX",
-  API_MODEL: "API",
-  LOCAL_MODEL: "LOCAL",
-  NATIVE_CHATGPT: "CHAT",
-  NATIVE_WORK: "WORK",
+const validTransportModes = {
+  OPENCLAW: ["CHAT", "WORK"],
+  CODEX: ["CODEX"],
+  API_MODEL: ["API"],
+  LOCAL_MODEL: ["LOCAL"],
+  NATIVE_CHATGPT: ["CHAT"],
+  NATIVE_WORK: ["WORK"],
 } as const;
 
 export const ResourceRouteCandidateSchema = z
@@ -60,7 +60,9 @@ export const ResourceRouteCandidateSchema = z
     expiresAt: TimestampSchema,
   })
   .superRefine((candidate, context) => {
-    if (candidate.mode !== validTransportPair[candidate.adapterKind]) {
+    if (
+      !(validTransportModes[candidate.adapterKind] as readonly string[]).includes(candidate.mode)
+    ) {
       context.addIssue({ code: "custom", message: "Route mode does not match its adapter" });
     }
     if (Date.parse(candidate.expiresAt) <= Date.parse(candidate.observedAt)) {

@@ -891,6 +891,20 @@ try {
   if (assignmentReplay.outcome !== "REPLAY") {
     throw new Error("Task assignment did not return an idempotent replay");
   }
+  const approvalResourceBroker = new PostgresResourceBrokerStore(pool);
+  await approvalResourceBroker.recordObservation({
+    routeId: ids.route,
+    observedAt: "2026-08-13T09:44:00.000Z",
+    expiresAt: "2026-08-13T09:50:00.000Z",
+    isAvailable: true,
+    quality: 0.9,
+    remainingLimits: 0.9,
+    cost: 0.8,
+    speed: 0.8,
+    load: 0.9,
+    sourceKind: "HEALTHCHECK",
+    sourceRef: "openclaw:isolated-ready",
+  });
   const approvalEventIds = [
     "event_19191919-1919-1919-1919-191919191919",
     "event_20202020-2020-2020-2020-202020202020",
@@ -1667,8 +1681,8 @@ try {
     conversation: "conversation_c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3",
     task: "task_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
     approval: "approval_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
-    run: "run_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
-    dispatch: "chat_dispatch_c7c7c7c7-c7c7-c7c7-c7c7-c7c7c7c7c7c7",
+    run: "run_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
+    dispatch: "chat_dispatch_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
   };
   await pool.query(
     "INSERT INTO agent_world.account_surfaces (account_id, surface) VALUES ($1, 'CHAT') ON CONFLICT DO NOTHING",
@@ -1694,6 +1708,14 @@ try {
              'Commit through the canonical Control event stream.', 'REQUIRED',
              'task:native-chat-control', $5)`,
     [nativeChat.task, nativeChat.conversation, ids.project, ids.agent, "2026-08-13T13:00:02.000Z"],
+  );
+  await preferenceStore.writeLayer(
+    ExecutionPreferenceLayerSchema.parse({
+      schemaVersion: 1,
+      scope: { kind: "TASK", taskId: nativeChat.task },
+      overrides: { mode: "CHAT" },
+    }),
+    "2026-08-13T13:00:02.050Z",
   );
   const resourceBroker = new PostgresResourceBrokerStore(pool);
   await resourceBroker.recordObservation({
@@ -1751,32 +1773,43 @@ try {
   await pool.query(
     `INSERT INTO agent_world.approvals
        (id, task_id, state, requested_at, expires_at, decided_at, decision_command_id)
-     VALUES ($1, $2, 'APPROVED', $3, $4, $5, 'approve:native-chat-control')`,
-    [
-      nativeChat.approval,
-      nativeChat.task,
-      "2026-08-13T13:00:02.000Z",
-      "2026-08-14T13:00:02.000Z",
-      "2026-08-13T13:00:03.000Z",
-    ],
+     VALUES ($1, $2, 'PENDING', $3, $4, NULL, NULL)`,
+    [nativeChat.approval, nativeChat.task, "2026-08-13T13:00:02.000Z", "2026-08-14T13:00:02.000Z"],
   );
-  await pool.query(
-    `INSERT INTO agent_world.runs
-       (id, task_id, conversation_id, agent_id, approval_id, adapter_kind,
-        route_id, account_id, execution_mode, status, dispatch_idempotency_key, created_at)
-     VALUES ($1, $2, $3, $4, $5, 'NATIVE_CHATGPT', $6, $7, 'CHAT',
-             'DISPATCH_PENDING', 'run:native-chat-control', $8)`,
-    [
-      nativeChat.run,
-      nativeChat.task,
-      nativeChat.conversation,
-      ids.agent,
-      nativeChat.approval,
-      nativeChat.route,
-      codex.account,
-      "2026-08-13T13:00:04.000Z",
-    ],
-  );
+  const nativeApprovalEventIds = [
+    "event_cbcbcbcb-cbcb-cbcb-cbcb-cbcbcbcbcbcb",
+    "event_cccccccc-cccc-cccc-cccc-cccccccccccc",
+  ];
+  const nativeApprovalStore = new PostgresApprovalRunStore(pool, {
+    eventId: () => {
+      const eventId = nativeApprovalEventIds.shift();
+      if (!eventId) throw new Error("Native Chat approval event identities were exhausted");
+      return eventId;
+    },
+  });
+  const nativeApprovalDecision = await nativeApprovalStore.decide({
+    taskId: nativeChat.task,
+    approvalId: nativeChat.approval,
+    decision: "APPROVE",
+    commandId: "approve:native-chat-control",
+    decidedAt: "2026-08-13T13:00:04.000Z",
+  });
+  if (
+    nativeApprovalDecision.run?.adapterKind !== "NATIVE_CHATGPT" ||
+    nativeApprovalDecision.run.routeId !== nativeChat.route ||
+    nativeApprovalDecision.run.accountId !== codex.account
+  ) {
+    throw new Error("Approval path did not atomically select the Native Chat route");
+  }
+  const nativeRunProvenance = await new PostgresRunProvenanceReader(pool).read(nativeChat.run);
+  if (
+    nativeRunProvenance.routeId !== nativeChat.route ||
+    nativeRunProvenance.accountId !== codex.account ||
+    nativeRunProvenance.mode !== "CHAT" ||
+    nativeRunProvenance.adapterKind !== "NATIVE_CHATGPT"
+  ) {
+    throw new Error("Native Chat Run provenance was not readable without a runtime binding");
+  }
   const nativeChatProvenance = await pool.query(
     `SELECT r.binding_id, r.session_id, r.route_id, r.account_id, r.execution_mode,
             (SELECT count(*)::integer
@@ -1804,20 +1837,10 @@ try {
     );
   }
   await pool.query(
-    `INSERT INTO agent_world.native_chat_dispatches
-       (id, run_id, task_id, agent_id, account_id, route_id, state,
-        created_at, submitted_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'BROWSER_SUBMITTED', $7, $8)`,
-    [
-      nativeChat.dispatch,
-      nativeChat.run,
-      nativeChat.task,
-      ids.agent,
-      codex.account,
-      nativeChat.route,
-      "2026-08-13T13:00:04.000Z",
-      "2026-08-13T13:00:05.000Z",
-    ],
+    `UPDATE agent_world.native_chat_dispatches
+        SET state = 'BROWSER_SUBMITTED', submitted_at = $2
+      WHERE id = $1 AND state = 'QUEUED'`,
+    [nativeChat.dispatch, "2026-08-13T13:00:05.000Z"],
   );
   const nativeChatEventIds = [
     "event_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8",
@@ -1946,7 +1969,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 4, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

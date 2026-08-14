@@ -23,13 +23,20 @@ export class PostgresRunProvenanceReader {
         `SELECT route.id AS route_id, route.account_id, route.mode,
                 route.adapter_kind, route.model_route_id, model.remote_model_id
            FROM agent_world.runs run
-           JOIN agent_world.runtime_bindings binding
+           LEFT JOIN agent_world.runtime_bindings binding
              ON binding.id = run.binding_id
             AND binding.agent_id = run.agent_id
             AND binding.adapter_kind = run.adapter_kind
            JOIN agent_world.execution_routes route
-             ON route.id = binding.route_id
-            AND route.adapter_kind = binding.adapter_kind
+             ON route.id = CASE
+                  WHEN run.adapter_kind = 'NATIVE_CHATGPT' THEN run.route_id
+                  ELSE binding.route_id
+                END
+            AND route.adapter_kind = run.adapter_kind
+            AND (
+              run.adapter_kind <> 'NATIVE_CHATGPT'
+              OR route.account_id IS NOT DISTINCT FROM run.account_id
+            )
            LEFT JOIN agent_world.model_routes model ON model.id = route.model_route_id
           WHERE run.id = $1
           LIMIT 2`,

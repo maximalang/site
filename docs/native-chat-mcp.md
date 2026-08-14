@@ -29,6 +29,10 @@ structured results and canonical Control events.
   evidence. Decisions record policy version, normalized candidate inputs,
   scores, exclusions, selected route/account and a content hash. Missing or
   expired observations never silently become availability.
+- Approval resolves Simple/Advanced execution preferences, persists the broker
+  decision and creates the approved Run plus `QUEUED` Native Chat dispatch in
+  the same transaction. Runtime routes must have an active session bound to the
+  exact selected route; Native Chat must not have one.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
 - Isolated PostgreSQL-backed OAuth provider under `/oauth` with public-client
@@ -70,8 +74,8 @@ the web resource server.
   endpoint and verify its public discovery/JWKS/DCR contract.
 - Implement the canonical Memory/RAG/Artifact stores so those currently
   unavailable pull classes can return provenance-aware content.
-- Create these transport-valid Runs and dispatches atomically from the persisted
-  Resource Broker decision and submit them through the on-demand launcher.
+- Submit queued dispatches through the on-demand launcher and record its exact
+  browser-submission receipt.
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
 
