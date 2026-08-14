@@ -134,7 +134,7 @@ try {
     "3s",
     "--health-retries",
     "30",
-    "postgres:18.3-bookworm@sha256:80630f83606d8db77d30b3851b16a9f78be2d0d4dda6f7b82a1fdca5ebe3acba",
+    "pgvector/pgvector:0.8.6-pg18-bookworm@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a",
   ]);
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const { stdout } = await execFileAsync("docker", [

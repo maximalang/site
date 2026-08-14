@@ -38,7 +38,7 @@ import {
 } from "../dist/index.js";
 
 const IMAGE =
-  "postgres:18.3-bookworm@sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7";
+  "pgvector/pgvector:0.8.6-pg18-bookworm@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a";
 const ACK = "AGENT_WORLD_DB_TEST_ACK";
 
 if (process.env[ACK] !== "isolated") {

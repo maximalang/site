@@ -30,8 +30,11 @@ migrations rather than adding an ORM before query requirements justify one.
 - Runtime transcripts and OpenClaw receipts remain evidence/projections, never
   canonical truth.
 
-The isolated database verifier pins an official PostgreSQL 18.3 image by
-platform digest and cannot receive a user database URL.
+The isolated database verifier pins the official
+`pgvector/pgvector:0.8.6-pg18-bookworm` image by multi-platform digest
+(PostgreSQL 18.6) and cannot receive a user database URL. This keeps vector
+retrieval inside the canonical database rather than introducing another source
+of truth.
 
 ## Alternatives considered
 

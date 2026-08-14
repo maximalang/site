@@ -69,12 +69,11 @@ $env:AGENT_WORLD_DB_TEST_ACK='isolated'
 npm run test:db
 ```
 
-It pins the official `postgres:18.3-bookworm` linux/amd64 manifest digest
-`sha256:4b2a518e377fe4cbb67168b8043724634f144cbad35a306c6bab44fced4ec2c7`,
-applies the migration set twice, exercises eleven conversation-store scenarios,
-one runtime-locator-redaction reader scenario and six owner-auth scenarios,
-checks the ledger/tables, and removes only its strictly named container plus
-attached anonymous volumes in `finally`.
+It pins the official `pgvector/pgvector:0.8.6-pg18-bookworm` multi-platform
+digest `sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a`
+(PostgreSQL 18.6 with pgvector 0.8.6), applies the migration set twice, checks
+the ledger/tables and store invariants, and removes only its strictly named
+container plus attached anonymous volumes in `finally`.
 
 This proves migration compatibility on an isolated database. It does not prove
 backup/restore, production credentials, production deployment, or upgrade from
