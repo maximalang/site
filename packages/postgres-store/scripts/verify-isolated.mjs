@@ -26,6 +26,7 @@ import {
   PostgresHubReader,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
+  PostgresNativeChatResourceReader,
   PostgresOwnerSessionStore,
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
@@ -209,7 +210,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 16
+    ledger.rows.at(-1)?.version !== 17
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -273,6 +274,7 @@ try {
     "native_chat_control_events",
     "native_chat_dispatches",
     "native_chat_results",
+    "native_chat_resource_pulls",
     "owner_auth_throttle",
     "owner_sessions",
     "project_agents",
@@ -1791,6 +1793,35 @@ try {
     payload: { statement: "PostgreSQL is canonical.", confidence: 1 },
   };
   await nativeChatStore.append(codex.account, findingEvent);
+  const nativeChatResourceReader = new PostgresNativeChatResourceReader(pool, {
+    pullId: () => "resource_pull_c7c7c7c7-c7c7-c7c7-c7c7-c7c7c7c7c7c7",
+    now: () => new Date("2026-08-13T13:01:03.000Z"),
+  });
+  const nativeChatPull = await nativeChatResourceReader.pull(codex.account, {
+    schemaVersion: 1,
+    runId: nativeChat.run,
+    resources: ["TASK", "PROJECT_STATE", "ACTION_HISTORY", "MEMORY"],
+    maxItems: 10,
+    maxTokens: 2_000,
+  });
+  if (
+    nativeChatPull.items.length !== 4 ||
+    nativeChatPull.omissions.length !== 1 ||
+    nativeChatPull.omissions[0]?.resource !== "MEMORY" ||
+    nativeChatPull.omissions[0]?.reason !== "UNAVAILABLE"
+  ) {
+    throw new Error("Native Chat lazy pull did not return exact bounded canonical resources");
+  }
+  await expectRejected(
+    nativeChatResourceReader.pull(legacy.account, {
+      schemaVersion: 1,
+      runId: nativeChat.run,
+      resources: ["TASK"],
+      maxItems: 1,
+      maxTokens: 500,
+    }),
+    "Native Chat lazy pull crossed the canonical Account boundary",
+  );
   const commitEvent = {
     schemaVersion: 1,
     runId: nativeChat.run,
@@ -1834,6 +1865,8 @@ try {
               WHERE e.run_id = r.id) AS events,
             (SELECT count(*)::integer FROM agent_world.native_chat_results x
               WHERE x.run_id = r.id) AS results,
+            (SELECT count(*)::integer FROM agent_world.native_chat_resource_pulls p
+              WHERE p.run_id = r.id) AS pulls,
             s.status AS world_status
        FROM agent_world.runs r
        JOIN agent_world.native_chat_dispatches d ON d.run_id = r.id
@@ -1847,13 +1880,14 @@ try {
     nativeChatEvidence.rows[0]?.last_sequence !== 3 ||
     nativeChatEvidence.rows[0]?.events !== 3 ||
     nativeChatEvidence.rows[0]?.results !== 1 ||
+    nativeChatEvidence.rows[0]?.pulls !== 1 ||
     nativeChatEvidence.rows[0]?.world_status !== "IDLE"
   ) {
     throw new Error("Native Chat Control events did not project one exact terminal result");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

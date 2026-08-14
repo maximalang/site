@@ -88,15 +88,54 @@ export const NativeChatResourceKindSchema = z.enum([
   "ACTION_HISTORY",
 ]);
 
-export const NativeChatPullRequestSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  runId: RunIdSchema,
-  resources: z.array(NativeChatResourceKindSchema).min(1).max(7),
-  query: z.string().trim().min(1).max(2_000).optional(),
-  maxItems: z.number().int().min(1).max(100),
-  maxTokens: z.number().int().min(64).max(100_000),
-});
+export const NativeChatPullRequestSchema = z
+  .strictObject({
+    schemaVersion: z.literal(1),
+    runId: RunIdSchema,
+    resources: z.array(NativeChatResourceKindSchema).min(1).max(7),
+    query: z.string().trim().min(1).max(2_000).optional(),
+    maxItems: z.number().int().min(1).max(100),
+    maxTokens: z.number().int().min(64).max(100_000),
+  })
+  .refine((request) => new Set(request.resources).size === request.resources.length, {
+    message: "Native Chat pull resources must be unique",
+    path: ["resources"],
+  });
 export type NativeChatPullRequest = z.infer<typeof NativeChatPullRequestSchema>;
+
+export const NativeChatPullProvenanceSchema = z.strictObject({
+  source: z.literal("CANONICAL_POSTGRES"),
+  entityType: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/),
+  entityId: z.string().trim().min(1).max(512),
+  recordedAt: TimestampSchema,
+});
+
+export const NativeChatPullItemSchema = z.strictObject({
+  resource: NativeChatResourceKindSchema,
+  content: z.string().trim().min(1).max(200_000),
+  contentSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  estimatedTokens: z.number().int().positive().max(100_000),
+  provenance: z.array(NativeChatPullProvenanceSchema).min(1).max(100),
+});
+
+export const NativeChatPullOmissionSchema = z.strictObject({
+  resource: NativeChatResourceKindSchema,
+  reason: z.enum(["UNAVAILABLE", "NO_MATCH", "ITEM_LIMIT", "TOKEN_BUDGET"]),
+});
+
+export const NativeChatPullResponseSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  pullId: z
+    .string()
+    .regex(/^resource_pull_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+  runId: RunIdSchema,
+  items: z.array(NativeChatPullItemSchema).max(100),
+  omissions: z.array(NativeChatPullOmissionSchema).max(7),
+  estimatedTokens: z.number().int().nonnegative().max(100_000),
+  maxTokens: z.number().int().min(64).max(100_000),
+  pulledAt: TimestampSchema,
+});
+export type NativeChatPullResponse = z.infer<typeof NativeChatPullResponseSchema>;
 
 const ControlEnvelope = {
   schemaVersion: z.literal(1),

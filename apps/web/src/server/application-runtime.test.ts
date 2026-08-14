@@ -16,6 +16,7 @@ function runtime() {
     assignTask: vi.fn(),
     decideApproval: vi.fn(),
     appendNativeChatControl: vi.fn(),
+    pullNativeChatResources: vi.fn(),
     executeHubCommand: vi.fn(),
     writeProviderCredential: vi.fn(),
     checkModelRoute: vi.fn(),

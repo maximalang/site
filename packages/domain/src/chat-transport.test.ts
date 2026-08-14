@@ -58,6 +58,9 @@ describe("Native Plus Chat contracts", () => {
 
     expect(request.resources).toEqual(["PROJECT_STATE", "MEMORY", "SKILLS"]);
     expect(() => NativeChatPullRequestSchema.parse({ ...request, maxTokens: 1_000_001 })).toThrow();
+    expect(() =>
+      NativeChatPullRequestSchema.parse({ ...request, resources: ["TASK", "TASK"] }),
+    ).toThrow();
   });
 
   it("accepts structured intermediate events and requires an explicit commit", () => {

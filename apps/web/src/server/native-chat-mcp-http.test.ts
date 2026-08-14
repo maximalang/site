@@ -22,6 +22,7 @@ describe("Native Chat MCP HTTP resource server", () => {
       resource: "https://world.example/api/mcp",
       authorize: async () => undefined,
       append: vi.fn(),
+      pull: vi.fn(),
     });
     const response = await handlers.POST(
       request({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
@@ -38,6 +39,7 @@ describe("Native Chat MCP HTTP resource server", () => {
       resource: "https://world.example/api/mcp",
       authorize: async () => ({ accountId, scopes: new Set(["ai_world.run.write"]) }),
       append: vi.fn(),
+      pull: vi.fn(),
     });
     const response = await handlers.POST(
       request(
@@ -50,6 +52,7 @@ describe("Native Chat MCP HTTP resource server", () => {
     expect(response.status).toBe(200);
     expect(body.result.tools.map(({ name }) => name)).toEqual([
       "begin_run",
+      "get_run_resources",
       "emit_run_event",
       "commit_result",
       "fail_run",
@@ -67,6 +70,7 @@ describe("Native Chat MCP HTTP resource server", () => {
       resource: "https://world.example/api/mcp",
       authorize: async () => ({ accountId, scopes: new Set(["ai_world.run.write"]) }),
       append,
+      pull: vi.fn(),
     });
     const response = await handlers.POST(
       request({
@@ -118,6 +122,7 @@ describe("Native Chat MCP HTTP resource server", () => {
       resource: "https://world.example/api/mcp",
       authorize: async () => ({ accountId, scopes: new Set(["ai_world.run.write"]) }),
       append,
+      pull: vi.fn(),
     });
     const hostile = await handlers.POST(
       request(
@@ -146,5 +151,51 @@ describe("Native Chat MCP HTTP resource server", () => {
     expect(forged.status).toBe(200);
     expect(await forged.json()).toMatchObject({ error: { code: -32602 } });
     expect(append).not.toHaveBeenCalled();
+  });
+
+  it("pulls bounded resources for the OAuth Account without accepting account_id", async () => {
+    const pull = vi.fn(async () => ({
+      schemaVersion: 1,
+      pullId: "resource_pull_11111111-1111-1111-1111-111111111111",
+      runId,
+      items: [],
+      omissions: [{ resource: "MEMORY", reason: "UNAVAILABLE" }],
+      estimatedTokens: 0,
+      maxTokens: 500,
+      pulledAt: "2026-08-14T19:00:00.000Z",
+    }));
+    const handlers = createNativeChatMcpHandlers({
+      resource: "https://world.example/api/mcp",
+      authorize: async () => ({ accountId, scopes: new Set(["ai_world.run.write"]) }),
+      append: vi.fn(),
+      pull,
+    });
+    const response = await handlers.POST(
+      request({
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: {
+          name: "get_run_resources",
+          arguments: {
+            run_id: runId,
+            resources: ["TASK", "MEMORY"],
+            max_items: 10,
+            max_tokens: 500,
+          },
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(pull).toHaveBeenCalledWith(accountId, {
+      schemaVersion: 1,
+      runId,
+      resources: ["TASK", "MEMORY"],
+      maxItems: 10,
+      maxTokens: 500,
+    });
+    expect(await response.json()).toMatchObject({
+      result: { structuredContent: { omissions: [{ resource: "MEMORY", reason: "UNAVAILABLE" }] } },
+    });
   });
 });

@@ -4,6 +4,8 @@ import type {
   AgentId,
   ModelRouteId,
   NativeChatControlEventInput,
+  NativeChatPullRequest,
+  NativeChatPullResponse,
   SendMessageIntent,
 } from "@agent-world/domain";
 import type {
@@ -37,6 +39,10 @@ export type ApplicationRuntime = {
     accountId: AccountId,
     event: NativeChatControlEventInput,
   ): Promise<unknown>;
+  pullNativeChatResources(
+    accountId: AccountId,
+    request: NativeChatPullRequest,
+  ): Promise<NativeChatPullResponse>;
   executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
   writeProviderCredential(input: ProviderCredentialWriteInput): Promise<SecretWriteReceipt>;
   checkModelRoute(modelRouteId: ModelRouteId): Promise<ModelRouteCheckResponse>;

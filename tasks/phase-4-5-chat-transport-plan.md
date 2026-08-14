@@ -97,7 +97,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 
 - [x] Persist dispatches and authenticated Control events atomically in
       PostgreSQL with per-Run sequence and idempotency conflict detection.
-- [ ] Expose OAuth-protected `begin_run`, bounded pull endpoints and event tools;
+- [x] Expose OAuth-protected `begin_run`, bounded pull endpoints and event tools;
       derive Account from auth instead of trusting request fields.
 - [x] Implement the isolated PostgreSQL-backed OAuth provider with DCR, PKCE
       S256, resource indicators, canonical Account selection, refresh rotation

@@ -48,6 +48,13 @@ export function appendApplicationNativeChatControl(
   return runtime().appendNativeChatControl(accountId, event);
 }
 
+export function pullApplicationNativeChatResources(
+  accountId: Parameters<ReturnType<typeof runtime>["pullNativeChatResources"]>[0],
+  request: Parameters<ReturnType<typeof runtime>["pullNativeChatResources"]>[1],
+) {
+  return runtime().pullNativeChatResources(accountId, request);
+}
+
 export const applicationHubCommandDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   execute: (command: Parameters<ReturnType<typeof runtime>["executeHubCommand"]>[0]) =>

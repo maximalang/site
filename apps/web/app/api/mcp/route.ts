@@ -1,7 +1,13 @@
-import { NativeChatControlEventInputSchema } from "@agent-world/domain";
+import {
+  NativeChatControlEventInputSchema,
+  NativeChatPullRequestSchema,
+} from "@agent-world/domain";
 import { verifyNativeChatMcpAccessToken } from "../../../src/server/native-chat-mcp-auth";
 import { createNativeChatMcpHandlers } from "../../../src/server/native-chat-mcp-http";
-import { appendApplicationNativeChatControl } from "../../../src/server/runtime-proxy";
+import {
+  appendApplicationNativeChatControl,
+  pullApplicationNativeChatResources,
+} from "../../../src/server/runtime-proxy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +53,8 @@ function handlers() {
     },
     append: (accountId, event) =>
       appendApplicationNativeChatControl(accountId, NativeChatControlEventInputSchema.parse(event)),
+    pull: (accountId, request) =>
+      pullApplicationNativeChatResources(accountId, NativeChatPullRequestSchema.parse(request)),
   });
 }
 

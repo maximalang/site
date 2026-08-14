@@ -3,6 +3,7 @@ import {
   AgentIdSchema,
   ArtifactIdSchema,
   NativeChatControlEventInputSchema,
+  NativeChatPullRequestSchema,
   RunIdSchema,
   StructuredAgentOutputSchema,
 } from "@agent-world/domain";
@@ -28,6 +29,7 @@ export type NativeChatMcpDependencies = {
   resource: string;
   authorize(request: Request): Promise<NativeChatPrincipal | undefined>;
   append(accountId: z.infer<typeof AccountIdSchema>, event: unknown): Promise<unknown>;
+  pull(accountId: z.infer<typeof AccountIdSchema>, request: unknown): Promise<unknown>;
 };
 
 const JsonRpcRequestSchema = z.strictObject({
@@ -38,7 +40,7 @@ const JsonRpcRequestSchema = z.strictObject({
 });
 
 const ToolCallSchema = z.strictObject({
-  name: z.enum(["begin_run", "emit_run_event", "commit_result", "fail_run"]),
+  name: z.enum(["begin_run", "get_run_resources", "emit_run_event", "commit_result", "fail_run"]),
   arguments: z.unknown().optional(),
 });
 
@@ -49,6 +51,18 @@ const EnvelopeArguments = {
 };
 
 const BeginArgumentsSchema = z.strictObject(EnvelopeArguments);
+const PullArgumentsSchema = z.strictObject({
+  run_id: RunIdSchema,
+  resources: z
+    .array(
+      z.enum(["TASK", "PROJECT_STATE", "MEMORY", "RAG", "SKILLS", "ARTIFACTS", "ACTION_HISTORY"]),
+    )
+    .min(1)
+    .max(7),
+  query: z.string().trim().min(1).max(2_000).optional(),
+  max_items: z.number().int().min(1).max(100),
+  max_tokens: z.number().int().min(64).max(100_000),
+});
 const EmitArgumentsSchema = z.discriminatedUnion("event_type", [
   z.strictObject({
     ...EnvelopeArguments,
@@ -103,6 +117,39 @@ const TOOLS = [
         idempotency_key: stringSchema(3, 200),
       },
       ["run_id", "sequence", "idempotency_key"],
+    ),
+  },
+  {
+    name: "get_run_resources",
+    title: "Pull bounded AI World resources",
+    description:
+      "After begin_run, lazily pull only the requested Task, project state, skills, history, memory, RAG or artifact resources with provenance and a token budget.",
+    inputSchema: objectSchema(
+      {
+        run_id: canonicalIdSchema("run"),
+        resources: {
+          type: "array",
+          minItems: 1,
+          maxItems: 7,
+          uniqueItems: true,
+          items: {
+            type: "string",
+            enum: [
+              "TASK",
+              "PROJECT_STATE",
+              "MEMORY",
+              "RAG",
+              "SKILLS",
+              "ARTIFACTS",
+              "ACTION_HISTORY",
+            ],
+          },
+        },
+        query: stringSchema(1, 2_000),
+        max_items: { type: "integer", minimum: 1, maximum: 100 },
+        max_tokens: { type: "integer", minimum: 64, maximum: 100_000 },
+      },
+      ["run_id", "resources", "max_items", "max_tokens"],
     ),
   },
   {
@@ -168,7 +215,7 @@ const TOOLS = [
   ...tool,
   securitySchemes: [{ type: "oauth2", scopes: [WRITE_SCOPE] }],
   annotations: {
-    readOnlyHint: false,
+    readOnlyHint: tool.name === "get_run_resources",
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
@@ -227,6 +274,29 @@ export function createNativeChatMcpHandlers(dependencies: NativeChatMcpDependenc
         return rpcError(id, -32602, "Invalid params");
       }
       let event: unknown;
+      if (call.name === "get_run_resources") {
+        try {
+          const args = PullArgumentsSchema.parse(call.arguments ?? {});
+          const pullRequest = NativeChatPullRequestSchema.parse({
+            schemaVersion: 1,
+            runId: args.run_id,
+            resources: args.resources,
+            ...(args.query ? { query: args.query } : {}),
+            maxItems: args.max_items,
+            maxTokens: args.max_tokens,
+          });
+          const structuredContent = await dependencies.pull(principal.accountId, pullRequest);
+          return rpcResult(id, {
+            content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+            structuredContent,
+          });
+        } catch {
+          return rpcResult(id, {
+            content: [{ type: "text", text: "AI World rejected the resource pull." }],
+            isError: true,
+          });
+        }
+      }
       try {
         event = eventFromTool(call.name, call.arguments);
       } catch {

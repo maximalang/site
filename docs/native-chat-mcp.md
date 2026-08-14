@@ -13,6 +13,13 @@ structured results and canonical Control events.
   `ai_world.run.write` scope validation.
 - Origin allowlist for ChatGPT plus exact same-origin requests.
 - `begin_run`, `emit_run_event`, `commit_result` and `fail_run` tools.
+- `get_run_resources` performs bounded lazy pulls after `begin_run`. TASK,
+  project state, assigned skills and canonical Action history include SHA-256
+  and PostgreSQL provenance; unavailable Memory/RAG/Artifact stores are stated
+  explicitly rather than fabricated.
+- Every pull records requested resource classes, a query hash, item/token
+  limits, actual counts and response hash in PostgreSQL. Raw search text is not
+  retained in the receipt.
 - Strict tool arguments contain no Account field. The trusted JWT subject is the
   Account and the PostgreSQL store verifies it against the selected dispatch.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
@@ -54,7 +61,8 @@ the web resource server.
 
 - Deploy the implemented authorization server behind the production HTTPS
   endpoint and verify its public discovery/JWKS/DCR contract.
-- Add bounded lazy Run/task/context/memory/skill pull tools.
+- Implement the canonical Memory/RAG/Artifact stores so those currently
+  unavailable pull classes can return provenance-aware content.
 - Create dispatches through the Resource Broker and on-demand launcher.
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
