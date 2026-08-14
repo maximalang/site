@@ -6,4 +6,5 @@ export * from "./hub-command.js";
 export * from "./model-route-check.js";
 export * from "./projection.js";
 export * from "./provider-credential.js";
+export * from "./resource-broker.js";
 export * from "./task-assignment.js";
