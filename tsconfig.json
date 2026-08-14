@@ -17,6 +17,9 @@
       "path": "./packages/domain"
     },
     {
+      "path": "./packages/graphiti-adapter"
+    },
+    {
       "path": "./packages/model-gateway"
     },
     {

@@ -1,0 +1,23 @@
+{
+  "name": "@agent-world/graphiti-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@agent-world/domain": "0.0.0"
+  }
+}
