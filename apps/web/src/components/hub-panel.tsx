@@ -10,6 +10,7 @@ import {
 } from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
 import { ModelRouteCheckPanel } from "./model-route-check-panel";
+import { type NativeChatProfileClient, NativeChatProfilePanel } from "./native-chat-profile-panel";
 import { ProviderCredentialForm } from "./provider-credential-form";
 
 type LoadHub = (attempt: number) => Promise<HubReadModel>;
@@ -20,11 +21,13 @@ export function HubPanel({
   onSelectAgent,
   csrfToken = "",
   preferenceClient,
+  nativeChatProfileClient,
 }: {
   load?: LoadHub;
   onSelectAgent: (agentId: AgentId) => void;
   csrfToken?: string;
   preferenceClient?: ExecutionPreferenceClient;
+  nativeChatProfileClient?: NativeChatProfileClient;
 }) {
   const [model, setModel] = useState<HubReadModel>();
   const [error, setError] = useState(false);
@@ -82,6 +85,11 @@ export function HubPanel({
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <NativeChatProfilePanel
+        {...(nativeChatProfileClient ? { client: nativeChatProfileClient } : {})}
+        csrfToken={csrfToken}
+        hub={model}
+      />
       <ProviderCredentialForm csrfToken={csrfToken} model={model} />
       <ModelRouteCheckPanel csrfToken={csrfToken} model={model} />
       <ExecutionPreferencesPanel

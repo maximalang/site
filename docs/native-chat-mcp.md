@@ -68,6 +68,13 @@ first launch, Chrome opens a dedicated directory below
 opaque profile alias and directory per ChatGPT Account. AI World never asks for
 or exports passwords, two-factor codes, cookies or browser storage.
 
+The owner can configure each canonical ChatGPT Account in Hub → Native Plus
+Chat. Simple mode requires only the Account and AI World App URL and assigns an
+opaque profile alias automatically; Advanced mode permits changing that alias
+or disabling its launcher mapping. The owner-only API stores the mapping in
+PostgreSQL. Browser filesystem paths remain host-local and never enter the API
+or canonical database.
+
 `AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL` must point to the AI World GPT/App connected
 to this MCP resource. Its instructions must call `begin_run(run_id)`, pull only
 needed context with `get_run_resources`, emit structured progress events, and

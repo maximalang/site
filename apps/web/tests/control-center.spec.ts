@@ -48,6 +48,17 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
         isEnabled: true,
         createdAt: "2026-08-13T06:00:00.000Z",
       },
+      {
+        accountId: "account_12121212-1212-1212-1212-121212121212",
+        providerId: "provider_10101010-1010-1010-1010-101010101010",
+        label: "ChatGPT Plus primary",
+        authMechanism: "CHATGPT_INTERACTIVE",
+        subscription: "Plus",
+        availableSurfaces: ["CHAT"],
+        health: "ACTIVE",
+        isEnabled: true,
+        createdAt: "2026-08-13T06:00:01.000Z",
+      },
     ],
     models: [
       {
@@ -136,6 +147,34 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       status: 200,
     }),
   );
+  await page.route("**/api/hub/native-chat-profiles", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        body: JSON.stringify({ schemaVersion: 1, profiles: [] }),
+        contentType: "application/json",
+        status: 200,
+      });
+      return;
+    }
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
+    const body = route.request().postDataJSON();
+    expect(body).toEqual({
+      schemaVersion: 1,
+      accountId: "account_12121212-1212-1212-1212-121212121212",
+      profileRef: "plus-1",
+      launchUrl: "https://chatgpt.com/g/ai-world-agent",
+      isEnabled: true,
+    });
+    await route.fulfill({
+      body: JSON.stringify({
+        ...body,
+        updatedAt: "2026-08-13T06:02:00.000Z",
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
   await page.route("**/api/hub/provider-credentials", async (route) => {
     expect(route.request().method()).toBe("POST");
     expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
@@ -421,6 +460,17 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     page.getByRole("heading", { level: 2, name: "Execution preferences" }),
   ).toBeVisible();
   await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
+
+  const nativeChatSection = page.locator("section.native-chat-profile-panel");
+  await expect(nativeChatSection.getByRole("heading", { name: "Native Plus Chat" })).toBeVisible();
+  await expect(nativeChatSection.getByLabel("Browser profile alias")).toHaveCount(0);
+  await nativeChatSection
+    .getByLabel("AI World App URL")
+    .fill("https://chatgpt.com/g/ai-world-agent");
+  await nativeChatSection.getByRole("button", { name: "Сохранить подключение" }).click();
+  await expect(nativeChatSection.getByText("Подключение сохранено")).toBeVisible();
+  await nativeChatSection.getByRole("button", { name: "Advanced" }).click();
+  await expect(nativeChatSection.getByLabel("Browser profile alias")).toHaveValue("plus-1");
 
   const providerKeySection = page
     .locator("section.hub-registry-section")
