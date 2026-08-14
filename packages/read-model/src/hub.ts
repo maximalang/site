@@ -11,6 +11,8 @@ import {
   SkillSchema,
   TimestampSchema,
   ToolSchema,
+  TransportDispatchModeSchema,
+  TransportResultChannelSchema,
 } from "@agent-world/domain";
 import * as z from "zod";
 
@@ -119,6 +121,9 @@ export const HubTransportCapabilitySchema = z
   .strictObject({
     mode: z.enum(["CHAT", "WORK", "CODEX"]),
     support: z.enum(["OFFICIAL", "EXPERIMENTAL", "UNSUPPORTED", "DISABLED"]),
+    dispatchMode: TransportDispatchModeSchema,
+    resultChannel: TransportResultChannelSchema,
+    contextMode: z.enum(["LAZY_PULL", "PUSH"]),
     selectable: z.boolean(),
     detail: z.string().trim().min(1).max(240),
   })
@@ -232,19 +237,30 @@ export const HubReadModelSchema = z.strictObject({
     .default([
       {
         mode: "CHAT",
-        support: "UNSUPPORTED",
+        support: "EXPERIMENTAL",
+        dispatchMode: "BROWSER_ON_DEMAND",
+        resultChannel: "CONTROL_API",
+        contextMode: "LAZY_PULL",
         selectable: false,
-        detail: "No supported consumer Chat transport is available.",
+        detail:
+          "Plus Chat launcher sends only run_id; backend commit integration is not live-verified.",
       },
       {
         mode: "WORK",
-        support: "UNSUPPORTED",
+        support: "EXPERIMENTAL",
+        dispatchMode: "SERVER_API",
+        resultChannel: "CONTROL_API",
+        contextMode: "LAZY_PULL",
         selectable: false,
-        detail: "No supported consumer Work transport is available.",
+        detail:
+          "Workspace Agents API is official; result callback integration is not live-verified.",
       },
       {
         mode: "CODEX",
         support: "OFFICIAL",
+        dispatchMode: "LOCAL_PROCESS",
+        resultChannel: "PROCESS_IO",
+        contextMode: "PUSH",
         selectable: true,
         detail: "Official Codex SDK and CLI transport; route readiness is enforced separately.",
       },

@@ -1,3 +1,4 @@
+export * from "./chat-transport.js";
 export * from "./context.js";
 export * from "./conversation.js";
 export * from "./events.js";

@@ -95,7 +95,7 @@ describe("HubPanel", () => {
     expect(summary.closest("details")?.hasAttribute("open")).toBe(true);
     expect(screen.getByText("gpt-x-primary")).not.toBeNull();
     expect(screen.getByText("gpt-x-fallback")).not.toBeNull();
-    expect(screen.getAllByText("UNSUPPORTED · not selectable")).toHaveLength(2);
+    expect(screen.getAllByText("EXPERIMENTAL · not selectable")).toHaveLength(2);
     expect(screen.getByText("OFFICIAL · selectable")).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: /Researcher.*Evidence-first research/i }));

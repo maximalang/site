@@ -131,9 +131,26 @@ describe("HubReadModelSchema", () => {
     expect(parsed.models[0]).not.toHaveProperty("providerId");
     expect(parsed.models[0]).not.toHaveProperty("accountId");
     expect(parsed.transportCapabilities).toEqual([
-      expect.objectContaining({ mode: "CHAT", support: "UNSUPPORTED", selectable: false }),
-      expect.objectContaining({ mode: "WORK", support: "UNSUPPORTED", selectable: false }),
-      expect.objectContaining({ mode: "CODEX", support: "OFFICIAL", selectable: true }),
+      expect.objectContaining({
+        mode: "CHAT",
+        support: "EXPERIMENTAL",
+        dispatchMode: "BROWSER_ON_DEMAND",
+        resultChannel: "CONTROL_API",
+        contextMode: "LAZY_PULL",
+        selectable: false,
+      }),
+      expect.objectContaining({
+        mode: "WORK",
+        support: "EXPERIMENTAL",
+        dispatchMode: "SERVER_API",
+        selectable: false,
+      }),
+      expect.objectContaining({
+        mode: "CODEX",
+        support: "OFFICIAL",
+        dispatchMode: "LOCAL_PROCESS",
+        selectable: true,
+      }),
     ]);
   });
 
@@ -143,7 +160,9 @@ describe("HubReadModelSchema", () => {
       HubReadModelSchema.safeParse({
         ...parsed,
         transportCapabilities: parsed.transportCapabilities.map((capability) =>
-          capability.mode === "CHAT" ? { ...capability, selectable: true } : capability,
+          capability.mode === "CHAT"
+            ? { ...capability, support: "UNSUPPORTED", selectable: true }
+            : capability,
         ),
       }).success,
     ).toBe(false);

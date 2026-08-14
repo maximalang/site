@@ -10,13 +10,28 @@ agent framework, model gateway, memory stack, or control panels.
 
 ## Non-negotiable architecture constraints
 
-- `Agent` is a durable identity and is never an `Account` or a runtime session.
+- `AgentTemplate` is reusable behavior; an `Agent`/`AgentInstance` is a durable
+  mission/project identity and is never an `Account`, Chat or runtime session.
+- `Mission` owns the user goal and success criteria above decomposed Tasks and
+  concrete Runs.
 - PostgreSQL is the canonical source of truth; integrated systems are runtime or
   telemetry projections.
+- The append-only PostgreSQL event log is the basis of Action Graph, World
+  state, history and deterministic replay.
 - World renders real typed events and never spends LLM tokens on decorative
   animation or chatter.
 - All execution backends sit behind a versioned `ExecutionAdapter` contract.
-- Consumer ChatGPT Chat/Work scraping is not a production transport.
+- Native Plus Chat uses an on-demand browser launcher only to choose an Account,
+  create a Chat and submit `run_id`; output is committed through Control API
+  tools and is never read from the DOM.
+- Chat context is lazy/pull-based: memory, RAG, skills and project state are
+  fetched only when needed under Context/Token Governor budgets.
+- One Resource Broker chooses Account/Chat/Work/Codex/API/Local from quality,
+  limits, cost, speed and load evidence while transports stay independent.
+- LangGraph provides durable orchestration, checkpoints, recovery, retries,
+  handoffs and review loops; it does not become a second product state store.
+- UI configuration has Simple/Advanced levels and defaults most choices to
+  safe `Auto` policies.
 - One primary World renderer and one model gateway are selected for the first
   production deployment.
 - The first deployment targets one VDS with Docker Compose, not Kubernetes.
@@ -29,7 +44,8 @@ Phase 0 reuse and license audit
     -> OpenClaw adapter plus World/Command working shell
       -> canonical Hub and PostgreSQL migrations
         -> model gateway and Codex routes
-          -> ContextCompiler, RAG, memory and orchestration
+          -> Mission + Resource Broker + lazy context + native Chat Control API
+            -> ContextCompiler, RAG, memory and LangGraph orchestration
             -> integrations, observability and production hardening
 ```
 
@@ -65,13 +81,21 @@ Phase 0 reuse and license audit
 - [ ] Integrate official ChatGPT-authenticated Codex execution.
 - [ ] Represent Chat/Work transports explicitly as official, experimental,
       unsupported or disabled.
+- [ ] Deliver Native Plus Chat dispatch-only launcher and authenticated
+      pull/Control API through Custom GPT Actions, with an App/Plugin adapter
+      capability-gated until personal Plus write support is live-proven.
 
 ### Phases 5-8: Context, memory and orchestration
 
 - [ ] Deliver ContextCompiler plus token/cost governor and pgvector RAG.
 - [ ] Deliver Graphiti/FalkorDB memory with evidence and curation.
+- [ ] Deliver Memory Center Network, Timeline and Inbox projections with
+      provenance-aware Curator `Accept / Merge / Reject` decisions.
 - [ ] Deliver LangGraph workflows, deterministic routing, handoffs, review,
       retry and approvals.
+- [ ] Deliver Mission decomposition, reusable Agent Templates/Instances,
+      Resource Broker scoring and structured position/synthesis/decision
+      meetings without free-form token chatter.
 
 ### Phases 9-11: Integrations and production readiness
 
@@ -112,7 +136,7 @@ Phase 0 reuse and license audit
 | AGPL or source-available UI contaminates permissive core | High | Treat as reference-only or separately deployed service unless an explicit licensing decision is accepted. |
 | World UI imports the wrong Agent/Account model | High | Define canonical contracts before porting UI state. |
 | Multiple sources of truth emerge | High | Persist authority in PostgreSQL and make all runtime configs projections. |
-| Consumer ChatGPT automation violates service rules | High | Keep transport disabled unless an official supported path is verified. |
+| Browser automation becomes an unsupported Chat state/output channel | High | Isolate launcher to opening an authenticated Account/Chat and submitting `run_id`; accept results only through authenticated supported Actions/App tools. |
 | One-VDS stack becomes operationally excessive | Medium | Keep optional Compose profiles and require the core profile to stand alone. |
 
 ## Open questions resolved during Phase 0

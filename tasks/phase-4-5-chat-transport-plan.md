@@ -1,117 +1,138 @@
-# Phase 4.5 Plan: Supported Chat Transports
+# Phase 4.5 Plan: Native Chat integration and resource routing
 
 ## Outcome
 
-Make `CHAT` a real execution mode without building production runtime on
-consumer ChatGPT DOM automation. Provide one automatic upstream-supported path
-for managed workspaces and one honest user-assisted path for personal ChatGPT
-accounts. Both paths use the canonical Task/Run/Event domain, persisted
-ContextPack and structured result contracts.
+Make `CHAT` a native ChatGPT execution surface while AI World remains the sole
+owner of Missions, Tasks, Runs, context, memory, orchestration and history. A
+minimal on-demand browser launcher selects the configured Account, creates a
+Chat and sends only `run_id`. It never reads output, waits for a final response,
+scrapes the DOM, copies cookies or calls private ChatGPT endpoints.
 
-## Refreshed upstream evidence (2026-08-14)
+The Chat agent pulls only the resources it actually needs and writes progress
+and the terminal structured result through the same AI World Control API used
+by a Custom GPT Action today and an AI World App/Plugin when Plus write support
+is available and verified.
 
-OpenAI now documents a Workspace Agents API that did not exist in the initial
-reuse snapshot:
+## Current upstream boundary (refreshed 2026-08-14)
 
-- `POST https://api.chatgpt.com/v1/workspace_agents/{id}/trigger` durably queues
-  a published workspace agent with caller-provided `conversation_key` and an
-  optional `Idempotency-Key`.
-- A beta run identifier can be polled for queued, in-progress, suspended,
-  completed or failed status.
-- Authentication uses a Workspace Agent access token scoped to workspace-agent
-  operations. A workspace admin must enable both Workspace agents and personal
-  access-token creation.
-- The trigger API currently returns the ChatGPT conversation URL but explicitly
-  does not return the Agent response body.
-- ChatGPT web can use remote MCP-backed tools supplied through installed
-  plugins, allowing a workspace Agent to submit a structured result to this
-  product without reading ChatGPT DOM content.
+- Custom GPTs are available on Plus and Actions call external APIs described by
+  OpenAPI with API-key or OAuth authentication. This is the current supported
+  implementation path for personal Plus accounts.
+- Full custom MCP write apps are currently documented for Business,
+  Enterprise and Edu, not personal Plus. The App/Plugin adapter remains the
+  target, but must stay capability-gated and experimental until OpenAI exposes
+  and a live verifier proves the required Plus write surface.
+- ChatGPT can request confirmation for external writes. AI World must model this
+  as an execution condition; it must not bypass or conceal the confirmation.
 
 Sources:
 
-- <https://learn.chatgpt.com/workspace-agents/trigger-runs>
-- <https://learn.chatgpt.com/workspace-agents/authentication>
-- <https://learn.chatgpt.com/docs/extend/mcp>
+- <https://help.openai.com/en/articles/9442513>
+- <https://help.openai.com/en/articles/8554397-creating-a-gpt>
+- <https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt>
 
-## Transport matrix
+## Fixed architecture
 
-| Transport | Account requirement | Automation | Result channel | Production status |
-| --- | --- | --- | --- | --- |
-| `WORKSPACE_CHAT` | Admin-enabled ChatGPT workspace + scoped access token | Automatic | Signed MCP `submit_agent_result` callback | Experimental until live-verified |
-| `PERSONAL_CHAT_RELAY` | Any personal ChatGPT account | User-assisted | Owner pastes result into canonical Run | Supported with explicit human step |
-| Consumer DOM/browser automation | Consumer session cookie | Apparent automation | Scraped page | Rejected |
+```text
+Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
+                                      |
+                         on-demand Chat launcher sends run_id
+                                      |
+                   ChatGPT pulls context and commits Control events
+                                      |
+                   PostgreSQL append-only canonical event log
+                     |          |          |           |
+               Action Graph   World     Memory      replay
+```
 
-## Fixed boundaries
+- `Agent != Account`. `AgentTemplate` defines reusable behavior;
+  `AgentInstance` binds a template to a Mission/project, and `Run` is one
+  execution attempt. ChatGPT identities map to canonical Accounts only.
+- `ChatTransport`, `WorkTransport`, `CodexTransport`, API and Local adapters are
+  independent. The Resource Broker chooses among eligible candidates using
+  quality, limits, cost, speed and load; policy or owner overrides remain
+  explicit and most UI controls default to `Auto`.
+- Native Plus Chat dispatch is `BROWSER_ON_DEMAND`; its result channel is
+  `CONTROL_API`. Browser submission is evidence of dispatch, never evidence of
+  execution or success.
+- `run_id` is an address, not a credential. OAuth/authenticated app identity
+  selects one canonical Account; authorization is capability-scoped to the Run.
+- Initial Chat input is intentionally minimal. Project state, memory, RAG,
+  skills, artifacts and history are bounded lazy pulls with provenance and
+  token budgets enforced by Context/Token Governor.
+- The agent calls `begin_run`, may emit `heartbeat`, `finding`, `artifact`,
+  `decision`, `handoff` or `fail`, and must call
+  `commit_result(run_id, structured_result)` before its final Chat message.
+- Only authenticated backend events change canonical Run state. A visible Chat
+  answer, browser navigation or DOM state cannot complete a Run.
+- The append-only PostgreSQL event log is the source for Action Graph, World
+  state, history and replay. World animation is a deterministic projection and
+  never invokes an LLM.
+- LangGraph owns durable orchestration, checkpoints, recovery, retries,
+  handoffs and review loops behind product-owned workflow interfaces.
+- Structured meetings record bounded positions, one synthesis and one decision;
+  free-form multi-agent chatter is not orchestration.
+- Memory Center projects Network, Timeline and Inbox. Curator proposals require
+  explicit `Accept`, `Merge` or `Reject`, retaining provenance for every choice.
+- Settings expose `Simple` and `Advanced`; `Simple` uses safe `Auto` defaults.
+- Reuse OpenClaw, Agent Town, LiteLLM, LangGraph, Graphiti/FalkorDB,
+  PostgreSQL/pgvector, Langfuse, n8n and MCP. Product-owned code is limited to
+  AI World UI, Unified Hub, Resource Broker, Context/Token Governor, shared
+  Event/Memory layer and Native Chat integration.
 
-- `Agent != Account`. A published ChatGPT workspace agent is an external
-  execution binding, not the canonical Agent identity.
-- Workspace access tokens are encrypted secrets and are never exposed to the
-  browser, prompt, model, logs or read models.
-- The automatic trigger adapter records only bounded validated upstream IDs,
-  status, conversation URL origin and failure class.
-- A Workspace Agent is instructed to call one capability-scoped MCP callback.
-  The callback token is single-Run, short-lived, hashed at rest and cannot read
-  other Runs or invoke arbitrary Hub commands.
-- A completed upstream status without a valid result callback is
-  `RESULT_MISSING`, never a successful canonical Run.
-- Personal relay cannot claim `AUTOMATIC`. Owner acknowledgement, exported
-  prompt hash, imported result hash and timestamps are immutable provenance.
-- Chat prompts contain a persisted ContextPack and no full transcript by
-  default.
-- No code reads or manipulates `chatgpt.com` DOM, cookies, browser storage or
-  private endpoints.
+## Slice 1: Contracts and product truth
 
-## Slice 1: Versioned transport contracts
+- [x] Replace relay/import contracts with dispatch-only Native Chat contracts.
+- [x] Define bounded lazy resource pulls and structured Control events.
+- [x] Enforce ordered events, `begin_run` before progress and terminal
+      `commit_result`/`fail` with no post-terminal writes.
+- [x] Keep CHAT experimental and non-selectable until implementation and live
+      evidence exist; never label manual relay as the primary transport.
+- [ ] Define additive Mission, AgentTemplate/Instance and Resource Broker
+      contracts without breaking existing Agent/Task records.
 
-- [ ] Add explicit `AUTOMATIC` and `USER_ASSISTED` execution interaction modes.
-- [ ] Define strict Workspace trigger/status and Personal relay export/import
-      schemas without leaking upstream secrets.
-- [ ] Add canonical suspended/waiting states without weakening terminal Run
-      invariants.
-- [ ] Hub capabilities describe support, automation and prerequisites
-      separately.
+## Slice 2: Canonical event and Control API
 
-## Slice 2: Personal Chat Relay
+- [ ] Persist dispatches and authenticated Control events atomically in
+      PostgreSQL with per-Run sequence and idempotency conflict detection.
+- [ ] Expose OAuth-protected `begin_run`, bounded pull endpoints and event tools;
+      derive Account from auth instead of trusting request fields.
+- [ ] Update Task/Run, Action Graph, World projections and Memory Inbox from the
+      same committed transaction/outbox boundary.
+- [ ] Reconcile restart, late/duplicate calls, missing commit and expired
+      capabilities deterministically.
 
-- [ ] Create an idempotent PostgreSQL relay ledger bound to Task, Run, Agent,
-      Account, route and persisted ContextPack hash.
-- [ ] Owner-only API exports the exact bounded prompt and marks the Run waiting
-      for a human relay.
-- [ ] Command/World show the same waiting state and a minimal Copy/Open/import
-      workflow; no third-party dashboard is required.
-- [ ] Imported output is size-bounded, hashed, schema-validated as untrusted
-      data and stored with exact owner/action provenance.
-- [ ] Duplicate import is idempotent; conflicting import is rejected.
+## Slice 3: Plus launcher and Actions adapter
 
-## Slice 3: Workspace Chat adapter
+- [ ] Isolated on-demand launcher selects an already authenticated Account,
+      opens the configured Custom GPT/new Chat and submits only `run_id`.
+- [ ] No DOM output read, final-response wait, cookie access or private API.
+- [ ] Publish one OpenAPI contract for Custom GPT Actions using the Control API;
+      each ChatGPT account connects through its own OAuth identity to the same
+      AI World owner/control plane.
+- [ ] Add an MCP/App adapter over the same use cases without a second state
+      store or orchestration path.
 
-- [ ] Trigger only allowlisted `https://api.chatgpt.com` endpoints with a scoped
-      encrypted token and bounded timeout/retry policy.
-- [ ] Use canonical idempotency and conversation keys; validate every response.
-- [ ] Poll beta status with bounded backoff and normalize all documented HTTP
-      and terminal failure classes.
-- [ ] Accept result only through a short-lived capability-scoped MCP callback.
-- [ ] Reconcile restart, upstream completion without callback and late callback
-      deterministically.
+## Slice 4: Resource Broker and durable orchestration
 
-## Slice 4: Routing and product truth
-
-- [ ] Personal `CHAT` is selectable only when user-assisted execution is
-      acceptable for the Task.
-- [ ] Workspace `CHAT` is selectable automatically only when Account, token,
-      published trigger and callback integration are ready.
-- [ ] Router can fall back among Workspace Chat, Codex, API and local routes;
-      it never silently changes an automatic Task into user-assisted work.
-- [ ] Every Task surface shows Account, Mode, Adapter and interaction mode.
+- [ ] Score eligible Account/Chat/Work/Codex/API/Local candidates from fresh
+      quality, remaining limits, marginal cost, latency and load observations.
+- [ ] Fail closed on stale quota/auth/capability evidence; record the selected
+      candidate, score inputs, policy version and fallback reason as events.
+- [ ] LangGraph checkpoints reference canonical Mission/Task/Run/Event IDs and
+      resume without duplicating side effects.
+- [ ] Mission decomposition and structured meetings produce bounded Tasks,
+      synthesis, decision and success-criteria evidence.
 
 ## Verification gate
 
-- Contract tests cover malicious URLs, forged IDs/status, oversized results,
-  duplicate/conflicting import, expired capability and missing callback.
-- Disposable PostgreSQL tests prove idempotency, restart recovery and exact
-  provenance.
-- A deterministic local upstream exercises trigger/status/failure behavior.
-- A real Workspace Agent run is required before `WORKSPACE_CHAT` becomes
-  production-supported; until then it remains experimental and fail-closed.
-- Personal relay must pass an authenticated browser flow at desktop and mobile
-  viewports without exposing credentials or claiming autonomous execution.
+- Contract tests reject extra launcher content, forged Account fields,
+  oversized pulls, skipped sequences, commit-before-begin, duplicate conflicts
+  and post-terminal writes.
+- Disposable PostgreSQL tests prove idempotency, ordered replay, restart and
+  exact provenance.
+- Browser verifier proves only `run_id` is submitted and no response DOM is
+  observed on each supported account profile.
+- A real Plus Custom GPT + Actions run must commit through the Control API before
+  CHAT becomes selectable. The App/Plugin path stays experimental until the
+  exact personal Plus write capability is officially available and live-proven.
