@@ -15,6 +15,7 @@ import { Pool } from "pg";
 import {
   applyMigrations,
   discoverMigrations,
+  MemoryGraphProjector,
   PostgresAgentConversationReader,
   PostgresApprovalRunStore,
   PostgresCodexBindingResolver,
@@ -27,7 +28,9 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
+  PostgresMemoryProjectionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -218,7 +221,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 24
+    ledger.rows.at(-1)?.version !== 25
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -293,6 +296,8 @@ try {
     "context_pack_evidence",
     "context_packs",
     "memory_curation_decisions",
+    "memory_events",
+    "memory_projection_checkpoints",
     "memory_proposals",
     "rag_document_chunks",
     "rag_document_sources",
@@ -610,9 +615,19 @@ try {
     mergeDecision: "memory_decision_76767676-7676-7676-7676-767676767676",
     rejectDecision: "memory_decision_77777777-7777-7777-7777-777777777777",
     context: "context_item_78787878-7878-7878-7878-787878787878",
+    events: [
+      "event_80808080-8080-8080-8080-808080808080",
+      "event_81818181-8181-8181-8181-818181818181",
+      "event_82828282-8282-8282-8282-828282828282",
+      "event_83838383-8383-8383-8383-838383838383",
+      "event_84848484-8484-8484-8484-848484848484",
+      "event_85858585-8585-8585-8585-858585858585",
+    ],
   };
+  let memoryEventIndex = 0;
   const memoryStore = new PostgresMemoryCurationStore(pool, {
     contextItemId: () => memoryIds.context,
+    eventId: () => memoryIds.events[memoryEventIndex++],
   });
   const memoryProposal = {
     schemaVersion: 1,
@@ -696,7 +711,11 @@ try {
     `SELECT proposal.status, memory.kind, memory.provenance_kind,
             memory.document_chunk_id,
             (SELECT count(*)::integer FROM agent_world.memory_curation_decisions
-              WHERE project_id = $1) AS decisions
+              WHERE project_id = $1) AS decisions,
+            (SELECT count(*)::integer FROM agent_world.memory_events
+              WHERE project_id = $1) AS events,
+            (SELECT array_agg(event_type ORDER BY sequence) FROM agent_world.memory_events
+              WHERE project_id = $1) AS event_types
        FROM agent_world.memory_proposals proposal
        JOIN agent_world.context_items memory ON memory.id = $2
       WHERE proposal.id = $3 AND proposal.project_id = $1`,
@@ -715,9 +734,60 @@ try {
     memoryEvidence.rows[0]?.kind !== "MEMORY" ||
     memoryEvidence.rows[0]?.provenance_kind !== "DOCUMENT_CHUNK" ||
     memoryEvidence.rows[0]?.document_chunk_id !== contextIds.chunk ||
-    memoryEvidence.rows[0]?.decisions !== 3
+    memoryEvidence.rows[0]?.decisions !== 3 ||
+    memoryEvidence.rows[0]?.events !== 6 ||
+    JSON.stringify(memoryEvidence.rows[0]?.event_types) !==
+      JSON.stringify([
+        "MEMORY_PROPOSED",
+        "MEMORY_CURATED",
+        "MEMORY_PROPOSED",
+        "MEMORY_CURATED",
+        "MEMORY_PROPOSED",
+        "MEMORY_CURATED",
+      ])
   ) {
     throw new Error("Memory curation lifecycle or exact provenance drifted");
+  }
+  const memoryReader = new PostgresMemoryCenterReader(pool);
+  const [memoryInbox, memoryTimeline, memoryNetwork] = await Promise.all([
+    memoryReader.inbox(ids.project, 50),
+    memoryReader.timeline(ids.project, 50),
+    memoryReader.network(ids.project, 50),
+  ]);
+  const projectedEventIds = [];
+  const memoryProjectionStore = new PostgresMemoryProjectionStore(pool);
+  const graphPort = {
+    apply: async (events) => {
+      projectedEventIds.push(...events.map(({ eventId }) => eventId));
+      return { appliedThrough: events.at(-1)?.sequence ?? 0 };
+    },
+  };
+  const projected = await new MemoryGraphProjector(memoryProjectionStore, graphPort, {
+    projectionName: "graphiti",
+    now: () => "2026-08-13T08:37:00.000Z",
+  }).runBatch(100);
+  const replayAfterRestart = await new MemoryGraphProjector(
+    new PostgresMemoryProjectionStore(pool),
+    graphPort,
+    { projectionName: "graphiti", now: () => "2026-08-13T08:38:00.000Z" },
+  ).runBatch(100);
+  if (
+    memoryInbox.proposals.length !== 0 ||
+    memoryTimeline.entries.length !== 3 ||
+    memoryTimeline.entries
+      .map(({ action }) => action)
+      .toSorted()
+      .join(",") !== "ACCEPT,MERGE,REJECT" ||
+    memoryNetwork.nodes.length !== 1 ||
+    memoryNetwork.nodes[0]?.contextItemId !== memoryIds.context ||
+    memoryNetwork.edges.length !== 2 ||
+    projected.applied !== 6 ||
+    projected.appliedThrough !== 6 ||
+    projectedEventIds.length !== 6 ||
+    replayAfterRestart.applied !== 0 ||
+    replayAfterRestart.appliedThrough !== 6
+  ) {
+    throw new Error("Memory Center projections or graph replay checkpoint drifted");
   }
   await pool.query(
     `INSERT INTO agent_world.agents
@@ -2443,7 +2513,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

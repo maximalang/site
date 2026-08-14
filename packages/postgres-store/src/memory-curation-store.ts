@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  EventIdSchema,
   type MemoryCurationDecision,
   MemoryCurationDecisionSchema,
   type MemoryProposal,
@@ -81,7 +82,7 @@ function receiptFromDecision(row: DecisionRow, outcome: "CREATED" | "REPLAYED") 
 export class PostgresMemoryCurationStore {
   constructor(
     private readonly pool: TransactionPool,
-    private readonly identities: { contextItemId?: () => string } = {},
+    private readonly identities: { contextItemId?: () => string; eventId?: () => string } = {},
   ) {}
 
   async propose(value: unknown): Promise<MemoryProposalReceipt> {
@@ -117,6 +118,27 @@ export class PostgresMemoryCurationStore {
         ],
       );
       if (inserted.rows[0]) {
+        const eventId = EventIdSchema.parse(
+          this.identities.eventId?.() ??
+            (() => {
+              throw new Error("A production memory Event identity is required");
+            })(),
+        );
+        await client.query(
+          `INSERT INTO agent_world.memory_events
+             (id, event_type, project_id, proposal_id, source_context_item_id,
+              content, payload_sha256, occurred_at)
+           VALUES ($1, 'MEMORY_PROPOSED', $2, $3, $4, $5, $6, $7)`,
+          [
+            eventId,
+            proposal.projectId,
+            proposal.id,
+            proposal.sourceContextItemId,
+            proposal.content,
+            sha256({ eventType: "MEMORY_PROPOSED", proposal }),
+            proposal.createdAt,
+          ],
+        );
         await client.query("COMMIT");
         return { outcome: "CREATED", proposalId: inserted.rows[0].id };
       }
@@ -272,6 +294,36 @@ export class PostgresMemoryCurationStore {
             SET status = $3, decided_at = $4
           WHERE id = $1 AND project_id = $2 AND status = 'PENDING'`,
         [decision.proposalId, decision.projectId, status, decision.decidedAt],
+      );
+      const eventId = EventIdSchema.parse(
+        this.identities.eventId?.() ??
+          (() => {
+            throw new Error("A production memory Event identity is required");
+          })(),
+      );
+      await client.query(
+        `INSERT INTO agent_world.memory_events
+           (id, event_type, project_id, proposal_id, decision_id,
+            source_context_item_id, materialized_context_item_id, action,
+            content, payload_sha256, occurred_at)
+         VALUES ($1, 'MEMORY_CURATED', $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          eventId,
+          decision.projectId,
+          decision.proposalId,
+          decision.id,
+          proposal.source_context_item_id,
+          materializedContextItemId,
+          decision.action,
+          proposal.content,
+          sha256({
+            eventType: "MEMORY_CURATED",
+            decision,
+            sourceContextItemId: proposal.source_context_item_id,
+            materializedContextItemId,
+          }),
+          decision.decidedAt,
+        ],
       );
       await client.query("COMMIT");
       return {

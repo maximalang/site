@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MemoryCurationDecisionSchema, MemoryProposalSchema } from "./memory.js";
+import {
+  MemoryCurationDecisionSchema,
+  MemoryNetworkSchema,
+  MemoryProjectionEventSchema,
+  MemoryProposalSchema,
+  MemoryTimelineSchema,
+} from "./memory.js";
 
 const ids = {
   proposal: "memory_proposal_11111111-1111-1111-1111-111111111111",
@@ -7,6 +13,7 @@ const ids = {
   project: "project_33333333-3333-3333-3333-333333333333",
   source: "context_item_44444444-4444-4444-4444-444444444444",
   target: "context_item_55555555-5555-5555-5555-555555555555",
+  event: "event_66666666-6666-6666-6666-666666666666",
 } as const;
 const now = "2026-08-15T00:00:00.000Z";
 
@@ -26,6 +33,36 @@ describe("memory curation contracts", () => {
         createdAt: now,
       }).status,
     ).toBe("PENDING");
+  });
+
+  it("defines bounded replay and Memory Center projection contracts", () => {
+    expect(
+      MemoryProjectionEventSchema.parse({
+        schemaVersion: 1,
+        sequence: 1,
+        eventId: ids.event,
+        eventType: "MEMORY_CURATED",
+        projectId: ids.project,
+        proposalId: ids.proposal,
+        decisionId: ids.decision,
+        action: "MERGE",
+        sourceContextItemId: ids.source,
+        materializedContextItemId: ids.target,
+        content: "Canonical memory.",
+        occurredAt: now,
+      }).action,
+    ).toBe("MERGE");
+    expect(
+      MemoryTimelineSchema.parse({ schemaVersion: 1, projectId: ids.project, entries: [] }),
+    ).toEqual({ schemaVersion: 1, projectId: ids.project, entries: [] });
+    expect(
+      MemoryNetworkSchema.parse({
+        schemaVersion: 1,
+        projectId: ids.project,
+        nodes: [],
+        edges: [],
+      }),
+    ).toMatchObject({ projectId: ids.project, nodes: [], edges: [] });
   });
 
   it("requires a target only for merge and rejects unknown fields", () => {

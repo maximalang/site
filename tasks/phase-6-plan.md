@@ -30,13 +30,13 @@ curation decisions or replay state.
 
 ## Slice 2: Graph projection adapter
 
-- [ ] Define a replaceable Graphiti projection port and bounded payload.
-- [ ] Publish committed memory events through a replayable outbox.
-- [ ] Prove restart/replay and projection rebuild without graph authority.
+- [x] Define a replaceable Graphiti projection port and bounded payload.
+- [x] Publish committed memory events through a replayable event stream.
+- [x] Prove restart/replay and projection rebuild without graph authority.
 
 ## Slice 3: Memory Center read API and UI
 
-- [ ] Expose project-scoped Inbox, Timeline and Network read models.
+- [x] Expose project-scoped Inbox, Timeline and Network store read models.
 - [ ] Add owner-authorized Accept/Merge/Reject commands.
 - [ ] Render Simple defaults and Advanced provenance/detail views.
 

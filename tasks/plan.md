@@ -88,7 +88,7 @@ Phase 0 reuse and license audit
 
 ### Phases 5-8: Context, memory and orchestration
 
-- [ ] Deliver ContextCompiler plus token/cost governor and pgvector RAG.
+- [x] Deliver ContextCompiler plus token/cost governor and pgvector RAG.
 - [ ] Deliver Graphiti/FalkorDB memory with evidence and curation.
 - [ ] Deliver Memory Center Network, Timeline and Inbox projections with
       provenance-aware Curator `Accept / Merge / Reject` decisions.

@@ -8,6 +8,7 @@ const ids = {
   project: "project_33333333-3333-3333-3333-333333333333",
   source: "context_item_44444444-4444-4444-4444-444444444444",
   memory: "context_item_55555555-5555-5555-5555-555555555555",
+  event: "event_77777777-7777-7777-7777-777777777777",
 } as const;
 const now = "2026-08-15T00:00:00.000Z";
 
@@ -25,9 +26,12 @@ describe("PostgresMemoryCurationStore", () => {
       if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
       if (sql.includes("INSERT INTO agent_world.memory_proposals"))
         return { rows: [{ id: ids.proposal }] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) return { rows: [] };
       throw new Error(`Unexpected query: ${sql}`);
     });
-    const proposal = await new PostgresMemoryCurationStore(pool as never).propose({
+    const proposal = await new PostgresMemoryCurationStore(pool as never, {
+      eventId: () => ids.event,
+    }).propose({
       schemaVersion: 1,
       id: ids.proposal,
       projectId: ids.project,
@@ -100,10 +104,12 @@ describe("PostgresMemoryCurationStore", () => {
         return { rows: [{ id: ids.memory }] };
       if (sql.includes("INSERT INTO agent_world.memory_curation_decisions")) return { rows: [] };
       if (sql.includes("UPDATE agent_world.memory_proposals")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) return { rows: [] };
       throw new Error(`Unexpected query: ${sql}`);
     });
     const result = await new PostgresMemoryCurationStore(pool as never, {
       contextItemId: () => ids.memory,
+      eventId: () => ids.event,
     }).decide({
       schemaVersion: 1,
       id: ids.decision,
