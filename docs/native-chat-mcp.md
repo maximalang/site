@@ -33,6 +33,10 @@ structured results and canonical Control events.
   decision and creates the approved Run plus `QUEUED` Native Chat dispatch in
   the same transaction. Runtime routes must have an active session bound to the
   exact selected route; Native Chat must not have one.
+- The launcher queue uses PostgreSQL `FOR UPDATE SKIP LOCKED` leases. Account IDs
+  map to opaque browser-profile aliases; filesystem paths, cookies and login
+  identities never enter canonical dispatches. Successful submission records a
+  versioned SHA-256 receipt, while duplicate or expired claims fail closed.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
 - Isolated PostgreSQL-backed OAuth provider under `/oauth` with public-client
@@ -75,7 +79,8 @@ the web resource server.
 - Implement the canonical Memory/RAG/Artifact stores so those currently
   unavailable pull classes can return provenance-aware content.
 - Submit queued dispatches through the on-demand launcher and record its exact
-  browser-submission receipt.
+  browser-submission receipt. The queue/lease/receipt store is implemented; the
+  local browser driver still requires a real authenticated-profile E2E.
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
 

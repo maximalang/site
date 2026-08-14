@@ -4,6 +4,7 @@ import {
   initialNativeChatRunControlState,
   NativeChatControlEventInputSchema,
   NativeChatDispatchSchema,
+  NativeChatLaunchClaimSchema,
   NativeChatLaunchMessageSchema,
   NativeChatPullRequestSchema,
 } from "./chat-transport.js";
@@ -23,6 +24,23 @@ describe("Native Plus Chat contracts", () => {
     expect(() =>
       NativeChatLaunchMessageSchema.parse({ runId: ids.run, task: "must stay in AI World" }),
     ).toThrow();
+  });
+
+  it("keeps browser profile routing outside the submitted Chat message", () => {
+    const claim = NativeChatLaunchClaimSchema.parse({
+      schemaVersion: 1,
+      dispatchId: ids.dispatch,
+      message: { runId: ids.run },
+      accountId: ids.account,
+      profileRef: "plus-primary",
+      launcherId: "launcher_77777777-7777-7777-7777-777777777777",
+      attempt: 1,
+      leaseExpiresAt: "2026-08-14T10:02:00.000Z",
+    });
+
+    expect(claim.message).toEqual({ runId: ids.run });
+    expect(claim.message).not.toHaveProperty("profileRef");
+    expect(claim.message).not.toHaveProperty("accountId");
   });
 
   it("binds dispatch evidence to one Account without claiming a DOM result", () => {

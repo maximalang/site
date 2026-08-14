@@ -32,6 +32,7 @@ describe("discoverMigrations", () => {
       { version: 17, name: "0017_native_chat_resource_pulls.sql" },
       { version: 18, name: "0018_transport_run_provenance.sql" },
       { version: 19, name: "0019_resource_broker.sql" },
+      { version: 20, name: "0020_native_chat_launcher.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -58,6 +59,8 @@ describe("discoverMigrations", () => {
     expect(migrations[17]?.sql).toContain("FROM agent_world.native_chat_dispatches AS dispatch");
     expect(migrations[18]?.sql).toContain("CREATE TABLE agent_world.resource_route_observations");
     expect(migrations[18]?.sql).toContain("CREATE TABLE agent_world.resource_broker_decisions");
+    expect(migrations[19]?.sql).toContain("CREATE TABLE agent_world.native_chat_browser_profiles");
+    expect(migrations[19]?.sql).toContain("native_chat_dispatches_launcher_shape_check");
   });
 
   it("rejects duplicate versions and non-canonical migration filenames", async () => {

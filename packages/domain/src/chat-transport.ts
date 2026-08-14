@@ -5,6 +5,7 @@ import {
   AgentIdSchema,
   ArtifactIdSchema,
   ChatDispatchIdSchema,
+  LauncherIdSchema,
   RouteIdSchema,
   RunIdSchema,
   TaskIdSchema,
@@ -23,6 +24,38 @@ export type TransportResultChannel = z.infer<typeof TransportResultChannelSchema
 
 export const NativeChatLaunchMessageSchema = z.strictObject({ runId: RunIdSchema });
 export type NativeChatLaunchMessage = z.infer<typeof NativeChatLaunchMessageSchema>;
+
+export const BrowserProfileRefSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/);
+
+export const NativeChatLaunchClaimSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  dispatchId: ChatDispatchIdSchema,
+  message: NativeChatLaunchMessageSchema,
+  accountId: AccountIdSchema,
+  profileRef: BrowserProfileRefSchema,
+  launcherId: LauncherIdSchema,
+  attempt: z.number().int().min(1).max(10),
+  leaseExpiresAt: TimestampSchema,
+});
+export type NativeChatLaunchClaim = z.infer<typeof NativeChatLaunchClaimSchema>;
+
+export const NativeChatSubmissionReceiptSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  dispatchId: ChatDispatchIdSchema,
+  runId: RunIdSchema,
+  accountId: AccountIdSchema,
+  profileRef: BrowserProfileRefSchema,
+  launcherId: LauncherIdSchema,
+  attempt: z.number().int().min(1).max(10),
+  submittedAt: TimestampSchema,
+  receiptSha256: z.string().regex(/^[a-f0-9]{64}$/),
+});
+export type NativeChatSubmissionReceipt = z.infer<typeof NativeChatSubmissionReceiptSchema>;
 
 export const NativeChatDispatchStateSchema = z.enum([
   "QUEUED",

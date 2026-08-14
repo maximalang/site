@@ -26,6 +26,7 @@ import {
   PostgresHubReader,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
+  PostgresNativeChatLaunchStore,
   PostgresNativeChatResourceReader,
   PostgresOwnerSessionStore,
   PostgresResourceBrokerStore,
@@ -211,7 +212,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 19
+    ledger.rows.at(-1)?.version !== 20
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -273,6 +274,7 @@ try {
     "model_route_reasoning_efforts",
     "model_route_tools",
     "native_chat_control_events",
+    "native_chat_browser_profiles",
     "native_chat_dispatches",
     "native_chat_results",
     "native_chat_resource_pulls",
@@ -280,6 +282,8 @@ try {
     "owner_sessions",
     "project_agents",
     "providers",
+    "resource_broker_decisions",
+    "resource_route_observations",
     "runtime_bindings",
     "schema_migrations",
     "secret_write_receipts",
@@ -1836,11 +1840,49 @@ try {
       `Native Chat Run provenance created a synthetic runtime binding/session: ${JSON.stringify(nativeChatProvenance.rows[0])}`,
     );
   }
-  await pool.query(
-    `UPDATE agent_world.native_chat_dispatches
-        SET state = 'BROWSER_SUBMITTED', submitted_at = $2
-      WHERE id = $1 AND state = 'QUEUED'`,
-    [nativeChat.dispatch, "2026-08-13T13:00:05.000Z"],
+  const nativeChatLauncher = new PostgresNativeChatLaunchStore(pool);
+  await nativeChatLauncher.configureProfile({
+    accountId: codex.account,
+    profileRef: "plus-isolated",
+    isEnabled: true,
+    updatedAt: "2026-08-13T13:00:04.100Z",
+  });
+  const launcherId = "launcher_cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd";
+  const launchClaim = await nativeChatLauncher.claimNext({
+    launcherId,
+    claimedAt: "2026-08-13T13:00:04.200Z",
+    leaseExpiresAt: "2026-08-13T13:02:04.200Z",
+  });
+  if (
+    launchClaim?.dispatchId !== nativeChat.dispatch ||
+    launchClaim.message.runId !== nativeChat.run ||
+    launchClaim.profileRef !== "plus-isolated" ||
+    Object.keys(launchClaim.message).length !== 1
+  ) {
+    throw new Error("Native Chat launcher claim leaked context or selected the wrong Account");
+  }
+  const submissionReceipt = await nativeChatLauncher.markSubmitted({
+    dispatchId: nativeChat.dispatch,
+    launcherId,
+    attempt: launchClaim.attempt,
+    submittedAt: "2026-08-13T13:00:05.000Z",
+  });
+  if (
+    submissionReceipt.runId !== nativeChat.run ||
+    submissionReceipt.accountId !== codex.account ||
+    submissionReceipt.profileRef !== "plus-isolated" ||
+    !/^[a-f0-9]{64}$/.test(submissionReceipt.receiptSha256)
+  ) {
+    throw new Error("Native Chat launcher submission receipt lost canonical provenance");
+  }
+  await expectRejected(
+    nativeChatLauncher.markSubmitted({
+      dispatchId: nativeChat.dispatch,
+      launcherId,
+      attempt: launchClaim.attempt,
+      submittedAt: "2026-08-13T13:00:05.000Z",
+    }),
+    "Native Chat launcher accepted a duplicate submission receipt",
   );
   const nativeChatEventIds = [
     "event_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8",
@@ -1969,7 +2011,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, codexExecutionScenarios: 19, nativeChatControlScenarios: 6, nativeChatPullScenarios: 3 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
