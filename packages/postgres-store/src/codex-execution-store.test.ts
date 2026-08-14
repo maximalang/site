@@ -245,6 +245,89 @@ describe("PostgresCodexExecutionStore worker lifecycle", () => {
     expect(events).toHaveLength(1);
   });
 
+  it("stores validated structured output separately from the bounded raw evidence", async () => {
+    const updates: unknown[][] = [];
+    const structured = {
+      schemaVersion: 1,
+      fullOutput: "Verified result.",
+      summary: "Verification completed.",
+      findings: ["Canonical state is intact."],
+      decisions: [],
+      actions: [],
+      artifacts: [],
+      openQuestions: [],
+      nextActions: [],
+      memoryCandidates: [],
+      confidence: 1,
+    };
+    const client: TransactionClient = {
+      async query<Row>(text: string, values: unknown[] = []) {
+        if (text.includes("FROM agent_world.codex_execution_jobs") && text.includes("FOR UPDATE"))
+          return { rows: [{ ...jobRow, status: "RUNNING" }] as Row[] };
+        if (text.includes("max(sequence)")) return { rows: [{ last_sequence: 0 }] as Row[] };
+        if (text.includes("FROM agent_world.codex_execution_events")) return { rows: [] as Row[] };
+        if (text.includes("SET final_output")) updates.push(values);
+        return { rows: [] as Row[] };
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore(
+      { connect: async () => client },
+      { now: () => "2026-08-13T12:00:02.000Z" },
+    );
+    await store.appendEvent(jobRow.id, "worker-1", {
+      schemaVersion: 1,
+      sequence: 1,
+      eventType: "FINAL_OUTPUT",
+      occurredAt: "2026-08-13T12:00:02.000Z",
+      content: JSON.stringify(structured),
+    });
+
+    expect(updates[0]).toEqual([
+      jobRow.id,
+      "worker-1",
+      JSON.stringify(structured),
+      structured,
+      "VALIDATED",
+      "2026-08-13T12:00:02.000Z",
+    ]);
+  });
+
+  it("keeps malformed structured output as a bounded raw fallback", async () => {
+    const updates: unknown[][] = [];
+    const client: TransactionClient = {
+      async query<Row>(text: string, values: unknown[] = []) {
+        if (text.includes("FROM agent_world.codex_execution_jobs") && text.includes("FOR UPDATE"))
+          return { rows: [{ ...jobRow, status: "RUNNING" }] as Row[] };
+        if (text.includes("max(sequence)")) return { rows: [{ last_sequence: 0 }] as Row[] };
+        if (text.includes("FROM agent_world.codex_execution_events")) return { rows: [] as Row[] };
+        if (text.includes("SET final_output")) updates.push(values);
+        return { rows: [] as Row[] };
+      },
+      release() {},
+    };
+    const store = new PostgresCodexExecutionStore(
+      { connect: async () => client },
+      { now: () => "2026-08-13T12:00:02.000Z" },
+    );
+    await store.appendEvent(jobRow.id, "worker-1", {
+      schemaVersion: 1,
+      sequence: 1,
+      eventType: "FINAL_OUTPUT",
+      occurredAt: "2026-08-13T12:00:02.000Z",
+      content: "Unstructured but preserved result.",
+    });
+
+    expect(updates[0]).toEqual([
+      jobRow.id,
+      "worker-1",
+      "Unstructured but preserved result.",
+      null,
+      "RAW_FALLBACK",
+      "2026-08-13T12:00:02.000Z",
+    ]);
+  });
+
   it("bounds persistence failures while observing", async () => {
     const client: TransactionClient = {
       async query() {

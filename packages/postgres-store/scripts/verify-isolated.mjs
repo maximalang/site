@@ -217,7 +217,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 22
+    ledger.rows.at(-1)?.version !== 23
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -1427,7 +1427,19 @@ try {
       sequence: 3,
       eventType: "FINAL_OUTPUT",
       occurredAt: "2026-08-13T12:00:04.000Z",
-      content: "All selected contracts passed.",
+      content: JSON.stringify({
+        schemaVersion: 1,
+        fullOutput: "All selected contracts passed.",
+        summary: "Selected contracts passed.",
+        findings: ["ContextPack provenance is exact."],
+        decisions: [],
+        actions: ["Ran isolated verification."],
+        artifacts: [],
+        openQuestions: [],
+        nextActions: [],
+        memoryCandidates: [],
+        confidence: 1,
+      }),
     },
     {
       schemaVersion: 1,
@@ -1462,7 +1474,8 @@ try {
   );
   const codexObservation = await codexStore.observe(codex.execution, 0);
   const codexEvidence = await pool.query(
-    `SELECT job.status, job.attempt, job.final_output, job.input_tokens, job.prompt,
+    `SELECT job.status, job.attempt, job.final_output, job.structured_result,
+            job.result_parse_status, job.input_tokens, job.prompt,
             job.cached_input_tokens, job.output_tokens,
             pack.content_sha256 AS context_pack_sha256,
             count(event.*)::integer AS event_count,
@@ -1478,7 +1491,10 @@ try {
     codexObservation.status !== "COMPLETED" ||
     codexEvidence.rows[0]?.status !== "COMPLETED" ||
     codexEvidence.rows[0]?.attempt !== 1 ||
-    codexEvidence.rows[0]?.final_output !== "All selected contracts passed." ||
+    codexEvidence.rows[0]?.result_parse_status !== "VALIDATED" ||
+    codexEvidence.rows[0]?.structured_result?.summary !== "Selected contracts passed." ||
+    JSON.parse(codexEvidence.rows[0]?.final_output ?? "null")?.fullOutput !==
+      "All selected contracts passed." ||
     codexEvidence.rows[0]?.prompt !== codexContextPack.rendered ||
     codexEvidence.rows[0]?.context_pack_sha256 !== codexContextPack.contentHash ||
     codexEvidence.rows[0]?.input_tokens !== "120" ||
@@ -2286,7 +2302,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, codexExecutionScenarios: 21, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

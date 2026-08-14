@@ -5,7 +5,7 @@ import {
   type CodexExecutionRequest,
   CodexExecutionRequestSchema,
 } from "@agent-world/codex-adapter";
-import { TimestampSchema } from "@agent-world/domain";
+import { StructuredAgentOutputSchema, TimestampSchema } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
 import * as z from "zod";
 import type { TransactionPool } from "./conversation-store.js";
@@ -545,11 +545,23 @@ export class PostgresCodexExecutionStore {
       return;
     }
     if (event.eventType === "FINAL_OUTPUT") {
+      let structuredResult: unknown = null;
+      let parseStatus = "RAW_FALLBACK";
+      try {
+        const parsed = StructuredAgentOutputSchema.safeParse(JSON.parse(event.content));
+        if (parsed.success) {
+          structuredResult = parsed.data;
+          parseStatus = "VALIDATED";
+        }
+      } catch {
+        // Raw bounded output remains canonical evidence when structured parsing fails.
+      }
       await client.query(
         `UPDATE agent_world.codex_execution_jobs
-            SET final_output = $3, updated_at = $4
+            SET final_output = $3, structured_result = $4::jsonb,
+                result_parse_status = $5, updated_at = $6
           WHERE id = $1 AND lease_owner = $2`,
-        [executionId, workerId, event.content, event.occurredAt],
+        [executionId, workerId, event.content, structuredResult, parseStatus, event.occurredAt],
       );
       return;
     }
