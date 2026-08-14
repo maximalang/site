@@ -141,8 +141,9 @@ export class PostgresRunDispatchStore {
     try {
       const result = await client.query<RunIdRow>(
         `SELECT id
-           FROM agent_world.runs
+         FROM agent_world.runs
           WHERE status IN ('DISPATCH_PENDING', 'RUNNING')
+            AND adapter_kind <> 'NATIVE_CHATGPT'
           ORDER BY created_at, id
           LIMIT $1`,
         [limit],

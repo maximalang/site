@@ -87,6 +87,54 @@ describe("task and approval contracts", () => {
     expect(run.externalRunId).toBe("openclaw-run-42");
   });
 
+  it("represents Native Chat without inventing a runtime binding or session", () => {
+    const run = RunSchema.parse({
+      schemaVersion: 1,
+      id: `run_${UUID}`,
+      taskId: `task_${UUID}`,
+      agentId: `agent_${UUID}`,
+      approvalId: `approval_${UUID}`,
+      adapterKind: "NATIVE_CHATGPT",
+      routeId: `route_${UUID}`,
+      accountId: `account_${UUID}`,
+      executionMode: "CHAT",
+      status: "DISPATCH_PENDING",
+      attempt: 0,
+      dispatchIdempotencyKey: `run:${UUID}`,
+      createdAt: "2026-08-13T05:31:00.000Z",
+    });
+
+    expect(run).not.toHaveProperty("bindingId");
+    expect(run).not.toHaveProperty("sessionId");
+  });
+
+  it("rejects synthetic or incomplete Native Chat provenance", () => {
+    const base = {
+      schemaVersion: 1,
+      id: `run_${UUID}`,
+      taskId: `task_${UUID}`,
+      agentId: `agent_${UUID}`,
+      approvalId: `approval_${UUID}`,
+      adapterKind: "NATIVE_CHATGPT",
+      routeId: `route_${UUID}`,
+      accountId: `account_${UUID}`,
+      executionMode: "CHAT",
+      status: "DISPATCH_PENDING",
+      attempt: 0,
+      dispatchIdempotencyKey: `run:${UUID}`,
+      createdAt: "2026-08-13T05:31:00.000Z",
+    };
+
+    expect(RunSchema.safeParse({ ...base, accountId: undefined }).success).toBe(false);
+    expect(
+      RunSchema.safeParse({
+        ...base,
+        bindingId: `binding_${UUID}`,
+        sessionId: `session_${UUID}`,
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects false execution and terminal claims", () => {
     const base = {
       schemaVersion: 1,

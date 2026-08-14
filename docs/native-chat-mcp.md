@@ -22,6 +22,9 @@ structured results and canonical Control events.
   retained in the receipt.
 - Strict tool arguments contain no Account field. The trusted JWT subject is the
   Account and the PostgreSQL store verifies it against the selected dispatch.
+- Canonical Native Chat Runs store `route_id`, `account_id` and `CHAT` mode
+  directly. They cannot contain a fabricated runtime binding or conversation
+  session; OpenClaw/Codex Runs retain their required binding/session shape.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
 - Isolated PostgreSQL-backed OAuth provider under `/oauth` with public-client
@@ -63,7 +66,8 @@ the web resource server.
   endpoint and verify its public discovery/JWKS/DCR contract.
 - Implement the canonical Memory/RAG/Artifact stores so those currently
   unavailable pull classes can return provenance-aware content.
-- Create dispatches through the Resource Broker and on-demand launcher.
+- Create these transport-valid Runs and dispatches through the Resource Broker
+  and on-demand launcher (the schema/store boundary is ready; selection is not).
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
 

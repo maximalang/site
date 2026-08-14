@@ -2,7 +2,7 @@ import { RunSchema } from "@agent-world/domain";
 import { describe, expect, it, vi } from "vitest";
 import { TaskDispatchError, TaskDispatchService } from "./task-dispatch.js";
 
-const run = RunSchema.parse({
+const parsedRun = RunSchema.parse({
   schemaVersion: 1,
   id: "run_11111111-1111-1111-1111-111111111111",
   taskId: "task_11111111-1111-1111-1111-111111111111",
@@ -16,6 +16,8 @@ const run = RunSchema.parse({
   dispatchIdempotencyKey: "run:11111111-1111-1111-1111-111111111111",
   createdAt: "2026-08-13T10:00:00.000Z",
 });
+if (parsedRun.adapterKind === "NATIVE_CHATGPT") throw new Error("Invalid runtime fixture");
+const run = parsedRun;
 
 const prepared = {
   kind: "READY" as const,

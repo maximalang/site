@@ -127,6 +127,9 @@ export class TaskDispatchService {
     if (!parsedRun.success || parsedRun.data.id !== parsedRunId.data) {
       throw new TaskDispatchError("PERSISTENCE_FAILED");
     }
+    if (parsedRun.data.adapterKind === "NATIVE_CHATGPT") {
+      throw new TaskDispatchError("DISPATCH_UNAVAILABLE");
+    }
     if (prepared.kind === "ALREADY_DISPATCHED") {
       if (parsedRun.data.status === "DISPATCH_PENDING") {
         throw new TaskDispatchError("PERSISTENCE_FAILED");

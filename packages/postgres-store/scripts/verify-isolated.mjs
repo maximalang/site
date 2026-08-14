@@ -210,7 +210,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 17
+    ledger.rows.at(-1)?.version !== 18
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -1663,9 +1663,7 @@ try {
 
   const nativeChat = {
     route: "route_c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1",
-    binding: "binding_c2c2c2c2-c2c2-c2c2-c2c2-c2c2c2c2c2c2",
     conversation: "conversation_c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3",
-    session: "session_c4c4c4c4-c4c4-c4c4-c4c4-c4c4c4c4c4c4",
     task: "task_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
     approval: "approval_c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5",
     run: "run_c6c6c6c6-c6c6-c6c6-c6c6-c6c6c6c6c6c6",
@@ -1682,29 +1680,10 @@ try {
     [nativeChat.route, codex.account],
   );
   await pool.query(
-    `INSERT INTO agent_world.runtime_bindings
-       (id, agent_id, route_id, adapter_kind, external_agent_id)
-     VALUES ($1, $2, $3, 'NATIVE_CHATGPT', 'ai-world-mcp:researcher')`,
-    [nativeChat.binding, ids.agent, nativeChat.route],
-  );
-  await pool.query(
     `INSERT INTO agent_world.conversations
        (id, agent_id, project_id, title, created_at)
      VALUES ($1, $2, $3, 'Native Plus Chat verification', $4)`,
     [nativeChat.conversation, ids.agent, ids.project, "2026-08-13T13:00:00.000Z"],
-  );
-  await pool.query(
-    `INSERT INTO agent_world.conversation_sessions
-       (id, conversation_id, agent_id, binding_id, adapter_kind,
-        external_session_ref, started_at)
-     VALUES ($1, $2, $3, $4, 'NATIVE_CHATGPT', 'native-chat:pending', $5)`,
-    [
-      nativeChat.session,
-      nativeChat.conversation,
-      ids.agent,
-      nativeChat.binding,
-      "2026-08-13T13:00:01.000Z",
-    ],
   );
   await pool.query(
     `INSERT INTO agent_world.tasks
@@ -1730,8 +1709,8 @@ try {
   await pool.query(
     `INSERT INTO agent_world.runs
        (id, task_id, conversation_id, agent_id, approval_id, adapter_kind,
-        binding_id, session_id, status, dispatch_idempotency_key, created_at)
-     VALUES ($1, $2, $3, $4, $5, 'NATIVE_CHATGPT', $6, $7,
+        route_id, account_id, execution_mode, status, dispatch_idempotency_key, created_at)
+     VALUES ($1, $2, $3, $4, $5, 'NATIVE_CHATGPT', $6, $7, 'CHAT',
              'DISPATCH_PENDING', 'run:native-chat-control', $8)`,
     [
       nativeChat.run,
@@ -1739,11 +1718,37 @@ try {
       nativeChat.conversation,
       ids.agent,
       nativeChat.approval,
-      nativeChat.binding,
-      nativeChat.session,
+      nativeChat.route,
+      codex.account,
       "2026-08-13T13:00:04.000Z",
     ],
   );
+  const nativeChatProvenance = await pool.query(
+    `SELECT r.binding_id, r.session_id, r.route_id, r.account_id, r.execution_mode,
+            (SELECT count(*)::integer
+               FROM agent_world.runtime_bindings
+              WHERE adapter_kind = 'NATIVE_CHATGPT') AS synthetic_bindings,
+            (SELECT count(*)::integer
+               FROM agent_world.conversation_sessions
+              WHERE adapter_kind = 'NATIVE_CHATGPT') AS synthetic_sessions
+       FROM agent_world.runs r
+      WHERE r.id = $1`,
+    [nativeChat.run],
+  );
+  if (
+    nativeChatProvenance.rows.length !== 1 ||
+    nativeChatProvenance.rows[0]?.binding_id !== null ||
+    nativeChatProvenance.rows[0]?.session_id !== null ||
+    nativeChatProvenance.rows[0]?.route_id !== nativeChat.route ||
+    nativeChatProvenance.rows[0]?.account_id !== codex.account ||
+    nativeChatProvenance.rows[0]?.execution_mode !== "CHAT" ||
+    nativeChatProvenance.rows[0]?.synthetic_bindings !== 0 ||
+    nativeChatProvenance.rows[0]?.synthetic_sessions !== 0
+  ) {
+    throw new Error(
+      `Native Chat Run provenance created a synthetic runtime binding/session: ${JSON.stringify(nativeChatProvenance.rows[0])}`,
+    );
+  }
   await pool.query(
     `INSERT INTO agent_world.native_chat_dispatches
        (id, run_id, task_id, agent_id, account_id, route_id, state,

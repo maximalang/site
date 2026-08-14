@@ -304,6 +304,9 @@ export class PostgresApprovalRunStore {
           dispatchIdempotencyKey: `run:${decision.taskId.slice("task_".length)}`,
           createdAt: decision.decidedAt,
         });
+        if (run.adapterKind === "NATIVE_CHATGPT") {
+          throw new ApprovalRunStoreError("NO_ACTIVE_SESSION");
+        }
         await client.query(
           `UPDATE agent_world.approvals
               SET state = 'APPROVED', decided_at = $2, decision_command_id = $3

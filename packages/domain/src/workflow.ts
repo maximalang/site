@@ -1,11 +1,13 @@
 import * as z from "zod";
 import {
+  AccountIdSchema,
   AgentIdSchema,
   ApprovalIdSchema,
   BindingIdSchema,
-  ExecutionAdapterKindSchema,
+  ExecutionModeSchema,
   OpaqueExternalIdSchema,
   ProjectIdSchema,
+  RouteIdSchema,
   RunIdSchema,
   SessionIdSchema,
   TaskIdSchema,
@@ -82,28 +84,47 @@ export const RunStatusSchema = z.enum([
 ]);
 export type RunStatus = z.infer<typeof RunStatusSchema>;
 
+const SharedRunFields = {
+  schemaVersion: z.literal(1),
+  id: RunIdSchema,
+  taskId: TaskIdSchema,
+  agentId: AgentIdSchema,
+  approvalId: ApprovalIdSchema,
+  status: RunStatusSchema,
+  attempt: z.number().int().nonnegative().max(10),
+  dispatchIdempotencyKey: IdempotencyKeySchema,
+  externalRunId: OpaqueExternalIdSchema.optional(),
+  createdAt: TimestampSchema,
+  startedAt: TimestampSchema.optional(),
+  completedAt: TimestampSchema.optional(),
+  failureCode: z
+    .string()
+    .regex(/^[A-Z][A-Z0-9_]{0,63}$/)
+    .optional(),
+};
+
+const RuntimeBoundRunSchema = z.strictObject({
+  ...SharedRunFields,
+  adapterKind: z.enum(["OPENCLAW", "CODEX", "API_MODEL", "LOCAL_MODEL", "NATIVE_WORK"]),
+  bindingId: BindingIdSchema,
+  sessionId: SessionIdSchema,
+  routeId: z.never().optional(),
+  accountId: z.never().optional(),
+  executionMode: z.never().optional(),
+});
+
+const NativeChatRunSchema = z.strictObject({
+  ...SharedRunFields,
+  adapterKind: z.literal("NATIVE_CHATGPT"),
+  routeId: RouteIdSchema,
+  accountId: AccountIdSchema,
+  executionMode: ExecutionModeSchema.extract(["CHAT"]),
+  bindingId: z.never().optional(),
+  sessionId: z.never().optional(),
+});
+
 export const RunSchema = z
-  .strictObject({
-    schemaVersion: z.literal(1),
-    id: RunIdSchema,
-    taskId: TaskIdSchema,
-    agentId: AgentIdSchema,
-    approvalId: ApprovalIdSchema,
-    adapterKind: ExecutionAdapterKindSchema,
-    bindingId: BindingIdSchema,
-    sessionId: SessionIdSchema,
-    status: RunStatusSchema,
-    attempt: z.number().int().nonnegative().max(10),
-    dispatchIdempotencyKey: IdempotencyKeySchema,
-    externalRunId: OpaqueExternalIdSchema.optional(),
-    createdAt: TimestampSchema,
-    startedAt: TimestampSchema.optional(),
-    completedAt: TimestampSchema.optional(),
-    failureCode: z
-      .string()
-      .regex(/^[A-Z][A-Z0-9_]{0,63}$/)
-      .optional(),
-  })
+  .discriminatedUnion("adapterKind", [RuntimeBoundRunSchema, NativeChatRunSchema])
   .superRefine((run, context) => {
     if (run.status === "DISPATCH_PENDING") {
       if (run.externalRunId || run.startedAt || run.completedAt || run.failureCode) {

@@ -25,6 +25,11 @@ request-supplied Account field. A custom remote MCP/App connected once in each
 personal Plus account through developer mode is the primary bridge. Custom GPT
 Actions are a development/fallback adapter over the same Control API.
 
+Canonical Run provenance is transport-shaped. Runtime-bound OpenClaw/Codex
+Runs require a binding and session. Browser-launched Native Chat Runs instead
+require their selected route, Account and `CHAT` mode and prohibit synthetic
+binding/session rows.
+
 A product-owned Resource Broker chooses among eligible
 Account/Chat/Work/Codex/API/Local candidates. It consumes normalized evidence
 for quality, remaining limits, marginal cost, latency and load, then records the
