@@ -26,6 +26,11 @@ export const HubCommandIdSchema = canonicalId("hub_command", "HubCommandId");
 export const LauncherIdSchema = canonicalId("launcher", "LauncherId");
 export const MissionIdSchema = canonicalId("mission", "MissionId");
 export const MissionCriterionIdSchema = canonicalId("mission_criterion", "MissionCriterionId");
+export const MissionDecompositionIdSchema = canonicalId(
+  "mission_decomposition",
+  "MissionDecompositionId",
+);
+export const StructuredMeetingIdSchema = canonicalId("structured_meeting", "StructuredMeetingId");
 export const AgentTemplateIdSchema = canonicalId("agent_template", "AgentTemplateId");
 export const MessageIdSchema = canonicalId("message", "MessageId");
 export const MemoryDecisionIdSchema = canonicalId("memory_decision", "MemoryDecisionId");
@@ -58,6 +63,8 @@ export type HubCommandId = z.infer<typeof HubCommandIdSchema>;
 export type LauncherId = z.infer<typeof LauncherIdSchema>;
 export type MissionId = z.infer<typeof MissionIdSchema>;
 export type MissionCriterionId = z.infer<typeof MissionCriterionIdSchema>;
+export type MissionDecompositionId = z.infer<typeof MissionDecompositionIdSchema>;
+export type StructuredMeetingId = z.infer<typeof StructuredMeetingIdSchema>;
 export type AgentTemplateId = z.infer<typeof AgentTemplateIdSchema>;
 export type MessageId = z.infer<typeof MessageIdSchema>;
 export type MemoryDecisionId = z.infer<typeof MemoryDecisionIdSchema>;

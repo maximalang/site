@@ -1,10 +1,16 @@
+import { createHash } from "node:crypto";
 import {
   type AgentInstanceAssignment,
   AgentInstanceAssignmentSchema,
   type AgentTemplate,
   AgentTemplateSchema,
+  EventIdSchema,
   type Mission,
+  type MissionDecomposition,
+  MissionDecompositionSchema,
   MissionSchema,
+  type StructuredMeeting,
+  StructuredMeetingSchema,
 } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
@@ -12,7 +18,9 @@ import type { TransactionPool } from "./conversation-store.js";
 export type MissionStoreErrorCode =
   | "MISSION_CONFLICT"
   | "TEMPLATE_CONFLICT"
-  | "ASSIGNMENT_CONFLICT";
+  | "ASSIGNMENT_CONFLICT"
+  | "DECOMPOSITION_CONFLICT"
+  | "MEETING_CONFLICT";
 
 export class MissionStoreError extends Error {
   constructor(readonly code: MissionStoreErrorCode) {
@@ -27,6 +35,10 @@ function timestamp(value: Date | string): string {
 
 function same(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sha256(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
 }
 
 type MissionRow = QueryResultRow & {
@@ -130,7 +142,10 @@ const SELECT_TEMPLATE = `SELECT t.id, t.version, t.slug, t.display_name, t.role,
  WHERE t.id = $1 AND t.version = $2`;
 
 export class PostgresMissionStore {
-  constructor(private readonly pool: TransactionPool) {}
+  constructor(
+    private readonly pool: TransactionPool,
+    private readonly identities: { eventId?: () => string } = {},
+  ) {}
 
   async createMission(input: unknown) {
     const mission = MissionSchema.parse(input);
@@ -295,5 +310,218 @@ export class PostgresMissionStore {
     } finally {
       client.release();
     }
+  }
+
+  async createDecomposition(input: unknown) {
+    const decomposition: MissionDecomposition = MissionDecompositionSchema.parse(input);
+    return this.persistCollaboration(
+      "DECOMPOSITION_CONFLICT",
+      decomposition.id,
+      decomposition,
+      async (client, payloadHash) => {
+        const inserted = await client.query(
+          `INSERT INTO agent_world.mission_decompositions
+             (id, mission_id, project_id, source_event_id, rationale,
+              payload, payload_sha256, created_at)
+           SELECT $1, mission.id, mission.project_id, $4, $5, $6::jsonb, $7, $8
+             FROM agent_world.missions mission
+             JOIN agent_world.world_events event ON event.id = $4
+             JOIN agent_world.project_agents source_membership
+               ON source_membership.project_id = mission.project_id
+              AND source_membership.agent_id = event.agent_id
+            WHERE mission.id = $2 AND mission.project_id = $3
+           RETURNING id`,
+          [
+            decomposition.id,
+            decomposition.missionId,
+            decomposition.projectId,
+            decomposition.sourceEventId,
+            decomposition.rationale,
+            JSON.stringify(decomposition),
+            payloadHash,
+            decomposition.createdAt,
+          ],
+        );
+        if (inserted.rows.length !== 1) throw new MissionStoreError("DECOMPOSITION_CONFLICT");
+        for (const [position, task] of decomposition.tasks.entries()) {
+          const taskInserted = await client.query(
+            `INSERT INTO agent_world.mission_decomposition_tasks
+               (decomposition_id, task_key, task_position, assignee_agent_id)
+             SELECT $1, $2, $3, membership.agent_id
+               FROM agent_world.mission_decompositions decomposition
+               JOIN agent_world.project_agents membership
+                 ON membership.project_id = decomposition.project_id
+                AND membership.agent_id = $4
+              WHERE decomposition.id = $1
+             RETURNING decomposition_id`,
+            [decomposition.id, task.key, position, task.assigneeAgentId],
+          );
+          if (taskInserted.rows.length !== 1) {
+            throw new MissionStoreError("DECOMPOSITION_CONFLICT");
+          }
+        }
+        await this.appendCollaborationEvent(client, {
+          eventType: "MISSION_DECOMPOSED",
+          missionId: decomposition.missionId,
+          decompositionId: decomposition.id,
+          payloadHash,
+          occurredAt: decomposition.createdAt,
+        });
+      },
+    );
+  }
+
+  async recordMeeting(input: unknown) {
+    const meeting: StructuredMeeting = StructuredMeetingSchema.parse(input);
+    return this.persistCollaboration(
+      "MEETING_CONFLICT",
+      meeting.id,
+      meeting,
+      async (client, payloadHash) => {
+        const inserted = await client.query(
+          `INSERT INTO agent_world.structured_meetings
+             (id, mission_id, project_id, topic, synthesis, decision,
+              payload, payload_sha256, decided_at)
+           SELECT $1, mission.id, mission.project_id, $4, $5, $6, $7::jsonb, $8, $9
+             FROM agent_world.missions mission
+            WHERE mission.id = $2 AND mission.project_id = $3
+           RETURNING id`,
+          [
+            meeting.id,
+            meeting.missionId,
+            meeting.projectId,
+            meeting.topic,
+            meeting.synthesis,
+            meeting.decision,
+            JSON.stringify(meeting),
+            payloadHash,
+            meeting.decidedAt,
+          ],
+        );
+        if (inserted.rows.length !== 1) throw new MissionStoreError("MEETING_CONFLICT");
+        for (const [position, value] of meeting.positions.entries()) {
+          const positionInserted = await client.query(
+            `INSERT INTO agent_world.structured_meeting_agents
+               (meeting_id, agent_id, position_index)
+             SELECT $1, membership.agent_id, $3
+               FROM agent_world.structured_meetings meeting
+               JOIN agent_world.project_agents membership
+                 ON membership.project_id = meeting.project_id
+                AND membership.agent_id = $2
+              WHERE meeting.id = $1
+             RETURNING meeting_id`,
+            [meeting.id, value.agentId, position],
+          );
+          if (positionInserted.rows.length !== 1) {
+            throw new MissionStoreError("MEETING_CONFLICT");
+          }
+        }
+        for (const eventId of meeting.sourceEventIds) {
+          const sourceInserted = await client.query(
+            `INSERT INTO agent_world.structured_meeting_sources (meeting_id, event_id)
+             SELECT $1, event.id
+               FROM agent_world.structured_meetings meeting
+               JOIN agent_world.world_events event ON event.id = $2
+               JOIN agent_world.project_agents membership
+                 ON membership.project_id = meeting.project_id
+                AND membership.agent_id = event.agent_id
+              WHERE meeting.id = $1
+             RETURNING meeting_id`,
+            [meeting.id, eventId],
+          );
+          if (sourceInserted.rows.length !== 1) {
+            throw new MissionStoreError("MEETING_CONFLICT");
+          }
+        }
+        await this.appendCollaborationEvent(client, {
+          eventType: "MEETING_DECIDED",
+          missionId: meeting.missionId,
+          meetingId: meeting.id,
+          payloadHash,
+          occurredAt: meeting.decidedAt,
+        });
+      },
+    );
+  }
+
+  private async persistCollaboration(
+    conflict: "DECOMPOSITION_CONFLICT" | "MEETING_CONFLICT",
+    id: string,
+    payload: MissionDecomposition | StructuredMeeting,
+    insert: (
+      client: Awaited<ReturnType<TransactionPool["connect"]>>,
+      hash: string,
+    ) => Promise<void>,
+  ) {
+    const payloadHash = sha256(payload);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        `agent_world:mission_collaboration:${id}`,
+      ]);
+      const table =
+        conflict === "DECOMPOSITION_CONFLICT" ? "mission_decompositions" : "structured_meetings";
+      const existing = await client.query(
+        `SELECT payload_sha256 FROM agent_world.${table} WHERE id = $1`,
+        [id],
+      );
+      if (existing.rows[0]) {
+        if (existing.rows.length !== 1 || existing.rows[0].payload_sha256 !== payloadHash) {
+          throw new MissionStoreError(conflict);
+        }
+        await client.query("COMMIT");
+        return { outcome: "REPLAY" as const, payload };
+      }
+      await insert(client, payloadHash);
+      await client.query("COMMIT");
+      return { outcome: "CREATED" as const, payload };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async appendCollaborationEvent(
+    client: Awaited<ReturnType<TransactionPool["connect"]>>,
+    input:
+      | {
+          eventType: "MISSION_DECOMPOSED";
+          missionId: string;
+          decompositionId: string;
+          payloadHash: string;
+          occurredAt: string;
+        }
+      | {
+          eventType: "MEETING_DECIDED";
+          missionId: string;
+          meetingId: string;
+          payloadHash: string;
+          occurredAt: string;
+        },
+  ) {
+    const eventId = EventIdSchema.parse(
+      this.identities.eventId?.() ??
+        (() => {
+          throw new Error("A production Mission collaboration Event identity is required");
+        })(),
+    );
+    await client.query(
+      `INSERT INTO agent_world.mission_collaboration_events
+         (id, event_type, mission_id, decomposition_id, meeting_id,
+          payload_sha256, occurred_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        eventId,
+        input.eventType,
+        input.missionId,
+        "decompositionId" in input ? input.decompositionId : null,
+        "meetingId" in input ? input.meetingId : null,
+        input.payloadHash,
+        input.occurredAt,
+      ],
+    );
   }
 }

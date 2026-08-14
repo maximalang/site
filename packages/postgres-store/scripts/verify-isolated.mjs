@@ -222,7 +222,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 28
+    ledger.rows.at(-1)?.version !== 29
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -305,6 +305,9 @@ try {
     "memory_projection_checkpoints",
     "memory_proposals",
     "missions",
+    "mission_collaboration_events",
+    "mission_decompositions",
+    "mission_decomposition_tasks",
     "mission_success_criteria",
     "rag_document_chunks",
     "rag_document_sources",
@@ -316,6 +319,9 @@ try {
     "schema_migrations",
     "secret_write_receipts",
     "skills",
+    "structured_meetings",
+    "structured_meeting_agents",
+    "structured_meeting_sources",
     "tasks",
     "tools",
     "world_event_stream",
@@ -1186,10 +1192,20 @@ try {
   }
   await pool.query(
     `INSERT INTO agent_world.project_agents (project_id, agent_id, created_at)
-     VALUES ($1, $2, $3)`,
-    [ids.project, ids.agent, "2026-08-13T08:59:00.000Z"],
+     VALUES ($1, $2, $4), ($1, $3, $4)`,
+    [ids.project, ids.agent, hub.secondaryAgent, "2026-08-13T08:59:00.000Z"],
   );
-  const missionStore = new PostgresMissionStore(pool);
+  const collaborationEventIds = [
+    "event_a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+    "event_a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
+  ];
+  const missionStore = new PostgresMissionStore(pool, {
+    eventId: () => {
+      const eventId = collaborationEventIds.shift();
+      if (!eventId) throw new Error("Isolated Mission collaboration identities were exhausted");
+      return eventId;
+    },
+  });
   const mission = {
     schemaVersion: 1,
     id: "mission_19191919-1919-1919-1919-191919191919",
@@ -1248,6 +1264,92 @@ try {
     missionStore.createMission({ ...mission, goal: "Conflicting goal." }),
     "Mission store accepted conflicting identity replay",
   );
+  const sourceEvents = await pool.query(
+    "SELECT id FROM agent_world.world_events ORDER BY sequence, id",
+  );
+  if (sourceEvents.rows.length !== 2) {
+    throw new Error("Mission collaboration verifier requires two canonical World events");
+  }
+  const decomposition = {
+    schemaVersion: 1,
+    id: "mission_decomposition_a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3",
+    missionId: mission.id,
+    projectId: ids.project,
+    sourceEventId: sourceEvents.rows[0].id,
+    rationale: "Separate implementation from independent review.",
+    tasks: [
+      {
+        key: "implement",
+        title: "Implement the canonical protocol",
+        assigneeAgentId: ids.agent,
+        dependsOn: [],
+      },
+      {
+        key: "review",
+        title: "Review the canonical protocol",
+        assigneeAgentId: hub.secondaryAgent,
+        dependsOn: ["implement"],
+      },
+    ],
+    createdAt: "2026-08-13T09:18:00.000Z",
+  };
+  if (
+    (await missionStore.createDecomposition(decomposition)).outcome !== "CREATED" ||
+    (await missionStore.createDecomposition(decomposition)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Mission decomposition idempotency drifted");
+  }
+  await expectRejected(
+    missionStore.createDecomposition({ ...decomposition, rationale: "Conflicting rationale." }),
+    "Mission decomposition accepted a conflicting identity replay",
+  );
+  await expectRejected(
+    missionStore.createDecomposition({
+      ...decomposition,
+      id: "mission_decomposition_a5a5a5a5-a5a5-a5a5-a5a5-a5a5a5a5a5a5",
+      tasks: [{ ...decomposition.tasks[0], assigneeAgentId: legacy.agent }],
+    }),
+    "Mission decomposition accepted a cross-Project Agent",
+  );
+  const meeting = {
+    schemaVersion: 1,
+    id: "structured_meeting_a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4",
+    missionId: mission.id,
+    projectId: ids.project,
+    topic: "Choose the verification order",
+    positions: [
+      { agentId: ids.agent, position: "Implement before review.", evidenceRefs: [] },
+      {
+        agentId: hub.secondaryAgent,
+        position: "Require independent review before release.",
+        evidenceRefs: [],
+      },
+    ],
+    synthesis: "Implement first, then require independent review.",
+    decision: "Release only after the independent review passes.",
+    sourceEventIds: sourceEvents.rows.map(({ id }) => id).sort(),
+    decidedAt: "2026-08-13T09:19:00.000Z",
+  };
+  if (
+    (await missionStore.recordMeeting(meeting)).outcome !== "CREATED" ||
+    (await missionStore.recordMeeting(meeting)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Structured meeting idempotency drifted");
+  }
+  const collaborationEvidence = await pool.query(
+    `SELECT event_type, sequence
+       FROM agent_world.mission_collaboration_events
+      WHERE mission_id = $1
+      ORDER BY sequence, id`,
+    [mission.id],
+  );
+  if (
+    collaborationEvidence.rows.length !== 2 ||
+    collaborationEvidence.rows[0]?.event_type !== "MISSION_DECOMPOSED" ||
+    collaborationEvidence.rows[1]?.event_type !== "MEETING_DECIDED"
+  ) {
+    throw new Error("Mission collaboration events are not complete and replayable");
+  }
   await pool.query(
     `INSERT INTO agent_world.conversations
        (id, agent_id, project_id, title, created_at)
@@ -2599,7 +2701,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 7, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 13, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
