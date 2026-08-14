@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
@@ -1841,13 +1842,31 @@ try {
     );
   }
   const nativeChatLauncher = new PostgresNativeChatLaunchStore(pool);
-  await nativeChatLauncher.configureProfile({
+  const configuredNativeChatProfile = await nativeChatLauncher.configureProfile({
     accountId: codex.account,
     profileRef: "plus-isolated",
     launchUrl: "https://chatgpt.com/g/ai-world-isolated",
     isEnabled: true,
     updatedAt: "2026-08-13T13:00:04.100Z",
   });
+  const listedNativeChatProfiles = await nativeChatLauncher.listProfiles();
+  if (
+    configuredNativeChatProfile.accountId !== codex.account ||
+    listedNativeChatProfiles.profiles.length !== 1 ||
+    listedNativeChatProfiles.profiles[0]?.launchUrl !== "https://chatgpt.com/g/ai-world-isolated"
+  ) {
+    throw new Error("Native Chat profile owner configuration was not persisted safely");
+  }
+  await assert.rejects(
+    nativeChatLauncher.configureProfile({
+      accountId: ids.account,
+      profileRef: "invalid-non-chat-account",
+      launchUrl: "https://chatgpt.com/g/ai-world-isolated",
+      isEnabled: true,
+      updatedAt: "2026-08-13T13:00:04.200Z",
+    }),
+    (error) => error?.code === "INVALID_ACCOUNT",
+  );
   const launcherId = "launcher_cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd";
   const launchClaim = await nativeChatLauncher.claimNext({
     launcherId,

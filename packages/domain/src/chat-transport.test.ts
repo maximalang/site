@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyNativeChatControlEvent,
   initialNativeChatRunControlState,
+  NativeChatBrowserProfileConfigurationSchema,
+  NativeChatBrowserProfileListSchema,
   NativeChatControlEventInputSchema,
   NativeChatDispatchSchema,
   NativeChatLaunchClaimSchema,
@@ -19,6 +21,29 @@ const ids = {
 } as const;
 
 describe("Native Plus Chat contracts", () => {
+  it("exposes only an opaque profile alias and public App URL to owner control surfaces", () => {
+    const profile = NativeChatBrowserProfileConfigurationSchema.parse({
+      schemaVersion: 1,
+      accountId: ids.account,
+      profileRef: "plus-primary",
+      launchUrl: "https://chatgpt.com/g/ai-world-agent",
+      isEnabled: true,
+      updatedAt: "2026-08-14T10:00:00.000Z",
+    });
+
+    expect(profile).not.toHaveProperty("profilePath");
+    expect(profile).not.toHaveProperty("cookie");
+    expect(
+      NativeChatBrowserProfileConfigurationSchema.safeParse({
+        ...profile,
+        launchUrl: "https://chatgpt.com/g/ai-world-agent?token=secret",
+      }).success,
+    ).toBe(false);
+    expect(
+      NativeChatBrowserProfileListSchema.parse({ schemaVersion: 1, profiles: [profile] }).profiles,
+    ).toEqual([profile]);
+  });
+
   it("limits the browser launcher payload to a canonical run_id", () => {
     expect(NativeChatLaunchMessageSchema.parse({ runId: ids.run })).toEqual({ runId: ids.run });
     expect(() =>

@@ -40,6 +40,39 @@ export const NativeChatLaunchUrlSchema = z
     "Native Chat launch URL must be an exact public chatgpt.com HTTPS path",
   );
 
+export const NativeChatBrowserProfileConfigurationInputSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  accountId: AccountIdSchema,
+  profileRef: BrowserProfileRefSchema,
+  launchUrl: NativeChatLaunchUrlSchema,
+  isEnabled: z.boolean(),
+});
+export type NativeChatBrowserProfileConfigurationInput = z.infer<
+  typeof NativeChatBrowserProfileConfigurationInputSchema
+>;
+
+export const NativeChatBrowserProfileConfigurationSchema =
+  NativeChatBrowserProfileConfigurationInputSchema.extend({ updatedAt: TimestampSchema });
+export type NativeChatBrowserProfileConfiguration = z.infer<
+  typeof NativeChatBrowserProfileConfigurationSchema
+>;
+
+export const NativeChatBrowserProfileListSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  profiles: z
+    .array(NativeChatBrowserProfileConfigurationSchema)
+    .max(500)
+    .refine(
+      (profiles) =>
+        profiles.every((profile, index) => {
+          const previous = profiles[index - 1];
+          return previous === undefined || previous.accountId < profile.accountId;
+        }),
+      "Native Chat browser profiles must be uniquely ordered by Account identity",
+    ),
+});
+export type NativeChatBrowserProfileList = z.infer<typeof NativeChatBrowserProfileListSchema>;
+
 export const NativeChatLaunchClaimSchema = z.strictObject({
   schemaVersion: z.literal(1),
   dispatchId: ChatDispatchIdSchema,

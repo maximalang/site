@@ -4,6 +4,10 @@ import {
   BrowserProfileRefSchema,
   ChatDispatchIdSchema,
   LauncherIdSchema,
+  type NativeChatBrowserProfileConfiguration,
+  NativeChatBrowserProfileConfigurationSchema,
+  type NativeChatBrowserProfileList,
+  NativeChatBrowserProfileListSchema,
   type NativeChatLaunchClaim,
   NativeChatLaunchClaimSchema,
   NativeChatLaunchUrlSchema,
@@ -59,10 +63,19 @@ type ClaimRow = QueryResultRow & {
   launch_attempt: number;
 };
 
+type ProfileRow = QueryResultRow & {
+  account_id: string;
+  profile_ref: string;
+  launch_url: string;
+  is_enabled: boolean;
+  updated_at: Date;
+};
+
 type SubmissionRow = ClaimRow & { browser_profile_ref: string };
 
 export type NativeChatLaunchStoreErrorCode =
   | "PROFILE_CONFLICT"
+  | "INVALID_ACCOUNT"
   | "CLAIM_CONFLICT"
   | "SUBMISSION_CONFLICT";
 
@@ -80,19 +93,28 @@ function hashReceipt(value: unknown): string {
 export class PostgresNativeChatLaunchStore {
   constructor(private readonly pool: TransactionPool) {}
 
-  async configureProfile(input: z.input<typeof ProfileSchema>): Promise<void> {
+  async configureProfile(
+    input: z.input<typeof ProfileSchema>,
+  ): Promise<NativeChatBrowserProfileConfiguration> {
     const profile = ProfileSchema.parse(input);
     const client = await this.pool.connect();
     try {
-      await client.query(
+      const configured = await client.query<ProfileRow>(
         `INSERT INTO agent_world.native_chat_browser_profiles
            (account_id, profile_ref, launch_url, is_enabled, updated_at)
-         VALUES ($1, $2, $3, $4, $5)
+         SELECT account.id, $2, $3, $4, $5
+           FROM agent_world.accounts account
+           JOIN agent_world.account_surfaces surface
+             ON surface.account_id = account.id AND surface.surface = 'CHAT'
+          WHERE account.id = $1
+            AND account.auth_mechanism = 'CHATGPT_INTERACTIVE'
+            AND account.is_enabled = true
          ON CONFLICT (account_id) DO UPDATE SET
            profile_ref = EXCLUDED.profile_ref,
            launch_url = EXCLUDED.launch_url,
            is_enabled = EXCLUDED.is_enabled,
-           updated_at = EXCLUDED.updated_at`,
+           updated_at = EXCLUDED.updated_at
+         RETURNING account_id, profile_ref, launch_url, is_enabled, updated_at`,
         [
           profile.accountId,
           profile.profileRef,
@@ -101,8 +123,44 @@ export class PostgresNativeChatLaunchStore {
           profile.updatedAt,
         ],
       );
-    } catch {
+      const row = configured.rows[0];
+      if (!row) throw new NativeChatLaunchStoreError("INVALID_ACCOUNT");
+      return NativeChatBrowserProfileConfigurationSchema.parse({
+        schemaVersion: 1,
+        accountId: row.account_id,
+        profileRef: row.profile_ref,
+        launchUrl: row.launch_url,
+        isEnabled: row.is_enabled,
+        updatedAt: row.updated_at.toISOString(),
+      });
+    } catch (error) {
+      if (error instanceof NativeChatLaunchStoreError) throw error;
       throw new NativeChatLaunchStoreError("PROFILE_CONFLICT");
+    } finally {
+      client.release();
+    }
+  }
+
+  async listProfiles(): Promise<NativeChatBrowserProfileList> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<ProfileRow>(
+        `SELECT account_id, profile_ref, launch_url, is_enabled, updated_at
+           FROM agent_world.native_chat_browser_profiles
+          ORDER BY account_id
+          LIMIT 501`,
+      );
+      return NativeChatBrowserProfileListSchema.parse({
+        schemaVersion: 1,
+        profiles: result.rows.map((row) => ({
+          schemaVersion: 1,
+          accountId: row.account_id,
+          profileRef: row.profile_ref,
+          launchUrl: row.launch_url,
+          isEnabled: row.is_enabled,
+          updatedAt: row.updated_at.toISOString(),
+        })),
+      });
     } finally {
       client.release();
     }
