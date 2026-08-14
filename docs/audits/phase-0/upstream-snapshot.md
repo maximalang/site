@@ -14,6 +14,7 @@ audit instead of silently moving the evidence anchor.
 
 | Repository | Default branch | HEAD SHA | Latest observed release | GitHub license |
 | --- | --- | --- | --- | --- |
+| `WW-AI-Lab/openclaw-office` | `main` | `def631a4533df2b0c8bb6aa19ef3e07c81f4fbc6` | `2026.6.11` package version | MIT |
 | `openclaw/openclaw` | `main` | `b05d2308e7a58be5e2b4a8b5d2823e0a217b3425` | `v2026.7.1-2` | unrecognized |
 | `geezerrrr/agent-town` | `main` | `e81a218dd376f37870290cc0c307a165475a303d` | `v0.4.1` | missing |
 | `rafapetter/agent-town` | `main` | `78e8e91b9c2620ff8048377f12048412ed603028` | none | MIT |

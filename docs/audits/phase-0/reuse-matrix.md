@@ -6,9 +6,10 @@ behind an adapter. Neither classification overrides the upstream license.
 
 | Component | Verified license boundary | Decision | What is reused | Why / constraint |
 | --- | --- | --- | --- | --- |
+| `WW-AI-Lab/openclaw-office` | MIT root at `def631a4533df2b0c8bb6aa19ef3e07c81f4fbc6`; selected SVG office uses code-drawn assets | Narrow attributed presentation port | SVG office/furniture, generated characters, status/walking/meeting/collaboration animation | Primary World hub; replace Gateway, Zustand stores, persistence, mock/runtime and console with canonical adapter + native overlays |
 | `openclaw/openclaw` | MIT root | Reuse as service + adapter | Public gateway client/protocol and plugin SDK | Sole general runtime; internals and config are not canonical APIs |
 | `geezerrrr/agent-town` | No root license; package metadata says MIT | Reference only | Interaction/task-flow ideas | Copyright permission is not established at pinned SHA |
-| `rafapetter/agent-town` | MIT | Narrow fork/port | Canvas renderer, layout, pathfinding, interaction | Primary World renderer; replace stores and random simulation |
+| `rafapetter/agent-town` | MIT | Superseded; remove after visual parity | Existing sizing/hit-testing reference only | Initial Canvas proof is replaced by OpenClaw Office presentation components |
 | `eliautobot/my-virtual-office` | AGPL-3.0 plus commercial feature gate | Reference only | Provider/event and office concepts | No code movement into permissive core |
 | `Pixel-Process-UG/agent-office` | MIT code; assets need separate review | Port selected components only | Office UI/provider patterns | Early-development APIs and non-code asset provenance |
 | `harishkotra/agent-office` | MIT | Reference UI; reject runtime | Office/task presentation ideas | Autonomous social brain duplicates runtime and emits fictional activity |
@@ -38,8 +39,8 @@ behind an adapter. Neither classification overrides the upstream license.
 
 1. One canonical PostgreSQL domain and one event ledger feed both World and
    Command.
-2. One general runtime (OpenClaw), one primary renderer (the narrow Agent Town
-   fork), and one first model gateway (LiteLLM) are enabled.
+2. One general runtime (OpenClaw), one primary renderer (the narrow OpenClaw
+   Office presentation port), and one first model gateway (LiteLLM) are enabled.
 3. Codex, Graphiti, Langfuse, n8n, MCP Gateway and Steel are adapters/services,
    never alternative owners of Agent, Task, Run, policy or audit truth.
 4. No AGPL, SSPL, Sustainable Use, enterprise, commercial or unlicensed code is

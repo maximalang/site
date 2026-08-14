@@ -26,8 +26,9 @@ Use one Next.js App Router application and one read-only `/api/world` endpoint.
 - World and Command derive their views from that same validated object and its
   replay cursor. Agent selection is one shared UI state resolved against the
   canonical Agent projection.
-- World uses the narrow MIT Canvas port recorded in ADR 0002. The port owns only
-  deterministic layout, drawing and hit testing.
+- World uses the narrow MIT OpenClaw Office presentation port recorded in ADR
+  0014. The port owns only deterministic layout, animation, drawing and hit
+  testing.
 - The browser never imports or connects to a runtime client and receives no
   runtime session IDs, gateway credentials or Agent instructions.
 - With no authoritative provider, the server returns a truthful `UNAVAILABLE`
@@ -46,11 +47,11 @@ task drift and would undermine the central acceptance invariant.
 Rejected. It would bypass the server-side adapter, credential boundary,
 canonical binding and future persisted event ledger.
 
-### Full Agent Town application fork
+### Full renderer application fork
 
-Rejected. Its in-memory stores, random idle simulation and generated chatter
-conflict with the product domain. Only the renderer/interaction kernel is
-reused.
+Rejected. Upstream stores, Gateway clients, random/mock simulation and generated
+chatter conflict with the product domain. Only presentation and interaction
+components are reused.
 
 ### Production demo fixture
 

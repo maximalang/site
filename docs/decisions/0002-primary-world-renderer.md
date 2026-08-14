@@ -1,6 +1,6 @@
 # ADR 0002: Primary World renderer
 
-- Status: Accepted
+- Status: Superseded by ADR 0014
 - Date: 2026-08-13
 
 ## Context

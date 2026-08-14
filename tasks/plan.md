@@ -32,8 +32,8 @@ agent framework, model gateway, memory stack, or control panels.
   handoffs and review loops; it does not become a second product state store.
 - UI configuration has Simple/Advanced levels and defaults most choices to
   safe `Auto` policies.
-- One primary World renderer and one model gateway are selected for the first
-  production deployment.
+- One primary World renderer—the narrow OpenClaw Office presentation port—and
+  one model gateway are selected for the first production deployment.
 - The first deployment targets one VDS with Docker Compose, not Kubernetes.
 
 ## Dependency graph
@@ -54,7 +54,8 @@ Phase 0 reuse and license audit
 ### Phase 0: Reuse audit (current)
 
 - [x] Record immutable upstream SHAs, versions, licenses, architecture and APIs.
-- [x] Inspect World/control-center candidates and choose one primary renderer.
+- [x] Reassess World candidates and choose OpenClaw Office as the primary
+      presentation layer without importing its backend or stores.
 - [x] Inspect runtime, model, memory, orchestration, observability, browser,
       automation and MCP candidates.
 - [x] Classify every candidate as direct reuse, fork, component port, adapter,
