@@ -61,6 +61,14 @@ export const applicationHubCommandDependencies = {
     runtime().executeHubCommand(command),
 };
 
+export const applicationNativeChatProfileDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  list: () => runtime().readNativeChatBrowserProfiles(),
+  configure: (
+    input: Parameters<ReturnType<typeof runtime>["configureNativeChatBrowserProfile"]>[0],
+  ) => runtime().configureNativeChatBrowserProfile(input),
+};
+
 export const applicationProviderCredentialDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   write: (input: Parameters<ReturnType<typeof runtime>["writeProviderCredential"]>[0]) =>

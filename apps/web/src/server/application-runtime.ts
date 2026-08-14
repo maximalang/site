@@ -3,6 +3,9 @@ import type {
   AccountId,
   AgentId,
   ModelRouteId,
+  NativeChatBrowserProfileConfiguration,
+  NativeChatBrowserProfileConfigurationInput,
+  NativeChatBrowserProfileList,
   NativeChatControlEventInput,
   NativeChatPullRequest,
   NativeChatPullResponse,
@@ -44,6 +47,10 @@ export type ApplicationRuntime = {
     request: NativeChatPullRequest,
   ): Promise<NativeChatPullResponse>;
   executeHubCommand(command: HubCommandRequest): Promise<HubCommandResponse>;
+  readNativeChatBrowserProfiles(): Promise<NativeChatBrowserProfileList>;
+  configureNativeChatBrowserProfile(
+    input: NativeChatBrowserProfileConfigurationInput & { updatedAt: string },
+  ): Promise<NativeChatBrowserProfileConfiguration>;
   writeProviderCredential(input: ProviderCredentialWriteInput): Promise<SecretWriteReceipt>;
   checkModelRoute(modelRouteId: ModelRouteId): Promise<ModelRouteCheckResponse>;
   readExecutionPreferences(

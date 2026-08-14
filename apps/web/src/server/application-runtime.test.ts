@@ -18,6 +18,8 @@ function runtime() {
     appendNativeChatControl: vi.fn(),
     pullNativeChatResources: vi.fn(),
     executeHubCommand: vi.fn(),
+    readNativeChatBrowserProfiles: vi.fn(),
+    configureNativeChatBrowserProfile: vi.fn(),
     writeProviderCredential: vi.fn(),
     checkModelRoute: vi.fn(),
     readExecutionPreferences: vi.fn(),

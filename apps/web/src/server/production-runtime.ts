@@ -23,6 +23,7 @@ import {
   PostgresHubReader,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
+  PostgresNativeChatLaunchStore,
   PostgresNativeChatResourceReader,
   PostgresOpenClawConfigurationReader,
   PostgresOwnerSessionStore,
@@ -258,6 +259,7 @@ export async function createProductionRuntime(
     const nativeChatControlStore = new PostgresNativeChatControlStore(pool, {
       eventId: () => `event_${randomUUID()}`,
     });
+    const nativeChatLaunchStore = new PostgresNativeChatLaunchStore(pool);
     const nativeChatResourceReader = new PostgresNativeChatResourceReader(pool, {
       pullId: () => `resource_pull_${randomUUID()}`,
     });
@@ -390,6 +392,8 @@ export async function createProductionRuntime(
       pullNativeChatResources: (accountId, request) =>
         nativeChatResourceReader.pull(accountId, request),
       executeHubCommand: (command) => hubCommandStore.execute(command),
+      readNativeChatBrowserProfiles: () => nativeChatLaunchStore.listProfiles(),
+      configureNativeChatBrowserProfile: (input) => nativeChatLaunchStore.configureProfile(input),
       writeProviderCredential: async (input) => {
         const receipt = await secretStore.writeProviderCredential(input);
         await reconcileModelRoutes();
