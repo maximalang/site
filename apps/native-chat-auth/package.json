@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node src/entrypoint.js",
-    "check": "node --check src/config.js && node --check src/owner-password.js && node --check src/postgres-adapter.js"
+    "check": "node --check src/config.js && node --check src/owner-password.js && node --check src/postgres-adapter.js && node --check src/server.js && node --check src/entrypoint.js && node --check test/lifecycle.test.js",
+    "test:lifecycle": "node --test --test-concurrency=1 test/lifecycle.test.js"
   },
   "dependencies": {
     "oidc-provider": "9.11.1",

@@ -99,6 +99,9 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
       PostgreSQL with per-Run sequence and idempotency conflict detection.
 - [ ] Expose OAuth-protected `begin_run`, bounded pull endpoints and event tools;
       derive Account from auth instead of trusting request fields.
+- [x] Implement the isolated PostgreSQL-backed OAuth provider with DCR, PKCE
+      S256, resource indicators, canonical Account selection, refresh rotation
+      and the cached-request-without-`offline_access` compatibility path.
 - [ ] Update Task/Run, Action Graph, World projections and Memory Inbox from the
       same committed transaction/outbox boundary.
 - [ ] Reconcile restart, late/duplicate calls, missing commit and expired

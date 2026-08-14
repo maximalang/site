@@ -36,30 +36,8 @@ CREATE TABLE agent_world_oauth.account_grants (
   grant_id text PRIMARY KEY CHECK (char_length(grant_id) BETWEEN 1 AND 512),
   client_id text NOT NULL CHECK (char_length(client_id) BETWEEN 1 AND 512),
   account_id text NOT NULL REFERENCES agent_world.accounts(id) ON DELETE RESTRICT,
-  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  revoked_at timestamptz,
-  CHECK (revoked_at IS NULL OR revoked_at >= created_at)
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
-CREATE INDEX native_chat_oauth_account_grants_active
-  ON agent_world_oauth.account_grants (account_id, created_at DESC)
-  WHERE revoked_at IS NULL;
-
-CREATE OR REPLACE FUNCTION agent_world_oauth.reject_oidc_update_delete()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF TG_OP = 'DELETE' AND current_setting('agent_world.oauth_maintenance', true) = 'on' THEN
-    RETURN OLD;
-  END IF;
-  IF TG_OP = 'UPDATE' THEN
-    RETURN NEW;
-  END IF;
-  RAISE EXCEPTION 'OAuth state deletion requires the bounded maintenance flag';
-END;
-$$;
-
-CREATE TRIGGER oidc_store_delete_guard
-BEFORE DELETE ON agent_world_oauth.oidc_store
-FOR EACH ROW EXECUTE FUNCTION agent_world_oauth.reject_oidc_update_delete();
+CREATE INDEX native_chat_oauth_account_grants_timeline
+  ON agent_world_oauth.account_grants (account_id, created_at DESC);

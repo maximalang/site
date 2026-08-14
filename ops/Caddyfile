@@ -4,7 +4,15 @@
 
 {$AGENT_WORLD_SITE_ADDRESS} {
 	encode zstd gzip
-	reverse_proxy web:3000
+	handle /oauth* {
+		reverse_proxy native-chat-auth:3002
+	}
+	handle /.well-known/oauth-authorization-server/oauth {
+		reverse_proxy native-chat-auth:3002
+	}
+	handle {
+		reverse_proxy web:3000
+	}
 	header -Server
 	log {
 		output stdout

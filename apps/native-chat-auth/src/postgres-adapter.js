@@ -108,7 +108,6 @@ export function createPostgresAdapter(pool) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        await client.query("SET LOCAL agent_world.oauth_maintenance = 'on'");
         await client.query(`DELETE FROM ${SCHEMA}.oidc_store WHERE model = $1 AND ${column} = $2`, [
           this.name,
           value,
@@ -148,13 +147,16 @@ export async function listEligibleChatAccounts(pool) {
 }
 
 export async function recordAccountGrant(pool, { grantId, clientId, accountId }) {
-  await pool.query(
+  const result = await pool.query(
     `INSERT INTO ${SCHEMA}.account_grants (grant_id, client_id, account_id)
      VALUES ($1, $2, $3) ON CONFLICT (grant_id) DO UPDATE SET
-       account_id = CASE WHEN ${SCHEMA}.account_grants.client_id = EXCLUDED.client_id
-                         THEN EXCLUDED.account_id ELSE ${SCHEMA}.account_grants.account_id END`,
+       account_id = EXCLUDED.account_id
+     WHERE ${SCHEMA}.account_grants.client_id = EXCLUDED.client_id
+       AND ${SCHEMA}.account_grants.account_id = EXCLUDED.account_id
+     RETURNING grant_id`,
     [grantId, clientId, accountId],
   );
+  if (result.rowCount !== 1) throw new Error("OAuth grant identity conflict");
 }
 
 export async function getLoginThrottle(pool, keys) {
@@ -204,7 +206,6 @@ export async function cleanupExpiredAuthState(pool) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL agent_world.oauth_maintenance = 'on'");
     await client.query(
       `DELETE FROM ${SCHEMA}.oidc_store
         WHERE expires_at IS NOT NULL AND expires_at < clock_timestamp() - INTERVAL '5 minutes'`,
