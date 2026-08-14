@@ -10,6 +10,7 @@ export * from "./encrypted-secret-store.js";
 export * from "./execution-preference-store.js";
 export * from "./hub-command-store.js";
 export * from "./hub-reader.js";
+export * from "./memory-curation-store.js";
 export * from "./migration.js";
 export * from "./model-route-resolver.js";
 export * from "./native-chat-control-store.js";

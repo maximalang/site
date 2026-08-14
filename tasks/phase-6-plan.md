@@ -22,9 +22,10 @@ curation decisions or replay state.
 
 ## Slice 1: Contracts and canonical lifecycle
 
-- [ ] Add strict identifiers, proposal, decision and projection contracts.
-- [ ] Persist proposals and decisions with exact provenance and idempotency.
-- [ ] Materialize accepted/merged memory atomically and reject post-decision
+- [x] Add strict identifiers plus proposal and decision contracts. Projection
+      contracts remain in Slice 2/3 with their actual consumers.
+- [x] Persist proposals and decisions with exact provenance and idempotency.
+- [x] Materialize accepted/merged memory atomically and reject post-decision
       mutation.
 
 ## Slice 2: Graph projection adapter
@@ -47,4 +48,3 @@ curation decisions or replay state.
   materialization, project isolation and restart replay.
 - API/browser tests prove owner authorization and all three projections.
 - Full lint, type, unit, build, database, runtime and Compose gates pass.
-

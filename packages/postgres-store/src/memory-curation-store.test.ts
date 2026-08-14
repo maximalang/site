@@ -1,0 +1,124 @@
+import { describe, expect, it, vi } from "vitest";
+import { PostgresMemoryCurationStore } from "./memory-curation-store.js";
+
+const ids = {
+  proposal: "memory_proposal_11111111-1111-1111-1111-111111111111",
+  duplicateProposal: "memory_proposal_66666666-6666-6666-6666-666666666666",
+  decision: "memory_decision_22222222-2222-2222-2222-222222222222",
+  project: "project_33333333-3333-3333-3333-333333333333",
+  source: "context_item_44444444-4444-4444-4444-444444444444",
+  memory: "context_item_55555555-5555-5555-5555-555555555555",
+} as const;
+const now = "2026-08-15T00:00:00.000Z";
+
+function poolFor(handler: (sql: string, params?: unknown[]) => { rows: unknown[] }) {
+  const query = vi.fn(async (sql: string, params?: unknown[]) => {
+    if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return { rows: [] };
+    return handler(sql, params);
+  });
+  return { query, pool: { connect: vi.fn(async () => ({ query, release: vi.fn() })) } };
+}
+
+describe("PostgresMemoryCurationStore", () => {
+  it("creates a proposal only through same-project canonical provenance", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_proposals"))
+        return { rows: [{ id: ids.proposal }] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const proposal = await new PostgresMemoryCurationStore(pool as never).propose({
+      schemaVersion: 1,
+      id: ids.proposal,
+      projectId: ids.project,
+      sourceContextItemId: ids.source,
+      content: "PostgreSQL owns canonical memory.",
+      contentHash: "a".repeat(64),
+      estimatedTokens: 7,
+      importance: 0.9,
+      status: "PENDING",
+      createdAt: now,
+    });
+    expect(proposal).toEqual({ outcome: "CREATED", proposalId: ids.proposal });
+    expect(query.mock.calls.some(([sql]) => sql.includes("source.id = $3"))).toBe(true);
+  });
+
+  it("deduplicates the same candidate provenance under a different requested id", async () => {
+    let requestHash = "";
+    const { pool } = poolFor((sql, params) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_proposals")) {
+        requestHash = String(params?.[7]);
+        return { rows: [] };
+      }
+      if (sql.includes("FROM agent_world.memory_proposals"))
+        return {
+          rows: [
+            {
+              id: ids.proposal,
+              request_sha256: requestHash,
+            },
+          ],
+        };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const receipt = await new PostgresMemoryCurationStore(pool as never).propose({
+      schemaVersion: 1,
+      id: ids.duplicateProposal,
+      projectId: ids.project,
+      sourceContextItemId: ids.source,
+      content: "PostgreSQL owns canonical memory.",
+      contentHash: "a".repeat(64),
+      estimatedTokens: 7,
+      importance: 0.9,
+      status: "PENDING",
+      createdAt: now,
+    });
+    expect(receipt).toEqual({ outcome: "DEDUPLICATED", proposalId: ids.proposal });
+  });
+
+  it("accepts atomically by copying exact source provenance into MEMORY context", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
+        return {
+          rows: [
+            {
+              id: ids.proposal,
+              project_id: ids.project,
+              source_context_item_id: ids.source,
+              content: "PostgreSQL owns canonical memory.",
+              content_sha256: "a".repeat(64),
+              estimated_tokens: 7,
+              importance: 0.9,
+              status: "PENDING",
+            },
+          ],
+        };
+      if (sql.includes("INSERT INTO agent_world.context_items"))
+        return { rows: [{ id: ids.memory }] };
+      if (sql.includes("INSERT INTO agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("UPDATE agent_world.memory_proposals")) return { rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const result = await new PostgresMemoryCurationStore(pool as never, {
+      contextItemId: () => ids.memory,
+    }).decide({
+      schemaVersion: 1,
+      id: ids.decision,
+      proposalId: ids.proposal,
+      projectId: ids.project,
+      action: "ACCEPT",
+      idempotencyKey: "memory:accept-1",
+      decidedAt: now,
+    });
+    expect(result).toEqual({
+      outcome: "CREATED",
+      proposalId: ids.proposal,
+      status: "ACCEPTED",
+      materializedContextItemId: ids.memory,
+    });
+    expect(query.mock.calls.some(([sql]) => sql.includes("source.provenance_kind"))).toBe(true);
+  });
+});

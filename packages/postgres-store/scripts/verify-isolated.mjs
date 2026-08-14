@@ -27,6 +27,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresMemoryCurationStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -217,7 +218,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 23
+    ledger.rows.at(-1)?.version !== 24
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -291,6 +292,8 @@ try {
     "context_items",
     "context_pack_evidence",
     "context_packs",
+    "memory_curation_decisions",
+    "memory_proposals",
     "rag_document_chunks",
     "rag_document_sources",
     "rag_documents",
@@ -595,6 +598,126 @@ try {
     retrievedContext[0]?.chunkId !== contextIds.chunk
   ) {
     throw new Error("Shared context idempotency, retrieval, or project isolation drifted");
+  }
+  const memoryIds = {
+    proposal: "memory_proposal_70707070-7070-7070-7070-707070707070",
+    duplicateProposal: "memory_proposal_71717171-7171-7171-7171-717171717171",
+    crossProjectProposal: "memory_proposal_79797979-7979-7979-7979-797979797979",
+    mergeProposal: "memory_proposal_72727272-7272-7272-7272-727272727272",
+    rejectProposal: "memory_proposal_73737373-7373-7373-7373-737373737373",
+    decision: "memory_decision_74747474-7474-7474-7474-747474747474",
+    conflictDecision: "memory_decision_75757575-7575-7575-7575-757575757575",
+    mergeDecision: "memory_decision_76767676-7676-7676-7676-767676767676",
+    rejectDecision: "memory_decision_77777777-7777-7777-7777-777777777777",
+    context: "context_item_78787878-7878-7878-7878-787878787878",
+  };
+  const memoryStore = new PostgresMemoryCurationStore(pool, {
+    contextItemId: () => memoryIds.context,
+  });
+  const memoryProposal = {
+    schemaVersion: 1,
+    id: memoryIds.proposal,
+    projectId: ids.project,
+    sourceContextItemId: chunkReceipt.contextItemId,
+    content: "Canonical memory is curated and provenance-linked.",
+    contentHash: "1".repeat(64),
+    estimatedTokens: 9,
+    importance: 0.95,
+    status: "PENDING",
+    createdAt: "2026-08-13T08:31:00.000Z",
+  };
+  const proposed = await memoryStore.propose(memoryProposal);
+  const duplicateProposal = await memoryStore.propose({
+    ...memoryProposal,
+    id: memoryIds.duplicateProposal,
+  });
+  await expectRejected(
+    memoryStore.propose({
+      ...memoryProposal,
+      id: memoryIds.crossProjectProposal,
+      projectId: contextIds.otherProject,
+    }),
+    "Memory Inbox accepted provenance from another project",
+  );
+  const acceptDecision = {
+    schemaVersion: 1,
+    id: memoryIds.decision,
+    proposalId: memoryIds.proposal,
+    projectId: ids.project,
+    action: "ACCEPT",
+    idempotencyKey: "memory:isolated-accept",
+    decidedAt: "2026-08-13T08:32:00.000Z",
+  };
+  const accepted = await memoryStore.decide(acceptDecision);
+  const replayed = await new PostgresMemoryCurationStore(pool).decide(acceptDecision);
+  await expectRejected(
+    memoryStore.decide({
+      ...acceptDecision,
+      id: memoryIds.conflictDecision,
+      action: "REJECT",
+      idempotencyKey: "memory:isolated-conflict",
+    }),
+    "Memory Inbox accepted a second terminal decision",
+  );
+  await memoryStore.propose({
+    ...memoryProposal,
+    id: memoryIds.mergeProposal,
+    content: "This evidence is already represented by accepted memory.",
+    contentHash: "2".repeat(64),
+    createdAt: "2026-08-13T08:33:00.000Z",
+  });
+  const merged = await memoryStore.decide({
+    schemaVersion: 1,
+    id: memoryIds.mergeDecision,
+    proposalId: memoryIds.mergeProposal,
+    projectId: ids.project,
+    action: "MERGE",
+    targetContextItemId: memoryIds.context,
+    idempotencyKey: "memory:isolated-merge",
+    decidedAt: "2026-08-13T08:34:00.000Z",
+  });
+  await memoryStore.propose({
+    ...memoryProposal,
+    id: memoryIds.rejectProposal,
+    content: "Untrusted speculation must not become memory.",
+    contentHash: "3".repeat(64),
+    createdAt: "2026-08-13T08:35:00.000Z",
+  });
+  const rejected = await memoryStore.decide({
+    schemaVersion: 1,
+    id: memoryIds.rejectDecision,
+    proposalId: memoryIds.rejectProposal,
+    projectId: ids.project,
+    action: "REJECT",
+    idempotencyKey: "memory:isolated-reject",
+    decidedAt: "2026-08-13T08:36:00.000Z",
+  });
+  const memoryEvidence = await pool.query(
+    `SELECT proposal.status, memory.kind, memory.provenance_kind,
+            memory.document_chunk_id,
+            (SELECT count(*)::integer FROM agent_world.memory_curation_decisions
+              WHERE project_id = $1) AS decisions
+       FROM agent_world.memory_proposals proposal
+       JOIN agent_world.context_items memory ON memory.id = $2
+      WHERE proposal.id = $3 AND proposal.project_id = $1`,
+    [ids.project, memoryIds.context, memoryIds.proposal],
+  );
+  if (
+    proposed.outcome !== "CREATED" ||
+    duplicateProposal.outcome !== "DEDUPLICATED" ||
+    accepted.status !== "ACCEPTED" ||
+    accepted.materializedContextItemId !== memoryIds.context ||
+    replayed.outcome !== "REPLAYED" ||
+    merged.status !== "MERGED" ||
+    merged.materializedContextItemId !== memoryIds.context ||
+    rejected.status !== "REJECTED" ||
+    memoryEvidence.rows[0]?.status !== "ACCEPTED" ||
+    memoryEvidence.rows[0]?.kind !== "MEMORY" ||
+    memoryEvidence.rows[0]?.provenance_kind !== "DOCUMENT_CHUNK" ||
+    memoryEvidence.rows[0]?.document_chunk_id !== contextIds.chunk ||
+    memoryEvidence.rows[0]?.decisions !== 3
+  ) {
+    throw new Error("Memory curation lifecycle or exact provenance drifted");
   }
   await pool.query(
     `INSERT INTO agent_world.agents
@@ -2234,9 +2357,12 @@ try {
     maxTokens: 2_000,
   });
   if (
-    nativeChatPull.items.length !== 8 ||
+    nativeChatPull.items.length !== 9 ||
     nativeChatPull.omissions.length !== 0 ||
-    new Set(nativeChatPull.items.map((item) => item.resource)).size !== 7
+    new Set(nativeChatPull.items.map((item) => item.resource)).size !== 7 ||
+    !nativeChatPull.items.some(
+      (item) => item.resource === "MEMORY" && item.provenance[0]?.entityId === memoryIds.context,
+    )
   ) {
     throw new Error(
       `Native Chat lazy pull did not return exact bounded canonical resources: ${JSON.stringify(nativeChatPull)}`,
@@ -2317,7 +2443,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);
