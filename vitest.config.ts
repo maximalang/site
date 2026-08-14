@@ -19,6 +19,9 @@ export default defineConfig({
       "@agent-world/openclaw-adapter": fileURLToPath(
         new URL("./packages/openclaw-adapter/src/index.ts", import.meta.url),
       ),
+      "@agent-world/orchestration": fileURLToPath(
+        new URL("./packages/orchestration/src/index.ts", import.meta.url),
+      ),
       "@agent-world/postgres-store": fileURLToPath(
         new URL("./packages/postgres-store/src/index.ts", import.meta.url),
       ),

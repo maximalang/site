@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "tsBuildInfoFile": "../../.cache/orchestration.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../domain" }]
+}

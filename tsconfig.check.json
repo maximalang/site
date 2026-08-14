@@ -21,5 +21,6 @@
     "apps/native-chat-launcher/src/**/*.ts",
     "packages/**/*.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["packages/orchestration/**/*"]
 }

@@ -24,9 +24,10 @@
     "test:litellm-live": "tsc -b && npm run test:live --workspace @agent-world/model-gateway",
     "test:runtime": "npm run build && npm run test:runtime:isolated --workspace @agent-world/web",
     "test:openclaw-live": "tsc -b && npm run test:live --workspace @agent-world/openclaw-adapter",
+    "test:orchestration": "tsc -b && npm run test:postgres --workspace @agent-world/orchestration",
     "test:compose": "node ops/verify-core.mjs",
     "test:codex-live": "tsc -b && npm run test:live --workspace @agent-world/codex-adapter",
-    "typecheck": "tsc -p tsconfig.check.json --noEmit && npm run typecheck --workspace @agent-world/web"
+    "typecheck": "tsc -p tsconfig.check.json --noEmit && npm run build --workspace @agent-world/orchestration && npm run typecheck --workspace @agent-world/web"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",

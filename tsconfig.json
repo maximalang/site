@@ -26,6 +26,9 @@
       "path": "./packages/openclaw-adapter"
     },
     {
+      "path": "./packages/orchestration"
+    },
+    {
       "path": "./packages/postgres-store"
     },
     {
