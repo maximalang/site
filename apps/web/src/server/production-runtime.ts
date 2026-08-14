@@ -300,6 +300,9 @@ export async function createProductionRuntime(
     });
     const nativeChatControlStore = new PostgresNativeChatControlStore(pool, {
       eventId: () => `event_${randomUUID()}`,
+      contextItemId: () => `context_item_${randomUUID()}`,
+      memoryProposalId: () => `memory_proposal_${randomUUID()}`,
+      memoryEventId: () => `event_${randomUUID()}`,
     });
     const nativeChatLaunchStore = new PostgresNativeChatLaunchStore(pool);
     const nativeChatResourceReader = new PostgresNativeChatResourceReader(pool, {

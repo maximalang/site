@@ -152,4 +152,72 @@ describe("PostgresNativeChatControlStore", () => {
       }),
     ).rejects.toEqual(new NativeChatControlStoreError("RUN_TERMINAL"));
   });
+
+  it("materializes the committed result and Memory Inbox proposals in the same transaction", async () => {
+    const running = {
+      ...dispatchRow,
+      project_id: "project_88888888-8888-8888-8888-888888888888",
+      state: "ATTACHED",
+      last_sequence: 1,
+      run_status: "RUNNING",
+    };
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("FROM agent_world.native_chat_control_events")) return { rows: [] };
+      if (sql.includes("JOIN agent_world.runs")) return { rows: [running] };
+      if (sql.includes("UPDATE agent_world.world_event_stream")) {
+        return { rows: [{ last_sequence: "13" }] };
+      }
+      if (sql.includes("INSERT INTO agent_world.context_items")) {
+        return { rows: [{ id: "context_item_99999999-9999-9999-9999-999999999999" }] };
+      }
+      if (sql.includes("INSERT INTO agent_world.memory_proposals")) {
+        return { rows: [{ id: "memory_proposal_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }] };
+      }
+      return { rows: [] };
+    });
+    const transactionPool = {
+      connect: vi.fn(async () => ({ query, release: vi.fn() })),
+    } as unknown as TransactionPool;
+
+    await new PostgresNativeChatControlStore(transactionPool, {
+      eventId: () => "event_77777777-7777-7777-7777-777777777777",
+      contextItemId: () => "context_item_99999999-9999-9999-9999-999999999999",
+      memoryProposalId: () => "memory_proposal_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      memoryEventId: () => "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      now: () => new Date("2026-08-14T10:03:00.000Z"),
+    }).append(ids.account, {
+      schemaVersion: 1,
+      runId: ids.run,
+      sequence: 2,
+      idempotencyKey: "chat:commit:2",
+      eventType: "COMMIT_RESULT",
+      payload: {
+        result: {
+          schemaVersion: 1,
+          fullOutput: "Completed work.",
+          summary: "Verified reusable result.",
+          findings: [],
+          decisions: [],
+          actions: [],
+          artifacts: [],
+          openQuestions: [],
+          nextActions: [],
+          memoryCandidates: [
+            { statement: "Use rotating OAuth refresh tokens.", confidence: 0.9, importance: 0.8 },
+          ],
+          confidence: 0.9,
+        },
+      },
+    });
+
+    const statements = query.mock.calls.map(([sql]) => String(sql));
+    expect(statements).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("INSERT INTO agent_world.context_items"),
+        expect.stringContaining("INSERT INTO agent_world.memory_proposals"),
+        expect.stringContaining("INSERT INTO agent_world.memory_events"),
+      ]),
+    );
+    expect(query).toHaveBeenLastCalledWith("COMMIT");
+  });
 });

@@ -2364,6 +2364,9 @@ try {
       if (!eventId) throw new Error("Isolated Native Chat event identities were exhausted");
       return eventId;
     },
+    contextItemId: () => "context_item_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8",
+    memoryProposalId: () => "memory_proposal_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8",
+    memoryEventId: () => "event_cacacaca-caca-caca-caca-cacacacacaca",
     now: () => new Date(`2026-08-13T13:01:0${nativeChatNow++}.000Z`),
   });
   const beginEvent = {
@@ -2559,6 +2562,14 @@ try {
               WHERE x.run_id = r.id) AS results,
             (SELECT count(*)::integer FROM agent_world.native_chat_resource_pulls p
               WHERE p.run_id = r.id) AS pulls,
+            (SELECT count(*)::integer FROM agent_world.context_items c
+              WHERE c.run_id = r.id AND c.kind = 'AGENT_RESULT') AS result_context,
+            (SELECT count(*)::integer FROM agent_world.memory_proposals m
+              WHERE m.source_context_item_id =
+                'context_item_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8') AS memory_proposals,
+            (SELECT count(*)::integer FROM agent_world.memory_events me
+              WHERE me.proposal_id =
+                'memory_proposal_c8c8c8c8-c8c8-c8c8-c8c8-c8c8c8c8c8c8') AS memory_events,
             s.status AS world_status
        FROM agent_world.runs r
        JOIN agent_world.native_chat_dispatches d ON d.run_id = r.id
@@ -2573,13 +2584,16 @@ try {
     nativeChatEvidence.rows[0]?.events !== 3 ||
     nativeChatEvidence.rows[0]?.results !== 1 ||
     nativeChatEvidence.rows[0]?.pulls !== 1 ||
+    nativeChatEvidence.rows[0]?.result_context !== 1 ||
+    nativeChatEvidence.rows[0]?.memory_proposals !== 1 ||
+    nativeChatEvidence.rows[0]?.memory_events !== 1 ||
     nativeChatEvidence.rows[0]?.world_status !== "IDLE"
   ) {
     throw new Error("Native Chat Control events did not project one exact terminal result");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 7, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 6, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 7, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

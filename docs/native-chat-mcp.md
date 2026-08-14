@@ -39,6 +39,11 @@ structured results and canonical Control events.
   versioned SHA-256 receipt, while duplicate or expired claims fail closed.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
+- The same `commit_result` transaction materializes an `AGENT_RESULT` shared
+  context item, creates provenance-linked pending Memory Inbox proposals for
+  declared memory candidates, appends their replayable memory events, completes
+  the Run and updates the World projection. Task state and Action Graph remain
+  derived from the immutable Task intent plus canonical Run/Control events.
 - Isolated PostgreSQL-backed OAuth provider under `/oauth` with public-client
   DCR, Authorization Code, mandatory PKCE S256, exact resource indicators,
   ES256 access tokens, revocation and rotating refresh tokens.

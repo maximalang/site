@@ -102,7 +102,7 @@ Mission -> Tasks -> Runs -> Resource Broker -> independent Transport
 - [x] Implement the isolated PostgreSQL-backed OAuth provider with DCR, PKCE
       S256, resource indicators, canonical Account selection, refresh rotation
       and the cached-request-without-`offline_access` compatibility path.
-- [ ] Update Task/Run, Action Graph, World projections and Memory Inbox from the
+- [x] Update Task/Run, Action Graph, World projections and Memory Inbox from the
       same committed transaction/outbox boundary.
 - [ ] Reconcile restart, late/duplicate calls, missing commit and expired
       capabilities deterministically.

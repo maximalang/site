@@ -3,11 +3,15 @@ import {
   type AccountId,
   AccountIdSchema,
   applyNativeChatControlEvent,
+  ContextItemIdSchema,
   EventIdSchema,
+  MemoryProposalIdSchema,
   type NativeChatControlEventInput,
   NativeChatControlEventInputSchema,
   type NativeChatRunControlState,
   NativeChatRunControlStateSchema,
+  ProjectIdSchema,
+  StructuredAgentOutputSchema,
   TimestampSchema,
 } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
@@ -29,6 +33,7 @@ type ControlRow = QueryResultRow & {
   agent_id: string;
   account_id: string;
   route_id: string;
+  project_id: string;
   state: string;
   last_sequence: number;
   created_at: Date | string;
@@ -70,8 +75,8 @@ function safeSequence(input: string | number): number {
   return value;
 }
 
-function defaultHash(event: NativeChatControlEventInput): string {
-  return createHash("sha256").update(JSON.stringify(event), "utf8").digest("hex");
+function hashJson(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
 }
 
 function stateFromRow(row: ControlRow): NativeChatRunControlState {
@@ -93,16 +98,20 @@ function stateFromRow(row: ControlRow): NativeChatRunControlState {
 const SELECT_CONTROL = `SELECT d.id, d.run_id, d.task_id, d.agent_id, d.account_id,
        d.route_id, d.state, d.last_sequence, d.created_at, d.submitted_at,
        d.attached_at, d.failed_at, d.failure_code, r.status AS run_status,
-       r.adapter_kind, r.created_at AS run_created_at
+       r.adapter_kind, r.created_at AS run_created_at, t.project_id
   FROM agent_world.native_chat_dispatches d
   JOIN agent_world.runs r ON r.id = d.run_id
+  JOIN agent_world.tasks t ON t.id = d.task_id
  WHERE d.run_id = $1
- FOR UPDATE OF d, r`;
+ FOR UPDATE OF d, r, t`;
 
 export class PostgresNativeChatControlStore {
   private readonly eventId: () => string;
   private readonly now: () => Date;
   private readonly hashEvent: (event: NativeChatControlEventInput) => string;
+  private readonly contextItemId: () => string;
+  private readonly memoryProposalId: () => string;
+  private readonly memoryEventId: () => string;
 
   constructor(
     private readonly pool: TransactionPool,
@@ -110,6 +119,9 @@ export class PostgresNativeChatControlStore {
       eventId?: () => string;
       now?: () => Date;
       hashEvent?: (event: NativeChatControlEventInput) => string;
+      contextItemId?: () => string;
+      memoryProposalId?: () => string;
+      memoryEventId?: () => string;
     } = {},
   ) {
     this.eventId =
@@ -118,7 +130,18 @@ export class PostgresNativeChatControlStore {
         throw new Error("A production World event identity generator is required");
       });
     this.now = options.now ?? (() => new Date());
-    this.hashEvent = options.hashEvent ?? defaultHash;
+    this.hashEvent = options.hashEvent ?? hashJson;
+    this.contextItemId =
+      options.contextItemId ??
+      (() => {
+        throw new Error("A production ContextItem identity generator is required");
+      });
+    this.memoryProposalId =
+      options.memoryProposalId ??
+      (() => {
+        throw new Error("A production MemoryProposal identity generator is required");
+      });
+    this.memoryEventId = options.memoryEventId ?? this.eventId;
   }
 
   async append(accountIdInput: unknown, eventInput: unknown) {
@@ -217,6 +240,7 @@ export class PostgresNativeChatControlStore {
           `UPDATE agent_world.runs SET status = 'COMPLETED', completed_at = $2 WHERE id = $1`,
           [event.runId, occurredAt],
         );
+        await this.materializeCommittedResult(client, row, event, occurredAt);
         await this.appendWorldStatus(client, row, "IDLE", event.idempotencyKey, occurredAt);
       } else if (event.eventType === "FAIL") {
         await client.query(
@@ -248,6 +272,96 @@ export class PostgresNativeChatControlStore {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  private async materializeCommittedResult(
+    client: Awaited<ReturnType<TransactionPool["connect"]>>,
+    row: ControlRow,
+    event: Extract<NativeChatControlEventInput, { eventType: "COMMIT_RESULT" }>,
+    occurredAt: string,
+  ) {
+    const result = StructuredAgentOutputSchema.parse(event.payload.result);
+    const projectId = ProjectIdSchema.parse(row.project_id);
+    const contextItemId = ContextItemIdSchema.parse(this.contextItemId());
+    const contentHash = createHash("sha256").update(result.summary, "utf8").digest("hex");
+    const estimatedTokens = Math.max(1, Math.min(100_000, Math.ceil(result.summary.length / 4)));
+    await client.query(
+      `INSERT INTO agent_world.context_items
+         (id, project_id, kind, temperature, content, summary, content_sha256,
+          estimated_tokens, importance, provenance_kind, run_id, agent_id, task_id, created_at)
+       VALUES ($1, $2, 'AGENT_RESULT', 'HOT', $3, $3, $4, $5, $6,
+               'RUN', $7, $8, $9, $10)`,
+      [
+        contextItemId,
+        projectId,
+        result.summary,
+        contentHash,
+        estimatedTokens,
+        result.confidence,
+        event.runId,
+        row.agent_id,
+        row.task_id,
+        occurredAt,
+      ],
+    );
+
+    for (const candidate of result.memoryCandidates) {
+      const proposalId = MemoryProposalIdSchema.parse(this.memoryProposalId());
+      const candidateHash = createHash("sha256").update(candidate.statement, "utf8").digest("hex");
+      const candidateTokens = Math.max(
+        1,
+        Math.min(10_000, Math.ceil(candidate.statement.length / 4)),
+      );
+      const proposal = {
+        schemaVersion: 1,
+        id: proposalId,
+        projectId,
+        sourceContextItemId: contextItemId,
+        content: candidate.statement,
+        contentHash: candidateHash,
+        estimatedTokens: candidateTokens,
+        importance: candidate.importance,
+        status: "PENDING",
+        createdAt: occurredAt,
+      } as const;
+      const { id: _proposalId, ...canonicalProposal } = proposal;
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO agent_world.memory_proposals
+           (id, project_id, source_context_item_id, content, content_sha256,
+            estimated_tokens, importance, status, request_sha256, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8, $9)
+         ON CONFLICT (project_id, source_context_item_id, content_sha256) DO NOTHING
+         RETURNING id`,
+        [
+          proposalId,
+          projectId,
+          contextItemId,
+          candidate.statement,
+          candidateHash,
+          candidateTokens,
+          candidate.importance,
+          hashJson(canonicalProposal),
+          occurredAt,
+        ],
+      );
+      if (!inserted.rows[0]) continue;
+      const memoryEventId = EventIdSchema.parse(this.memoryEventId());
+      await client.query(
+        `INSERT INTO agent_world.memory_events
+           (id, event_type, project_id, proposal_id, source_context_item_id,
+            content, payload_sha256, occurred_at)
+         VALUES ($1, 'MEMORY_PROPOSED', $2, $3, $4, $5, $6, $7)`,
+        [
+          memoryEventId,
+          projectId,
+          proposalId,
+          contextItemId,
+          candidate.statement,
+          hashJson({ eventType: "MEMORY_PROPOSED", proposal }),
+          occurredAt,
+        ],
+      );
     }
   }
 
