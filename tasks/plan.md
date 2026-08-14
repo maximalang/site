@@ -94,7 +94,7 @@ Phase 0 reuse and license audit
       provenance-aware Curator `Accept / Merge / Reject` decisions.
 - [ ] Deliver LangGraph workflows, deterministic routing, handoffs, review,
       retry and approvals.
-- [ ] Deliver Mission decomposition, reusable Agent Templates/Instances,
+- [x] Deliver Mission decomposition, reusable Agent Templates/Instances,
       Resource Broker scoring and structured position/synthesis/decision
       meetings without free-form token chatter.
 
