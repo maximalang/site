@@ -33,10 +33,9 @@ const DecisionBase = {
   proposalId: MemoryProposalIdSchema,
   projectId: ProjectIdSchema,
   idempotencyKey: IdempotencyKeySchema,
-  decidedAt: TimestampSchema,
 };
 
-export const MemoryCurationDecisionSchema = z.discriminatedUnion("action", [
+export const MemoryCurationDecisionInputSchema = z.discriminatedUnion("action", [
   z.strictObject({ ...DecisionBase, action: z.literal("ACCEPT") }),
   z.strictObject({
     ...DecisionBase,
@@ -44,6 +43,18 @@ export const MemoryCurationDecisionSchema = z.discriminatedUnion("action", [
     targetContextItemId: ContextItemIdSchema,
   }),
   z.strictObject({ ...DecisionBase, action: z.literal("REJECT") }),
+]);
+export type MemoryCurationDecisionInput = z.infer<typeof MemoryCurationDecisionInputSchema>;
+
+export const MemoryCurationDecisionSchema = z.discriminatedUnion("action", [
+  z.strictObject({ ...DecisionBase, action: z.literal("ACCEPT"), decidedAt: TimestampSchema }),
+  z.strictObject({
+    ...DecisionBase,
+    action: z.literal("MERGE"),
+    targetContextItemId: ContextItemIdSchema,
+    decidedAt: TimestampSchema,
+  }),
+  z.strictObject({ ...DecisionBase, action: z.literal("REJECT"), decidedAt: TimestampSchema }),
 ]);
 export type MemoryCurationDecision = z.infer<typeof MemoryCurationDecisionSchema>;
 

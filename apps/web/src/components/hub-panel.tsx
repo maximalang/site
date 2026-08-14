@@ -9,6 +9,7 @@ import {
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
+import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { ModelRouteCheckPanel } from "./model-route-check-panel";
 import { type NativeChatProfileClient, NativeChatProfilePanel } from "./native-chat-profile-panel";
 import { ProviderCredentialForm } from "./provider-credential-form";
@@ -22,12 +23,14 @@ export function HubPanel({
   csrfToken = "",
   preferenceClient,
   nativeChatProfileClient,
+  memoryClient,
 }: {
   load?: LoadHub;
   onSelectAgent: (agentId: AgentId) => void;
   csrfToken?: string;
   preferenceClient?: ExecutionPreferenceClient;
   nativeChatProfileClient?: NativeChatProfileClient;
+  memoryClient?: MemoryCenterClient;
 }) {
   const [model, setModel] = useState<HubReadModel>();
   const [error, setError] = useState(false);
@@ -85,6 +88,11 @@ export function HubPanel({
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <MemoryCenter
+        {...(memoryClient ? { client: memoryClient } : {})}
+        csrfToken={csrfToken}
+        projects={model.projects}
+      />
       <NativeChatProfilePanel
         {...(nativeChatProfileClient ? { client: nativeChatProfileClient } : {})}
         csrfToken={csrfToken}

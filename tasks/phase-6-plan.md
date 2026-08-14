@@ -37,8 +37,8 @@ curation decisions or replay state.
 ## Slice 3: Memory Center read API and UI
 
 - [x] Expose project-scoped Inbox, Timeline and Network store read models.
-- [ ] Add owner-authorized Accept/Merge/Reject commands.
-- [ ] Render Simple defaults and Advanced provenance/detail views.
+- [x] Add owner-authorized Accept/Merge/Reject commands.
+- [x] Render Simple defaults and Advanced provenance/detail views.
 
 ## Verification gate
 

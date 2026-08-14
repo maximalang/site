@@ -91,6 +91,15 @@ export const applicationExecutionPreferenceDependencies = {
   ) => runtime().writeExecutionPreferences(layer, updatedAt),
 };
 
+export const applicationMemoryDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  inbox: (projectId: string, limit: number) => runtime().readMemoryInbox(projectId, limit),
+  timeline: (projectId: string, limit: number) => runtime().readMemoryTimeline(projectId, limit),
+  network: (projectId: string, limit: number) => runtime().readMemoryNetwork(projectId, limit),
+  decide: (input: Parameters<ReturnType<typeof runtime>["decideMemory"]>[0]) =>
+    runtime().decideMemory(input),
+};
+
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {
   try {
     return runtime().auth.authorize(request);

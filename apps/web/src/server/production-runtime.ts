@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CodexTaskExecutionAdapter } from "@agent-world/codex-adapter";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
-import { RunIdSchema } from "@agent-world/domain";
+import { ContextItemIdSchema, EventIdSchema, RunIdSchema } from "@agent-world/domain";
 import { LiteLlmModelGateway, LiteLlmProjectionReconciler } from "@agent-world/model-gateway";
 import {
   type OpenClawCredential,
@@ -21,6 +21,8 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresMemoryCenterReader,
+  PostgresMemoryCurationStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -194,6 +196,11 @@ export async function createProductionRuntime(
     const conversationStore = new PostgresConversationStore(pool);
     const hubReader = new PostgresHubReader(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
+    const memoryReader = new PostgresMemoryCenterReader(pool);
+    const memoryStore = new PostgresMemoryCurationStore(pool, {
+      contextItemId: () => ContextItemIdSchema.parse(`context_item_${randomUUID()}`),
+      eventId: () => EventIdSchema.parse(`event_${randomUUID()}`),
+    });
     const secretStore = new PostgresEncryptedSecretStore(pool, parseSecretKeyMaterial(environment));
     const routeResolver = new PostgresModelRouteResolver(pool, {
       allowedLocalOrigins: (environment.AGENT_WORLD_LOCAL_MODEL_ORIGINS ?? "")
@@ -436,6 +443,10 @@ export async function createProductionRuntime(
       readExecutionPreferences: (selection) => executionPreferenceStore.read(selection),
       writeExecutionPreferences: (layer, updatedAt) =>
         executionPreferenceStore.writeLayer(layer, updatedAt),
+      readMemoryInbox: (projectId, limit) => memoryReader.inbox(projectId, limit),
+      readMemoryTimeline: (projectId, limit) => memoryReader.timeline(projectId, limit),
+      readMemoryNetwork: (projectId, limit) => memoryReader.network(projectId, limit),
+      decideMemory: (input) => memoryStore.decide(input),
       readHub: () => hubReader.read(),
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {

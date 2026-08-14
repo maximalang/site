@@ -104,7 +104,16 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     ],
     skills: [],
     tools: [],
-    projects: [],
+    projects: [
+      {
+        projectId,
+        slug: "ai-world",
+        name: "AI World",
+        isArchived: false,
+        createdAt: "2026-08-13T06:00:00.000Z",
+        agentIds: [agentId],
+      },
+    ],
   });
   const systemPreferences = ExecutionPreferenceLayerSchema.parse({
     schemaVersion: 1,
@@ -124,6 +133,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     resolved: resolveExecutionPreferences([systemPreferences]),
   });
   let assignedTaskId: string | undefined;
+  let memoryProposalPending = true;
 
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -232,6 +242,56 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       status: 200,
     }),
   );
+  await page.route("**/api/memory**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === "POST") {
+      expect(request.headers()["x-agent-world-csrf"]).toBe(csrfToken);
+      expect(request.postDataJSON()).toMatchObject({
+        action: "ACCEPT",
+        projectId,
+        proposalId: "memory_proposal_56565656-5656-5656-5656-565656565656",
+      });
+      memoryProposalPending = false;
+      await route.fulfill({
+        body: JSON.stringify({ outcome: "CREATED" }),
+        contentType: "application/json",
+        status: 201,
+      });
+      return;
+    }
+    const view = url.searchParams.get("view");
+    const body =
+      view === "TIMELINE"
+        ? { schemaVersion: 1, projectId, entries: [] }
+        : view === "NETWORK"
+          ? { schemaVersion: 1, projectId, nodes: [], edges: [] }
+          : {
+              schemaVersion: 1,
+              projectId,
+              proposals: memoryProposalPending
+                ? [
+                    {
+                      schemaVersion: 1,
+                      id: "memory_proposal_56565656-5656-5656-5656-565656565656",
+                      projectId,
+                      sourceContextItemId: "context_item_57575757-5757-5757-5757-575757575757",
+                      content: "PostgreSQL remains canonical.",
+                      contentHash: "a".repeat(64),
+                      estimatedTokens: 5,
+                      importance: 0.9,
+                      status: "PENDING",
+                      createdAt: "2026-08-13T06:03:00.000Z",
+                    },
+                  ]
+                : [],
+            };
+    await route.fulfill({
+      body: JSON.stringify(body),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
   await page.route(`**/api/agents/${agentId}/conversations`, (route) =>
     route.fulfill({
       body: JSON.stringify({
@@ -460,6 +520,26 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     page.getByRole("heading", { level: 2, name: "Execution preferences" }),
   ).toBeVisible();
   await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
+
+  const memorySection = page.locator("section.memory-center-launcher");
+  await memorySection.getByRole("button", { name: "Открыть Memory Center" }).click();
+  const memoryDialog = page.getByRole("dialog", { name: "Memory Center · AI World" });
+  await expect(memoryDialog).toBeVisible();
+  await expect(memoryDialog.getByText("PostgreSQL remains canonical.")).toBeVisible();
+  await expect(memoryDialog.getByRole("button", { name: "Закрыть Memory Center" })).toBeFocused();
+  await memoryDialog.getByRole("button", { name: "Accept" }).click();
+  await expect(memoryDialog.getByText("Inbox пуст.")).toBeVisible();
+  await memoryDialog.getByRole("tab", { name: "Inbox" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(memoryDialog.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const memoryAccessibility = await new AxeBuilder({ page }).include("dialog").analyze();
+  expect(memoryAccessibility.violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(memoryDialog).toBeHidden();
+  await expect(memorySection.getByRole("button", { name: "Открыть Memory Center" })).toBeFocused();
 
   const nativeChatSection = page.locator("section.native-chat-profile-panel");
   await expect(nativeChatSection.getByRole("heading", { name: "Native Plus Chat" })).toBeVisible();

@@ -2,6 +2,7 @@ import type { ConversationSendResult } from "@agent-world/conversation-service";
 import type {
   AccountId,
   AgentId,
+  MemoryCurationDecision,
   ModelRouteId,
   NativeChatBrowserProfileConfiguration,
   NativeChatBrowserProfileConfigurationInput,
@@ -57,6 +58,10 @@ export type ApplicationRuntime = {
     selection: ExecutionPreferenceSelection,
   ): Promise<ExecutionPreferenceReadModel>;
   writeExecutionPreferences(layer: ExecutionPreferenceLayer, updatedAt: string): Promise<void>;
+  readMemoryInbox(projectId: string, limit: number): Promise<unknown>;
+  readMemoryTimeline(projectId: string, limit: number): Promise<unknown>;
+  readMemoryNetwork(projectId: string, limit: number): Promise<unknown>;
+  decideMemory(input: MemoryCurationDecision): Promise<unknown>;
   readHub(): Promise<HubReadModel>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;

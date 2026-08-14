@@ -158,7 +158,7 @@ export function NativeChatProfilePanel({
                 id="native-chat-profile-ref"
                 name="profileRef"
                 onChange={(event) => setProfileRef(event.target.value)}
-                pattern="[a-z0-9]+([._-][a-z0-9]+)*"
+                pattern="[a-z0-9]+((?:[.]|_|-)[a-z0-9]+)*"
                 required
                 value={profileRef}
               />

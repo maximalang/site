@@ -198,6 +198,12 @@ try {
   if (anonymousHub.status !== 401) {
     throw new Error(`Anonymous Hub request returned ${anonymousHub.status}`);
   }
+  const anonymousMemory = await fetch(
+    `${baseUrl}/api/memory?projectId=project_11111111-1111-1111-1111-111111111111&view=INBOX`,
+  );
+  if (anonymousMemory.status !== 401) {
+    throw new Error(`Anonymous Memory request returned ${anonymousMemory.status}`);
+  }
   const anonymousNativeChatProfiles = await fetch(`${baseUrl}/api/hub/native-chat-profiles`);
   if (anonymousNativeChatProfiles.status !== 401) {
     throw new Error(
@@ -258,6 +264,19 @@ try {
   }
   if (/credential|configurationRef|sourceRef|instructions|binding_|session_/.test(serializedHub)) {
     throw new Error("Authorized Hub leaked a private or runtime locator");
+  }
+  const projectId = "project_11111111-1111-1111-1111-111111111111";
+  const memoryInbox = await fetch(
+    `${baseUrl}/api/memory?projectId=${encodeURIComponent(projectId)}&view=INBOX`,
+    { headers: { cookie } },
+  );
+  const memoryInboxBody = await memoryInbox.json();
+  if (
+    memoryInbox.status !== 200 ||
+    memoryInboxBody.projectId !== projectId ||
+    !Array.isArray(memoryInboxBody.proposals)
+  ) {
+    throw new Error("Authorized Memory Inbox did not return its canonical projection");
   }
   const nativeChatProfiles = await fetch(`${baseUrl}/api/hub/native-chat-profiles`, {
     headers: { cookie },
@@ -485,7 +504,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 25, authLifecycle: true, worldAuth: true, hubAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 25, authLifecycle: true, worldAuth: true, hubAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);
