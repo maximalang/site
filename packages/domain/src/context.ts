@@ -66,16 +66,22 @@ export const RagDocumentIngestSchema = z.strictObject({
 });
 export type RagDocumentIngest = z.infer<typeof RagDocumentIngestSchema>;
 
+export const ContextTemperatureSchema = z.enum(["HOT", "WARM", "COLD"]);
+export type ContextTemperature = z.infer<typeof ContextTemperatureSchema>;
+
 export const RagDocumentChunkWriteSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
     id: DocumentChunkIdSchema,
+    contextItemId: ContextItemIdSchema,
     documentId: DocumentIdSchema,
     projectId: ProjectIdSchema,
     ordinal: z.number().int().min(0).max(1_000_000),
     content: z.string().trim().min(1).max(200_000),
     contentHash: ContentHashSchema,
     estimatedTokens: z.number().int().positive().max(100_000),
+    temperature: ContextTemperatureSchema,
+    importance: z.number().min(0).max(1),
     embeddingModel: z.string().trim().min(1).max(200).optional(),
     embedding: EmbeddingSchema.optional(),
     createdAt: TimestampSchema,
@@ -107,9 +113,6 @@ export const RagRetrievalResultSchema = z.strictObject({
   createdAt: TimestampSchema,
 });
 export type RagRetrievalResult = z.infer<typeof RagRetrievalResultSchema>;
-
-export const ContextTemperatureSchema = z.enum(["HOT", "WARM", "COLD"]);
-export type ContextTemperature = z.infer<typeof ContextTemperatureSchema>;
 
 export const ContextKindSchema = z.enum([
   "PROJECT_STATE",

@@ -30,6 +30,7 @@ export type SharedContextWriteReceipt = {
   outcome: "CREATED" | "DEDUPLICATED";
   documentId?: string;
   chunkId?: string;
+  contextItemId?: string;
 };
 
 export class SharedContextConflictError extends Error {
@@ -152,8 +153,53 @@ export class PostgresSharedContextStore {
         canonical = raced.rows[0];
       }
       if (!canonical) throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+      const contextResult = await client.query<{ id: string }>(
+        `WITH inserted AS (
+           INSERT INTO agent_world.context_items
+             (id, project_id, kind, temperature, content, content_sha256,
+              estimated_tokens, importance, provenance_kind, document_chunk_id, created_at)
+           VALUES ($1, $2, 'RAG_CHUNK', $3, $4, $5, $6, $7,
+                   'DOCUMENT_CHUNK', $8, $9)
+           ON CONFLICT DO NOTHING
+           RETURNING id
+         )
+         SELECT id FROM inserted
+         UNION ALL
+         SELECT id FROM agent_world.context_items
+          WHERE project_id = $2 AND kind = 'RAG_CHUNK' AND content_sha256 = $5
+            AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $8
+            AND NOT EXISTS (SELECT 1 FROM inserted)
+         LIMIT 1`,
+        [
+          input.contextItemId,
+          input.projectId,
+          input.temperature,
+          input.content,
+          input.contentHash,
+          input.estimatedTokens,
+          input.importance,
+          canonical.id,
+          input.createdAt,
+        ],
+      );
+      let contextItemId = contextResult.rows[0]?.id;
+      if (!contextItemId) {
+        const racedContext = await client.query<{ id: string }>(
+          `SELECT id
+             FROM agent_world.context_items
+            WHERE project_id = $1 AND kind = 'RAG_CHUNK' AND content_sha256 = $2
+              AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $3`,
+          [input.projectId, input.contentHash, canonical.id],
+        );
+        contextItemId = racedContext.rows[0]?.id;
+      }
+      if (!contextItemId) throw new Error("Canonical RAG context item was not persisted");
       await client.query("COMMIT");
-      return { outcome: canonical.inserted ? "CREATED" : "DEDUPLICATED", chunkId: canonical.id };
+      return {
+        outcome: canonical.inserted ? "CREATED" : "DEDUPLICATED",
+        chunkId: canonical.id,
+        contextItemId,
+      };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

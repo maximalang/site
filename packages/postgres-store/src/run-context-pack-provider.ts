@@ -53,6 +53,7 @@ type ContextRow = QueryResultRow & {
   skill_id: string | null;
   created_at: Date | string;
   valid_until: Date | string | null;
+  relevance: number;
 };
 
 type ToolRow = QueryResultRow & { slug: string };
@@ -137,16 +138,25 @@ export class PostgresRunContextPackProvider {
         throw new Error("Run is not eligible for ContextPack compilation");
       }
       scope = scopeResult.rows[0];
+      const taskQuery = `${scope.task_title} ${scope.task_description ?? ""}`.trim();
       const contextResult = await client.query<ContextRow>(
         `SELECT id, project_id, kind, temperature, content, summary, content_sha256,
                 estimated_tokens, importance, provenance_kind, event_id, message_id,
                 run_id, artifact_id, document_chunk_id, agent_id, task_id, skill_id,
-                created_at, valid_until
+                created_at, valid_until,
+                CASE WHEN length(trim($3)) = 0 THEN 0::double precision
+                     ELSE LEAST(1.0, GREATEST(0.0,
+                       ts_rank_cd(
+                         to_tsvector('simple', coalesce(summary, '') || ' ' || content),
+                         plainto_tsquery('simple', $3)
+                       )
+                     ))::double precision
+                END AS relevance
            FROM agent_world.context_items
           WHERE project_id = $1 AND (valid_until IS NULL OR valid_until > $2)
-          ORDER BY importance DESC, created_at DESC, id
+          ORDER BY relevance DESC, importance DESC, created_at DESC, id
           LIMIT 500`,
-        [scope.project_id, this.now()],
+        [scope.project_id, this.now(), taskQuery],
       );
       contexts = contextResult.rows;
       const toolResult = await client.query<ToolRow>(
@@ -230,7 +240,7 @@ export class PostgresRunContextPackProvider {
           "Preserve findings, decisions, artifacts, open questions, and next actions.",
         availableTools: tools.map(({ slug }) => slug),
       },
-      contextItems.map((item) => ({ item, relevance: 1 })),
+      contextItems.map((item, index) => ({ item, relevance: contexts[index]?.relevance ?? 0 })),
       compiledAt,
     );
     try {

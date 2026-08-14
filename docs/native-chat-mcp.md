@@ -117,8 +117,9 @@ the web resource server.
 - Deploy the implemented authorization server behind the production HTTPS
   endpoint and verify its public discovery/JWKS/DCR contract.
 - Connect ingestion/chunking and an embedding adapter to the canonical RAG
-  write store; the schema, idempotent store, retrieval and lazy pull path are
-  implemented, but automated document ingestion is not yet activated.
+  write store. Every written chunk is already materialized as provenance-linked
+  shared context and ranked against the Task during ContextPack compilation,
+  but automated source ingestion and embedding generation are not yet activated.
 - Run the host-local launcher against an owner-authenticated dedicated profile
   and record a real browser-submission receipt. The queue, driver and receipt
   path are implemented but still require this live E2E.

@@ -530,12 +530,15 @@ try {
   const chunkReceipt = await contextStore.writeChunk({
     schemaVersion: 1,
     id: contextIds.chunk,
+    contextItemId: "context_item_60606060-6060-6060-6060-606060606060",
     documentId: contextIds.document,
     projectId: ids.project,
     ordinal: 0,
     content: "PostgreSQL is canonical.",
     contentHash: "f".repeat(64),
     estimatedTokens: 6,
+    temperature: "WARM",
+    importance: 0.9,
     embeddingModel: "isolated-1536",
     embedding: vectorA,
     createdAt: contextTimestamp,
@@ -543,12 +546,15 @@ try {
   const duplicateChunkReceipt = await contextStore.writeChunk({
     schemaVersion: 1,
     id: contextIds.duplicateChunk,
+    contextItemId: "context_item_61616161-6161-6161-6161-616161616161",
     documentId: contextIds.document,
     projectId: ids.project,
     ordinal: 1,
     content: "PostgreSQL is canonical.",
     contentHash: "f".repeat(64),
     estimatedTokens: 6,
+    temperature: "WARM",
+    importance: 0.9,
     embeddingModel: "isolated-1536",
     embedding: vectorA,
     createdAt: contextTimestamp,
@@ -556,12 +562,15 @@ try {
   await contextStore.writeChunk({
     schemaVersion: 1,
     id: contextIds.otherChunk,
+    contextItemId: "context_item_62626262-6262-6262-6262-626262626262",
     documentId: contextIds.otherDocument,
     projectId: contextIds.otherProject,
     ordinal: 0,
     content: "This closer evidence belongs to another project.",
     contentHash: "0".repeat(64),
     estimatedTokens: 10,
+    temperature: "WARM",
+    importance: 0.9,
     embeddingModel: "isolated-1536",
     embedding: vectorB,
     createdAt: contextTimestamp,
@@ -577,8 +586,10 @@ try {
     duplicateDocumentReceipt.outcome !== "DEDUPLICATED" ||
     duplicateDocumentReceipt.documentId !== contextIds.document ||
     chunkReceipt.outcome !== "CREATED" ||
+    chunkReceipt.contextItemId !== "context_item_60606060-6060-6060-6060-606060606060" ||
     duplicateChunkReceipt.outcome !== "DEDUPLICATED" ||
     duplicateChunkReceipt.chunkId !== contextIds.chunk ||
+    duplicateChunkReceipt.contextItemId !== chunkReceipt.contextItemId ||
     retrievedContext.length !== 1 ||
     retrievedContext[0]?.projectId !== ids.project ||
     retrievedContext[0]?.chunkId !== contextIds.chunk
@@ -1353,7 +1364,11 @@ try {
     codexContextPack.routeId !== codex.route ||
     codexContextPack.runId !== codex.run ||
     codexContextPack.contentHash !== codexContextPackReplay.contentHash ||
-    codexContextPack.rendered !== codexContextPackReplay.rendered
+    codexContextPack.rendered !== codexContextPackReplay.rendered ||
+    !codexContextPack.evidence.some(
+      (evidence) => evidence.contextItemId === chunkReceipt.contextItemId,
+    ) ||
+    !codexContextPack.rendered.includes("PostgreSQL is canonical.")
   ) {
     throw new Error("Codex ContextPack did not preserve exact Run and Route provenance");
   }

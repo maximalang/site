@@ -56,10 +56,10 @@ Switch the canonical PostgreSQL image to the pinned official pgvector image,
 enable the extension additively and add project-scoped context/RAG tables plus
 an HNSW cosine index.
 
-- [ ] Context/RAG writes are parameterized, idempotent and content-hashed.
-- [ ] Retrieval filters project before ranking and returns bounded provenance.
-- [ ] Duplicate documents/chunks do not create duplicate canonical evidence.
-- [ ] Migration, extension, index and restart persistence pass in disposable
+- [x] Context/RAG writes are parameterized, idempotent and content-hashed.
+- [x] Retrieval filters project before ranking and returns bounded provenance.
+- [x] Duplicate documents/chunks do not create duplicate canonical evidence.
+- [x] Migration, extension, index and restart persistence pass in disposable
       PostgreSQL.
 
 ## Slice 3: Deterministic ContextCompiler
@@ -69,11 +69,11 @@ kind, relevance, importance and recency; deduplicate by content hash; then fit
 whole entries into the budget with deterministic truncation only for mandatory
 task fields.
 
-- [ ] Required sections always appear in canonical order.
-- [ ] Optional entries never exceed their category or total token limits.
-- [ ] Full transcripts and full Agent outputs are excluded by default.
-- [ ] Identical inputs produce identical pack content and content hash.
-- [ ] Huge/duplicate/adversarial context has bounded deterministic behavior.
+- [x] Required sections always appear in canonical order.
+- [x] Optional entries never exceed their category or total token limits.
+- [x] Full transcripts and full Agent outputs are excluded by default.
+- [x] Identical inputs produce identical pack content and content hash.
+- [x] Huge/duplicate/adversarial context has bounded deterministic behavior.
 
 ## Slice 4: Execution integration and structured results
 
@@ -82,11 +82,11 @@ against the Run, and pass the rendered pack through the existing adapter
 contract. Parse structured output as untrusted data and preserve a bounded raw
 fallback when it does not validate.
 
-- [ ] Dispatch records compiler version, pack hash, selected evidence and token
+- [x] Dispatch records compiler version, pack hash, selected evidence and token
       count before the external turn starts.
-- [ ] Adapter receives Task goal plus ContextPack, not prior transcript.
-- [ ] Result stores full output and validated structured handoff separately.
-- [ ] Restart can recover the exact persisted pack without recompiling drifted
+- [x] Adapter receives Task goal plus ContextPack, not prior transcript.
+- [x] Result stores full output and validated structured handoff separately.
+- [x] Restart can recover the exact persisted pack without recompiling drifted
       context.
 
 ## Verification gate

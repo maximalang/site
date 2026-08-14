@@ -5,6 +5,7 @@ const ids = {
   project: "project_11111111-1111-1111-1111-111111111111",
   document: "document_22222222-2222-2222-2222-222222222222",
   chunk: "document_chunk_33333333-3333-3333-3333-333333333333",
+  context: "context_item_44444444-4444-4444-4444-444444444444",
 } as const;
 const now = "2026-08-14T20:00:00.000Z";
 const embedding = Array.from({ length: 1536 }, (_, index) => (index === 0 ? 1 : 0));
@@ -66,6 +67,37 @@ describe("PostgresSharedContextStore", () => {
       createdAt: now,
     });
     expect(result).toEqual({ outcome: "DEDUPLICATED", documentId: ids.document });
+  });
+
+  it("materializes every canonical RAG chunk as provenance-linked shared context", async () => {
+    const { pool } = poolFor((sql) => {
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunks"))
+        return { rows: [{ id: ids.chunk, inserted: true }], rowCount: 1 };
+      if (sql.includes("INSERT INTO agent_world.context_items"))
+        return { rows: [{ id: ids.context }], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const receipt = await new PostgresSharedContextStore(pool as never).writeChunk({
+      schemaVersion: 1,
+      id: ids.chunk,
+      contextItemId: ids.context,
+      documentId: ids.document,
+      projectId: ids.project,
+      ordinal: 0,
+      content: "Canonical context evidence.",
+      contentHash: "b".repeat(64),
+      estimatedTokens: 6,
+      temperature: "WARM",
+      importance: 0.9,
+      embeddingModel: "text-embedding-3-small",
+      embedding,
+      createdAt: now,
+    });
+    expect(receipt).toEqual({
+      outcome: "CREATED",
+      chunkId: ids.chunk,
+      contextItemId: ids.context,
+    });
   });
 
   it("serializes validated vectors as a parameter and filters retrieval by project", async () => {
