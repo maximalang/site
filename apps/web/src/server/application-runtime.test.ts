@@ -39,6 +39,7 @@ function runtime() {
     readIntegrations: vi.fn(),
     createIntegration: vi.fn(),
     writeIntegrationCredential: vi.fn(),
+    setIntegrationEnabled: vi.fn(),
     readWorld: vi.fn(),
     stop: vi.fn(async () => undefined),
   };

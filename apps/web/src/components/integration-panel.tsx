@@ -7,6 +7,7 @@ export type IntegrationClient = {
   list(): Promise<IntegrationRegistry>;
   create(input: IntegrationCreate, csrf: string): Promise<void>;
   credential(id: string, plaintext: string, csrf: string): Promise<void>;
+  lifecycle(id: string, operation: "ENABLE" | "DISABLE", csrf: string): Promise<void>;
 };
 export function IntegrationPanel({
   csrfToken,
@@ -59,6 +60,18 @@ export function IntegrationPanel({
       setLabel("");
       setLocator("");
       setUsername("");
+      await refresh();
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const lifecycle = async (id: string, operation: "ENABLE" | "DISABLE") => {
+    setBusy(true);
+    setError(false);
+    try {
+      await client.lifecycle(id, operation, csrfToken);
       await refresh();
     } catch {
       setError(true);
@@ -131,6 +144,13 @@ export function IntegrationPanel({
                 : `${item.endpoint.username}@${item.endpoint.host}:${item.endpoint.port}`}
             </small>
             <span>{item.hasCredential ? "Credential настроен" : "Без credential"}</span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void lifecycle(item.id, item.isEnabled ? "DISABLE" : "ENABLE")}
+            >
+              {item.isEnabled ? "Отключить" : "Включить"}
+            </button>
           </li>
         ))}
       </ul>

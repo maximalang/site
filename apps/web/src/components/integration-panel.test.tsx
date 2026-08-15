@@ -14,6 +14,7 @@ describe("IntegrationPanel", () => {
       }),
       create: vi.fn().mockResolvedValue(undefined),
       credential: vi.fn().mockResolvedValue(undefined),
+      lifecycle: vi.fn().mockResolvedValue(undefined),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     await screen.findByRole("heading", { name: "Интеграции" });

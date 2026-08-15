@@ -87,6 +87,12 @@ export type ApplicationRuntime = {
     plaintext: string;
     writtenAt: string;
   }): Promise<unknown>;
+  setIntegrationEnabled(input: {
+    operation: "ENABLE" | "DISABLE";
+    integrationId: string;
+    commandId: string;
+    updatedAt: string;
+  }): Promise<unknown>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
 };

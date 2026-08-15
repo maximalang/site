@@ -29,6 +29,7 @@ describe("integration HTTP boundary", () => {
       list: vi.fn().mockResolvedValue(registry),
       create: vi.fn().mockResolvedValue({ outcome: "CREATED" }),
       credential: vi.fn(),
+      lifecycle: vi.fn(),
     };
     const handlers = createIntegrationRouteHandlers(dependencies);
     expect((await handlers.GET(new Request("https://world.test/api/integrations"))).status).toBe(
@@ -45,6 +46,7 @@ describe("integration HTTP boundary", () => {
       list: vi.fn(),
       create: vi.fn(),
       credential,
+      lifecycle: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const body = {
@@ -67,5 +69,28 @@ describe("integration HTTP boundary", () => {
         )
       ).status,
     ).toBe(400);
+  });
+
+  it("accepts idempotent enable and disable lifecycle commands", async () => {
+    const lifecycle = vi.fn().mockResolvedValue({ outcome: "UPDATED" });
+    const handlers = createIntegrationRouteHandlers({
+      authorize: async () => true,
+      list: vi.fn(),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle,
+    });
+    const response = await handlers.POST(
+      request({
+        operation: "DISABLE",
+        integrationId: create.id,
+        commandId: "integration:disable:1",
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(lifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: "DISABLE", integrationId: create.id }),
+      expect.any(String),
+    );
   });
 });

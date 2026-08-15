@@ -141,6 +141,10 @@ export const applicationIntegrationDependencies = {
     >,
     writtenAt: string,
   ) => runtime().writeIntegrationCredential({ ...input, writtenAt }),
+  lifecycle: (
+    input: Omit<Parameters<ReturnType<typeof runtime>["setIntegrationEnabled"]>[0], "updatedAt">,
+    updatedAt: string,
+  ) => runtime().setIntegrationEnabled({ ...input, updatedAt }),
 };
 
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {

@@ -32,4 +32,17 @@ export const integrationClient = {
     });
     if (!response.ok) throw new Error("Credential rejected");
   },
+  async lifecycle(integrationId: string, operation: "ENABLE" | "DISABLE", csrfToken: string) {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({
+        operation,
+        integrationId,
+        commandId: `integration:${operation.toLowerCase()}:${crypto.randomUUID()}`,
+      }),
+    });
+    if (!response.ok) throw new Error("Integration lifecycle rejected");
+  },
 };

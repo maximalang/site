@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionPool } from "./conversation-store.js";
 import { PostgresIntegrationStore } from "./integration-store.js";
@@ -75,5 +76,32 @@ describe("PostgresIntegrationStore", () => {
     await expect(
       store.bindCredential(input.id, "secret-store:other/credential", input.createdAt),
     ).rejects.toThrow(/reference/i);
+  });
+
+  it("idempotently disables an Integration without deleting its configuration", async () => {
+    const command = {
+      operation: "DISABLE" as const,
+      integrationId: input.id,
+      commandId: "disable-1",
+      updatedAt: "2026-08-15T12:02:00.000Z",
+    };
+    const requestHash = createHash("sha256").update(JSON.stringify(command), "utf8").digest("hex");
+    const fake = pool([
+      [],
+      [],
+      [],
+      [{ id: input.id }],
+      [],
+      [],
+      [],
+      [],
+      [{ request_sha256: requestHash, integration_id: input.id }],
+      [],
+    ]);
+    const store = new PostgresIntegrationStore(fake.value);
+    const first = await store.setEnabled(command);
+    const replay = await store.setEnabled(command);
+    expect(first.outcome).toBe("UPDATED");
+    expect(replay.outcome).toBe("REPLAY");
   });
 });

@@ -134,12 +134,61 @@ export class PostgresIntegrationStore {
     try {
       const result = await client.query<{ id: string }>(
         `UPDATE agent_world.integration_endpoints
-            SET credential_ref = $2, health = 'READY', updated_at = $3
+            SET credential_ref = $2, health = 'UNCONFIGURED', updated_at = $3
           WHERE id = $1 AND updated_at <= $3
         RETURNING id`,
         [integrationId, secretRef, updatedAt],
       );
       if (result.rows.length !== 1) throw new Error("INTEGRATION_NOT_FOUND");
+    } finally {
+      client.release();
+    }
+  }
+
+  async setEnabled(input: {
+    operation: "ENABLE" | "DISABLE";
+    integrationId: string;
+    commandId: string;
+    updatedAt: string;
+  }) {
+    const requestHash = hash(input);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        input.commandId,
+      ]);
+      const receipt = await client.query<{ request_sha256: string; integration_id: string }>(
+        "SELECT request_sha256, integration_id FROM agent_world.integration_command_receipts WHERE command_id = $1",
+        [input.commandId],
+      );
+      if (receipt.rows[0]) {
+        if (
+          receipt.rows[0].request_sha256 !== requestHash ||
+          receipt.rows[0].integration_id !== input.integrationId
+        )
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        await client.query("COMMIT");
+        return { outcome: "REPLAY" as const, integrationId: input.integrationId };
+      }
+      const updated = await client.query<{ id: string }>(
+        `UPDATE agent_world.integration_endpoints
+            SET is_enabled = $2, health = 'UNCONFIGURED', updated_at = $3
+          WHERE id = $1 AND updated_at <= $3
+        RETURNING id`,
+        [input.integrationId, input.operation === "ENABLE", input.updatedAt],
+      );
+      if (updated.rows.length !== 1) throw new Error("INTEGRATION_NOT_FOUND");
+      await client.query(
+        `INSERT INTO agent_world.integration_command_receipts
+           (command_id, request_sha256, integration_id, created_at) VALUES ($1, $2, $3, $4)`,
+        [input.commandId, requestHash, input.integrationId, input.updatedAt],
+      );
+      await client.query("COMMIT");
+      return { outcome: "UPDATED" as const, integrationId: input.integrationId };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }

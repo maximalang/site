@@ -13,12 +13,18 @@ const CredentialSchema = z.strictObject({
   commandId: z.string().trim().min(1).max(512),
   plaintext: z.string().min(1).max(16_384),
 });
+const LifecycleSchema = z.strictObject({
+  operation: z.enum(["ENABLE", "DISABLE"]),
+  integrationId: IntegrationIdSchema,
+  commandId: z.string().trim().min(1).max(512),
+});
 
 export type IntegrationHttpDependencies = {
   authorize(request: Request): Promise<boolean>;
   list(): Promise<unknown>;
   create(input: z.infer<typeof IntegrationCreateSchema>): Promise<unknown>;
   credential(input: z.infer<typeof CredentialSchema>, writtenAt: string): Promise<unknown>;
+  lifecycle(input: z.infer<typeof LifecycleSchema>, updatedAt: string): Promise<unknown>;
   now?: () => Date;
 };
 const headers = { "Cache-Control": "no-store, max-age=0", "X-Content-Type-Options": "nosniff" };
@@ -58,7 +64,9 @@ export function createIntegrationRouteHandlers(dependencies: IntegrationHttpDepe
         const result =
           raw.operation === "CREDENTIAL"
             ? await dependencies.credential(CredentialSchema.parse(raw), now)
-            : await dependencies.create(IntegrationCreateSchema.parse(raw));
+            : raw.operation === "ENABLE" || raw.operation === "DISABLE"
+              ? await dependencies.lifecycle(LifecycleSchema.parse(raw), now)
+              : await dependencies.create(IntegrationCreateSchema.parse(raw));
         return Response.json({ schemaVersion: 1, result }, { headers, status: 201 });
       } catch {
         return error("INTEGRATION_COMMAND_REJECTED", 409);

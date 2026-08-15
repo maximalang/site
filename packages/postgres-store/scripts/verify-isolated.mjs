@@ -3078,11 +3078,27 @@ try {
     integrationSecretRef,
     "2026-08-15T11:02:00.000Z",
   );
+  const disableIntegration = {
+    operation: "DISABLE",
+    integrationId: mcpIntegration.id,
+    commandId: "integration:disable:mcp-isolated",
+    updatedAt: "2026-08-15T11:03:00.000Z",
+  };
+  if (
+    (await integrationStore.setEnabled(disableIntegration)).outcome !== "UPDATED" ||
+    (await integrationStore.setEnabled(disableIntegration)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Integration lifecycle replay drifted");
+  }
   const integrationRegistry = await integrationStore.list();
   if (
     integrationRegistry.integrations.length !== 2 ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.hasCredential !==
       true ||
+    integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.isEnabled !==
+      false ||
+    integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.health !==
+      "UNCONFIGURED" ||
     (await secretStore.read(integrationSecretRef, "INTEGRATION_CREDENTIAL")) !==
       "isolated-mcp-token" ||
     JSON.stringify(integrationRegistry).includes("secret-store:")

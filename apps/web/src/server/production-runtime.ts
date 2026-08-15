@@ -591,6 +591,7 @@ export async function createProductionRuntime(
         await integrationStore.bindCredential(input.integrationId, secretRef, input.writtenAt);
         return receipt;
       },
+      setIntegrationEnabled: (input) => integrationStore.setEnabled(input),
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
         await taskRunSupervisor?.stop();
