@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { selectResourceRoute } from "../../read-model/dist/index.js";
 import {
   LiteLlmModelGateway,
   LiteLlmProjectionReconciler,
@@ -21,7 +22,10 @@ const execFileAsync = promisify(execFile);
 const IMAGE =
   "ghcr.io/berriai/litellm@sha256:154e23bb5f31b1f10e16392a8ef299bd2cde08de3a64a6849002cfcc25ce3c63";
 const routeId = "model_route_22222222-2222-2222-2222-222222222222";
+const executionRouteId = "route_22222222-2222-2222-2222-222222222222";
 const modelAlias = "route-model_route_22222222";
+const projectedAlias = `route-${routeId}`;
+const fallbackAlias = "route-model_route_22222222-fallback";
 const containerName = `agent-world-litellm-${process.pid}-${Date.now()}`;
 const postgresName = `${containerName}-postgres`;
 const networkName = `${containerName}-network`;
@@ -29,6 +33,8 @@ const tempDirectory = await mkdtemp(path.join(tmpdir(), "agent-world-litellm-"))
 const configPath = path.join(tempDirectory, "config.yaml");
 let upstreamMode = "success";
 let upstreamRequests = 0;
+let primaryRequests = 0;
+let fallbackRequests = 0;
 const logs = [];
 
 const upstream = createServer(async (request, response) => {
@@ -48,16 +54,28 @@ const upstream = createServer(async (request, response) => {
   }
   upstreamRequests += 1;
   assert(
-    ["Bearer loopback-provider-key", "Bearer local-model-no-secret"].includes(
-      request.headers.authorization,
-    ),
+    [
+      "Bearer loopback-provider-key",
+      "Bearer loopback-fallback-key",
+      "Bearer local-model-no-secret",
+    ].includes(request.headers.authorization),
   );
+  if (request.headers.authorization === "Bearer loopback-provider-key") primaryRequests += 1;
+  if (request.headers.authorization === "Bearer loopback-fallback-key") fallbackRequests += 1;
   const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   assert.equal(body.model, "local-test");
   assert.deepEqual(body.messages, [{ role: "user", content: "live contract" }]);
   if (upstreamMode === "rate-limited") {
     response.writeHead(429, { "content-type": "application/json", "retry-after": "1" });
     response.end(JSON.stringify({ error: { message: "deterministic limit", type: "rate_limit" } }));
+    return;
+  }
+  if (
+    upstreamMode === "primary-unavailable" &&
+    request.headers.authorization === "Bearer loopback-provider-key"
+  ) {
+    response.writeHead(503, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "deterministic outage", type: "api_error" } }));
     return;
   }
   response.writeHead(200, { "content-type": "application/json" });
@@ -92,6 +110,11 @@ function close(server) {
 
 async function waitForPublishedPort(deadline) {
   while (Date.now() < deadline) {
+    if (container?.exitCode !== null && container?.exitCode !== undefined) {
+      throw new Error(
+        `LiteLLM exited before publishing its port (${container.exitCode})\n${logs.slice(-80).join("")}`,
+      );
+    }
     try {
       const { stdout } = await execFileAsync("docker", ["port", containerName, "4000/tcp"]);
       const match = stdout.match(/127\.0\.0\.1:(\d+)/);
@@ -99,7 +122,7 @@ async function waitForPublishedPort(deadline) {
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Timed out waiting for LiteLLM published port");
+  throw new Error(`Timed out waiting for LiteLLM published port\n${logs.slice(-80).join("")}`);
 }
 
 async function waitForReady(gateway, deadline) {
@@ -156,10 +179,20 @@ try {
       api_base: os.environ/TEST_OPENAI_API_BASE
       api_key: os.environ/TEST_OPENAI_API_KEY
       num_retries: 0
+  - model_name: ${fallbackAlias}
+    litellm_params:
+      model: openai/local-test
+      api_base: os.environ/TEST_OPENAI_API_BASE
+      api_key: os.environ/TEST_OPENAI_FALLBACK_API_KEY
+      num_retries: 0
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
 router_settings:
   num_retries: 0
+  max_fallbacks: 1
+  fallbacks:
+    - ${projectedAlias}:
+        - ${fallbackAlias}
 `,
     { encoding: "utf8", mode: 0o600 },
   );
@@ -196,6 +229,8 @@ router_settings:
       "-e",
       "TEST_OPENAI_API_KEY=loopback-provider-key",
       "-e",
+      "TEST_OPENAI_FALLBACK_API_KEY=loopback-fallback-key",
+      "-e",
       "LITELLM_MASTER_KEY=litellm-live-master-key",
       "-e",
       "LITELLM_SALT_KEY=litellm-live-salt-key-32-bytes-minimum",
@@ -227,7 +262,6 @@ router_settings:
     }),
   });
   await waitForReady(gateway, Date.now() + 90_000);
-  const projectedAlias = `route-${routeId}`;
   const reconciler = new LiteLlmProjectionReconciler({
     baseUrl: `http://127.0.0.1:${proxyPort}`,
     credentialProvider: async () => "litellm-live-master-key",
@@ -266,6 +300,44 @@ router_settings:
     timeoutMs: 30_000,
     idempotencyKey: "litellm-live-contract-1",
   };
+  const brokerDecision = selectResourceRoute({
+    policy: {
+      version: "litellm-live-v1",
+      weights: { quality: 0.35, remainingLimits: 0.25, cost: 0.15, speed: 0.15, load: 0.1 },
+    },
+    now: "2026-08-15T12:00:00.000Z",
+    candidates: [
+      {
+        routeId: "route_33333333-3333-3333-3333-333333333333",
+        accountId: "account_33333333-3333-3333-3333-333333333333",
+        mode: "API",
+        adapterKind: "API_MODEL",
+        isAvailable: true,
+        quality: 0.5,
+        remainingLimits: 0.5,
+        cost: 0.5,
+        speed: 0.5,
+        load: 0.5,
+        observedAt: "2026-08-15T11:59:00.000Z",
+        expiresAt: "2026-08-15T12:05:00.000Z",
+      },
+      {
+        routeId: executionRouteId,
+        accountId: "account_22222222-2222-2222-2222-222222222222",
+        mode: "API",
+        adapterKind: "API_MODEL",
+        isAvailable: true,
+        quality: 0.95,
+        remainingLimits: 0.9,
+        cost: 0.8,
+        speed: 0.9,
+        load: 0.85,
+        observedAt: "2026-08-15T11:59:00.000Z",
+        expiresAt: "2026-08-15T12:05:00.000Z",
+      },
+    ],
+  });
+  assert.equal(brokerDecision.selected?.routeId, executionRouteId);
   const result = await projectedGateway.complete(request);
   assert.equal(result.content, "live gateway reply");
   assert.equal(result.upstreamRequestId, "chatcmpl-live-contract");
@@ -283,12 +355,37 @@ router_settings:
   });
   assert.equal(localResult.content, "live gateway reply");
 
+  const primaryBeforeFallback = primaryRequests;
+  const fallbackBeforeFallback = fallbackRequests;
+  upstreamMode = "primary-unavailable";
+  const fallbackResult = await projectedGateway
+    .complete({
+      ...request,
+      runId: "run_66666666-6666-6666-6666-666666666666",
+      idempotencyKey: "litellm-fallback-live-contract-1",
+    })
+    .catch((error) => {
+      throw new Error(
+        `LiteLLM bounded fallback failed: ${String(error)}\n${logs.slice(-120).join("")}`,
+      );
+    });
+  assert.equal(fallbackResult.content, "live gateway reply");
+  assert.equal(primaryRequests, primaryBeforeFallback + 1);
+  assert.equal(fallbackRequests, fallbackBeforeFallback + 1);
+
   upstreamMode = "rate-limited";
-  const failure = await projectedGateway.complete(request).catch((error) => error);
+  const failedChainStart = upstreamRequests;
+  const failure = await projectedGateway
+    .complete({
+      ...request,
+      runId: "run_77777777-7777-7777-7777-777777777777",
+      idempotencyKey: "litellm-bounded-failure-contract-1",
+    })
+    .catch((error) => error);
   assert(failure instanceof ModelGatewayFailure);
   assert.equal(failure.code, "RATE_LIMITED");
   assert.equal(failure.retryable, true);
-  assert(upstreamRequests >= 2);
+  assert.equal(upstreamRequests - failedChainStart, 2);
 
   const { stdout: inspectOutput } = await execFileAsync("docker", ["inspect", containerName]);
   const inspection = JSON.parse(inspectOutput)[0];
@@ -303,8 +400,11 @@ router_settings:
       image: IMAGE,
       release: "v1.96.2",
       completion: true,
+      brokerSelectedLiveDispatch: true,
       projectionReconciliation: true,
       localModelRoute: true,
+      boundedFallback: true,
+      boundedFailureRequests: upstreamRequests - failedChainStart,
       rateLimitNormalization: true,
       upstreamRequests,
       user: inspection.Config.User,
