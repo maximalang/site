@@ -13,7 +13,7 @@ proven. `OPEN` means the required product surface is absent.
 | 4 | Add a ChatGPT Account once | PARTIAL | Canonical Account commands and Native Chat OAuth mapping exist; a complete owner UI and real Plus connection proof remain. |
 | 5 | Add API provider/key | PASS | Owner-only Hub/provider credential flow stores encrypted secrets and never returns plaintext. |
 | 6 | See models without duplicates | PASS | Canonical Model plus multiple Route model is enforced in PostgreSQL and the Hub projection. |
-| 7 | Create Agent with role, instructions, skills, tools, memory, schedule, budget and preferred execution | PARTIAL | Agent/Template, skills/tools and inherited execution preferences exist. Schedule and an integrated creation flow for every listed setting remain open. |
+| 7 | Create Agent with role, instructions, skills, tools, memory, schedule, budget and preferred execution | PARTIAL | Agent/Template, skills/tools, Agent schedules and inherited execution preferences exist. One integrated Agent creation flow for every listed setting remains open. |
 | 8 | Give an Agent a Task on the map | PASS | World selection opens the Task drawer; canonical assignment and approvals are persisted. |
 | 9 | See Account/API/Model/Mode used | PASS | Run provenance readers and Command surfaces expose canonical execution provenance without credentials. |
 | 10 | See real movement/status/handoff | PARTIAL | Real status and deterministic activity cues drive movement. End-to-end automatic handoff animation is not yet proven. |
@@ -23,7 +23,7 @@ proven. `OPEN` means the required product surface is absent.
 | 14 | Extract Memory candidates automatically | PASS | Native Chat `commit_result` creates provenance-linked Memory Inbox proposals transactionally. |
 | 15 | Manage the visual Memory network | PASS | Network, Timeline and Inbox plus Accept/Merge/Reject are product-native views. |
 | 16 | Open a Memory node and see exact evidence | PASS | Advanced Memory details preserve canonical Context/Event/Run provenance. |
-| 17 | Configure an Agent schedule | OPEN | No canonical schedule domain/store/supervisor/UI exists. |
+| 17 | Configure an Agent schedule | PASS | Strict Agent schedule contracts, timezone/DST-aware recurrence, PostgreSQL schedules/firings, atomic Task + approval + World-event materialization, restart-safe polling and the owner-only Hub Simple/Advanced UI are proven by 5 real isolated-PostgreSQL schedule scenarios, standalone restart verification, unit tests and five-viewport Playwright/axe tests. Account and transport are intentionally absent from schedule intent. |
 | 18 | Manage MCP/n8n/servers/SSH from the site | OPEN | Native Chat MCP exists, but the unified integrations/server management surface and n8n/SSH adapters do not. |
 | 19 | See tokens/limits/cost/context pressure | PARTIAL | Usage, Context Pack budgets and Broker quota observations are persisted; the unified Observatory/UI is missing. |
 | 20 | Automatically choose the rational Route | PASS | Resource Broker scores fresh quality, limits, cost, latency and load evidence and appends its exact decision event. |
@@ -43,8 +43,7 @@ proven. `OPEN` means the required product surface is absent.
 
 ## Next implementation order
 
-1. Canonical Agent schedules and restart-safe scheduler.
-2. Dependency/handoff action executor for LangGraph Mission Tasks.
-3. Product Action Graph/usage/limits/cost/context-pressure Observatory.
-4. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
-5. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.
+1. Dependency/handoff action executor for LangGraph Mission Tasks.
+2. Product Action Graph/usage/limits/cost/context-pressure Observatory.
+3. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
+4. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.

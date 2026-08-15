@@ -13,6 +13,7 @@ import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { ModelRouteCheckPanel } from "./model-route-check-panel";
 import { type NativeChatProfileClient, NativeChatProfilePanel } from "./native-chat-profile-panel";
 import { ProviderCredentialForm } from "./provider-credential-form";
+import { type ScheduleClient, SchedulePanel } from "./schedule-panel";
 
 type LoadHub = (attempt: number) => Promise<HubReadModel>;
 const defaultLoadHub: LoadHub = () => loadHubReadModel();
@@ -24,6 +25,7 @@ export function HubPanel({
   preferenceClient,
   nativeChatProfileClient,
   memoryClient,
+  scheduleClient,
 }: {
   load?: LoadHub;
   onSelectAgent: (agentId: AgentId) => void;
@@ -31,6 +33,7 @@ export function HubPanel({
   preferenceClient?: ExecutionPreferenceClient;
   nativeChatProfileClient?: NativeChatProfileClient;
   memoryClient?: MemoryCenterClient;
+  scheduleClient?: ScheduleClient;
 }) {
   const [model, setModel] = useState<HubReadModel>();
   const [error, setError] = useState(false);
@@ -95,6 +98,11 @@ export function HubPanel({
       />
       <NativeChatProfilePanel
         {...(nativeChatProfileClient ? { client: nativeChatProfileClient } : {})}
+        csrfToken={csrfToken}
+        hub={model}
+      />
+      <SchedulePanel
+        {...(scheduleClient ? { client: scheduleClient } : {})}
         csrfToken={csrfToken}
         hub={model}
       />

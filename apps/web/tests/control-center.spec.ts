@@ -157,6 +157,44 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       status: 200,
     }),
   );
+  await page.route("**/api/schedules**", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        body: JSON.stringify({ schemaVersion: 1, schedules: [] }),
+        contentType: "application/json",
+        status: 200,
+      });
+      return;
+    }
+    expect(route.request().headers()["x-agent-world-csrf"]).toBe(csrfToken);
+    const body = route.request().postDataJSON();
+    expect(body).not.toHaveProperty("accountId");
+    expect(body).toMatchObject({
+      projectId,
+      agentId,
+      title: "Daily evidence audit",
+      cronExpression: "0 9 * * *",
+      isEnabled: true,
+    });
+    const now = "2026-08-15T12:00:00.000Z";
+    await route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        schedule: {
+          outcome: "CREATED",
+          schedule: {
+            schemaVersion: 1,
+            ...body,
+            nextFireAt: "2026-08-16T06:00:00.000Z",
+            createdAt: now,
+            updatedAt: now,
+          },
+        },
+      }),
+      contentType: "application/json",
+      status: 201,
+    });
+  });
   await page.route("**/api/hub/native-chat-profiles", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
@@ -551,6 +589,16 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(nativeChatSection.getByText("Подключение сохранено")).toBeVisible();
   await nativeChatSection.getByRole("button", { name: "Advanced" }).click();
   await expect(nativeChatSection.getByLabel("Browser profile alias")).toHaveValue("plus-1");
+
+  const scheduleSection = page.locator("section.schedule-panel");
+  await expect(scheduleSection.getByRole("heading", { name: "Расписания" })).toBeVisible();
+  await expect(scheduleSection.getByText("Расписаний пока нет.")).toBeVisible();
+  await scheduleSection.getByLabel("Название задачи").fill("Daily evidence audit");
+  await scheduleSection.getByRole("button", { name: "Создать расписание" }).click();
+  await expect(scheduleSection.getByText("Расписание создано")).toBeVisible();
+  await expect(scheduleSection.getByText(/0 9 \* \* \*/)).toBeVisible();
+  await scheduleSection.getByRole("button", { name: "Advanced" }).click();
+  await expect(scheduleSection.getByLabel("Cron (5 полей)")).toBeVisible();
 
   const providerKeySection = page
     .locator("section.hub-registry-section")

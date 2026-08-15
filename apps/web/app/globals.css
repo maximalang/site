@@ -1443,7 +1443,8 @@ button:disabled {
   background: var(--surface-raised);
 }
 
-.native-chat-profile-panel {
+.native-chat-profile-panel,
+.schedule-panel {
   display: grid;
   gap: var(--space-4);
   margin: 0 var(--space-4) var(--space-4);
@@ -1455,6 +1456,8 @@ button:disabled {
 
 .native-chat-profile-panel .eyebrow,
 .native-chat-profile-panel h2,
+.schedule-panel .eyebrow,
+.schedule-panel h2,
 .panel-note,
 .field-hint,
 .form-status {
@@ -1545,6 +1548,74 @@ button:disabled {
 .native-chat-profile-form .primary-button {
   justify-self: start;
   margin-top: var(--space-2);
+}
+
+.schedule-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 56rem;
+  gap: var(--space-3);
+}
+
+.schedule-form > label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.schedule-form input,
+.schedule-form select {
+  width: 100%;
+  min-height: 3rem;
+  box-sizing: border-box;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.schedule-form .checkbox-field {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  min-height: 3rem;
+}
+
+.schedule-form .checkbox-field input {
+  width: 1.25rem;
+  min-height: 1.25rem;
+  accent-color: var(--accent);
+}
+
+.schedule-form .form-status,
+.schedule-form .primary-button {
+  align-self: center;
+}
+
+.schedule-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-list li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.schedule-list span,
+.schedule-list small {
+  color: var(--text-muted);
 }
 
 .preference-lead {
@@ -1653,6 +1724,10 @@ button:disabled {
 }
 
 @media (max-width: 54rem) {
+  .schedule-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .world-grid {
     grid-template-columns: minmax(0, 1fr);
   }
