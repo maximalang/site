@@ -14,6 +14,7 @@ import { HubRegistry } from "./hub-registry";
 import { IntegrationPanel } from "./integration-panel";
 import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { MissionPanel } from "./mission-panel";
+import { ModelExecutionConnectionPanel } from "./model-execution-connection-panel";
 import { ModelRouteCheckPanel } from "./model-route-check-panel";
 import { type NativeChatProfileClient, NativeChatProfilePanel } from "./native-chat-profile-panel";
 import { OperationsPanel } from "./operations-panel";
@@ -113,6 +114,11 @@ export function HubPanel({
         projects={model.projects}
         skills={model.skills}
         tools={model.tools}
+      />
+      <ModelExecutionConnectionPanel
+        csrfToken={csrfToken}
+        model={model}
+        onProvisioned={() => setAttempt((value) => value + 1)}
       />
       <OperationsPanel />
       <IntegrationPanel csrfToken={csrfToken} />

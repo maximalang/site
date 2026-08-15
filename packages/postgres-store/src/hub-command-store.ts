@@ -341,6 +341,82 @@ export class PostgresHubCommandStore {
           sessionId: command.sessionId,
         });
       }
+      case "MODEL_AGENT_ROUTE_PROVISION": {
+        const route = await client.query<{ adapter_kind: "API_MODEL" | "LOCAL_MODEL" }>(
+          `INSERT INTO agent_world.execution_routes
+             (id, label, mode, adapter_kind, account_id, model_route_id)
+           SELECT $1, $2, mr.surface,
+                  CASE mr.surface WHEN 'API' THEN 'API_MODEL' ELSE 'LOCAL_MODEL' END,
+                  mr.account_id, mr.id
+             FROM agent_world.model_routes mr
+             JOIN agent_world.providers provider ON provider.id = mr.provider_id
+             LEFT JOIN agent_world.accounts account ON account.id = mr.account_id
+            WHERE mr.id = $3 AND mr.is_enabled = true AND mr.availability = 'AVAILABLE'
+              AND provider.is_enabled = true
+              AND ((mr.surface = 'API' AND provider.category = 'LLM_API'
+                    AND account.id IS NOT NULL AND account.is_enabled = true
+                    AND account.health = 'ACTIVE')
+                OR (mr.surface = 'LOCAL' AND provider.category = 'LOCAL_MODEL'
+                    AND mr.account_id IS NULL))
+          RETURNING adapter_kind`,
+          [command.routeId, command.routeLabel, command.modelRouteId],
+        );
+        const adapterKind = route.rows[0]?.adapter_kind;
+        if (!adapterKind) throw new HubCommandStoreError("INVALID_REFERENCE");
+        const conversation = await client.query<{ id: string }>(
+          `INSERT INTO agent_world.conversations
+             (id, agent_id, project_id, title, created_at)
+           SELECT $1, agent.id, project.id, $4, $5
+             FROM agent_world.agents agent
+             JOIN agent_world.project_agents membership ON membership.agent_id = agent.id
+             JOIN agent_world.projects project
+               ON project.id = $3 AND project.id = membership.project_id
+            WHERE agent.id = $2 AND agent.is_enabled = true AND project.is_archived = false
+          RETURNING id`,
+          [
+            command.conversationId,
+            command.agentId,
+            command.projectId,
+            command.conversationTitle,
+            command.startedAt,
+          ],
+        );
+        if (conversation.rows.length !== 1) throw new HubCommandStoreError("INVALID_REFERENCE");
+        await client.query(
+          `INSERT INTO agent_world.runtime_bindings
+             (id, agent_id, route_id, adapter_kind, external_agent_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            command.bindingId,
+            command.agentId,
+            command.routeId,
+            adapterKind,
+            command.externalAgentId,
+          ],
+        );
+        await client.query(
+          `INSERT INTO agent_world.conversation_sessions
+             (id, conversation_id, agent_id, binding_id, adapter_kind,
+              external_session_ref, started_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            command.sessionId,
+            command.conversationId,
+            command.agentId,
+            command.bindingId,
+            adapterKind,
+            command.externalSessionRef,
+            command.startedAt,
+          ],
+        );
+        return created(command.commandId, {
+          kind: "MODEL_AGENT_ROUTE_CONNECTION",
+          id: command.bindingId,
+          routeId: command.routeId,
+          conversationId: command.conversationId,
+          sessionId: command.sessionId,
+        });
+      }
       case "AGENT_CREATE":
         if (command.provisioning) {
           await client.query(

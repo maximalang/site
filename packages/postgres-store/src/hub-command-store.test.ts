@@ -213,6 +213,57 @@ describe("PostgresHubCommandStore", () => {
     ]);
   });
 
+  it("provisions route, conversation, binding and session under one receipt transaction", async () => {
+    const command = HubCommandRequestSchema.parse({
+      schemaVersion: 1,
+      commandId: "hub_command_91919191-9191-4191-8191-919191919191",
+      kind: "MODEL_AGENT_ROUTE_PROVISION",
+      routeId: "route_92929292-9292-4292-8292-929292929292",
+      modelRouteId: "model_route_93939393-9393-4393-8393-939393939393",
+      routeLabel: "Research API",
+      bindingId: "binding_94949494-9494-4494-8494-949494949494",
+      sessionId: "session_95959595-9595-4595-8595-959595959595",
+      agentId: "agent_96969696-9696-4696-8696-969696969696",
+      projectId: "project_97979797-9797-4797-8797-979797979797",
+      conversationId: "conversation_98989898-9898-4898-8898-989898989898",
+      conversationTitle: "Research API session",
+      externalAgentId: "api-model:researcher",
+      externalSessionRef: "api-model:research-session",
+      startedAt: "2026-08-15T12:00:00.000Z",
+    });
+    if (command.kind !== "MODEL_AGENT_ROUTE_PROVISION") throw new Error("Invalid fixture");
+    const fake = pool([
+      [],
+      [],
+      [],
+      [{ adapter_kind: "API_MODEL" }],
+      [{ id: command.conversationId }],
+      [],
+      [],
+      [],
+      [],
+    ]);
+    await expect(new PostgresHubCommandStore(fake.value).execute(command)).resolves.toMatchObject({
+      outcome: "CREATED",
+      resource: {
+        kind: "MODEL_AGENT_ROUTE_CONNECTION",
+        id: command.bindingId,
+        routeId: command.routeId,
+        conversationId: command.conversationId,
+        sessionId: command.sessionId,
+      },
+    });
+    expect(fake.query.mock.calls.map(([sql]) => String(sql))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("INSERT INTO agent_world.execution_routes"),
+        expect.stringContaining("INSERT INTO agent_world.conversations"),
+        expect.stringContaining("INSERT INTO agent_world.runtime_bindings"),
+        expect.stringContaining("INSERT INTO agent_world.conversation_sessions"),
+      ]),
+    );
+    expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
   it.each([
     [
       HubCommandRequestSchema.parse({

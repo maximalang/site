@@ -120,6 +120,23 @@ const AgentRouteBindCommandSchema = z.strictObject({
   startedAt: z.iso.datetime({ offset: true }),
 });
 
+const ModelAgentRouteProvisionCommandSchema = z.strictObject({
+  ...commandBase,
+  kind: z.literal("MODEL_AGENT_ROUTE_PROVISION"),
+  routeId: ExecutionRouteSchema.shape.id,
+  modelRouteId: ModelRouteSchema.shape.id,
+  routeLabel: ExecutionRouteSchema.shape.label,
+  bindingId: BindingIdSchema,
+  sessionId: SessionIdSchema,
+  agentId: AgentSchema.shape.id,
+  projectId: ProjectSchema.shape.id,
+  conversationId: ConversationIdSchema,
+  conversationTitle: z.string().trim().min(1).max(160),
+  externalAgentId: ExternalRuntimeReferenceSchema,
+  externalSessionRef: ExternalRuntimeReferenceSchema,
+  startedAt: z.iso.datetime({ offset: true }),
+});
+
 const AgentCreateCommandSchema = z.strictObject({
   ...commandBase,
   kind: z.literal("AGENT_CREATE"),
@@ -198,6 +215,7 @@ export const HubCommandRequestSchema = z.discriminatedUnion("kind", [
   CodexRouteCreateCommandSchema,
   ModelExecutionRouteCreateCommandSchema,
   AgentRouteBindCommandSchema,
+  ModelAgentRouteProvisionCommandSchema,
   AgentCreateCommandSchema,
   SkillCreateCommandSchema,
   ToolCreateCommandSchema,
@@ -214,6 +232,13 @@ const HubCommandResourceSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("AGENT_ROUTE_BINDING"),
     id: BindingIdSchema,
+    sessionId: SessionIdSchema,
+  }),
+  z.strictObject({
+    kind: z.literal("MODEL_AGENT_ROUTE_CONNECTION"),
+    id: BindingIdSchema,
+    routeId: ExecutionRouteSchema.shape.id,
+    conversationId: ConversationIdSchema,
     sessionId: SessionIdSchema,
   }),
   z.strictObject({ kind: z.literal("AGENT"), id: AgentSchema.shape.id }),

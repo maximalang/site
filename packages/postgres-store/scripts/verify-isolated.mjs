@@ -227,7 +227,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 39
+    ledger.rows.at(-1)?.version !== 40
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -1133,37 +1133,25 @@ try {
   const apiBindingId = "binding_b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9";
   const apiSessionId = "session_babababa-baba-4aba-8aba-babababababa";
   const apiConversationId = "conversation_bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc";
-  await pool.query(
-    `INSERT INTO agent_world.conversations (id, agent_id, project_id, title, created_at)
-     VALUES ($1, $2, $3, 'API execution proof', '2026-08-13T12:02:00.000Z')`,
-    [apiConversationId, provisionedAgentId, ids.project],
-  );
-  const createApiRoute = HubCommandRequestSchema.parse({
+  const provisionApiConnection = HubCommandRequestSchema.parse({
     schemaVersion: 1,
     commandId: "hub_command_b8b8b8b8-b8b8-48b8-88b8-b8b8b8b8b8b8",
-    kind: "MODEL_EXECUTION_ROUTE_CREATE",
+    kind: "MODEL_AGENT_ROUTE_PROVISION",
     routeId: apiExecutionRouteId,
     modelRouteId: hub.primaryModelRoute,
-    label: "Primary API execution",
-  });
-  if ((await hubCommandStore.execute(createApiRoute)).outcome !== "CREATED") {
-    throw new Error("Hub command did not create an eligible API execution route");
-  }
-  const bindApiAgent = HubCommandRequestSchema.parse({
-    schemaVersion: 1,
-    commandId: "hub_command_b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9",
-    kind: "AGENT_ROUTE_BIND",
+    routeLabel: "Primary API execution",
     bindingId: apiBindingId,
     sessionId: apiSessionId,
     agentId: provisionedAgentId,
+    projectId: ids.project,
     conversationId: apiConversationId,
-    routeId: apiExecutionRouteId,
+    conversationTitle: "API execution proof",
     externalAgentId: "api-model:atomic-provisioned-agent",
     externalSessionRef: "api-model:isolated-session",
     startedAt: "2026-08-13T12:03:00.000Z",
   });
-  if ((await hubCommandStore.execute(bindApiAgent)).outcome !== "CREATED") {
-    throw new Error("Hub command did not bind the Agent to its API execution session");
+  if ((await hubCommandStore.execute(provisionApiConnection)).outcome !== "CREATED") {
+    throw new Error("Hub command did not atomically provision the API execution connection");
   }
   const apiBindingEvidence = await pool.query(
     `SELECT route.mode, route.adapter_kind, route.model_route_id,
@@ -1354,7 +1342,7 @@ try {
   );
   if (
     commandEvidence.rows[0]?.providers !== 1 ||
-    commandEvidence.rows[0]?.receipts !== 4 ||
+    commandEvidence.rows[0]?.receipts !== 3 ||
     commandEvidence.rows[0]?.rejected_routes !== 0 ||
     commandEvidence.rows[0]?.assignments !== 1 ||
     commandEvidence.rows[0]?.preferences !== 1
