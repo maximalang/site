@@ -10,7 +10,7 @@ proven. `OPEN` means the required product surface is absent.
 | 1 | Open one site | PASS | The Next.js app serves World, Command, Hub and overlays from `/`; production standalone and Playwright smoke cover the same app. |
 | 2 | See animated AI World with all Agents | PASS | `OpenClawOfficeWorld` renders the canonical `/api/world` projection; no second World backend exists. |
 | 3 | Switch to Command without another app | PASS | `ControlCenter` switches World/Command over the shared read model. |
-| 4 | Add a ChatGPT Account once | PARTIAL | The native Hub now creates or reuses the ChatGPT consumer Provider, creates a distinct `CHATGPT_INTERACTIVE` Account with Plus/Pro/Free subscription metadata and CHAT plus optional CODEX surfaces, refreshes the canonical snapshot, and hands the Account to Native Chat profile setup. Component, production HTTP and browser tests prove the product flow without conflating Account and Agent. One real personal Plus MCP/App connection is still the external live gate. |
+| 4 | Add a ChatGPT Account once | PARTIAL | The native Hub now creates or reuses the ChatGPT consumer Provider, creates a distinct `CHATGPT_INTERACTIVE` Account with Plus/Pro/Free subscription metadata and CHAT plus optional CODEX surfaces, refreshes the canonical snapshot, and hands the Account to Native Chat profile setup. Component, production HTTP and browser tests prove the product flow without conflating Account and Agent. The isolated OAuth lifecycle additionally proves PostgreSQL-persisted grants, compatibility with a cached ChatGPT request that omitted `offline_access`, application restart, refresh-token rotation and replay-family revocation. One real personal Plus MCP/App connection is still the external live gate. |
 | 5 | Add API provider/key | PASS | Owner-only Hub/provider credential flow stores encrypted secrets and never returns plaintext. |
 | 6 | See models without duplicates | PASS | Canonical Model plus multiple Route model is enforced in PostgreSQL and the Hub projection. |
 | 7 | Create Agent with role, instructions, skills, tools, memory, schedule, budget and preferred execution | PASS | The native Hub atomically provisions one immutable Agent Template plus one project-scoped Agent Instance with role, instructions, skill/tool links and Agent-level memory-context, token-budget and preferred-mode policies. It then refreshes the canonical Hub snapshot, focuses the new Agent in the durable Schedule panel and offers a direct schedule action. Isolated PostgreSQL, production HTTP, component and five-viewport browser tests prove the path while Account remains a separate Resource Broker concern. |
@@ -32,6 +32,17 @@ proven. `OPEN` means the required product surface is absent.
 | 23 | Do not send every Agent the full history | PASS | Lazy MCP pulls and ContextCompiler category/token limits exclude full transcripts by default. |
 | 24 | Avoid third-party dashboards in normal work | PASS | World, Command, Hub and Memory are native product surfaces; LiteLLM/Graphiti/OpenClaw dashboards are not exposed. |
 
+## Production preflight evidence
+
+The isolated production Compose verifier passed on the current head
+`49b63f07e7dcb760d912ad03d2de3f0a56c6ed9f`. It created a unique disposable
+Compose project, exercised HTTPS, readiness degradation, a real PostgreSQL
+backup/mutation/restore cycle, non-root and read-only containers, private
+database/model-gateway/Codex-worker boundaries, separated Codex authentication,
+the configured CA boundary and pinned Codex CLI `0.147.0`, then removed its
+containers, volumes and temporary backup directory. This evidence does not
+substitute for the two account-bound live gates below.
+
 ## External live gates
 
 - A real AI World MCP/App connection from personal Plus must complete
@@ -43,6 +54,9 @@ proven. `OPEN` means the required product surface is absent.
 
 ## Next implementation order
 
-1. Product Action Graph/usage/limits/cost/context-pressure Observatory.
-2. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
-3. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.
+1. Add policy- and approval-gated predefined integration actions for n8n,
+   GitHub and SSH/VDS; do not expose arbitrary remote commands.
+2. Integrate an authoritative monetary-spend source where a configured provider
+   exposes one; preserve `unknown` instead of estimating unsupported spend.
+3. Run the two account-bound live gates and repeat the full browser/runtime
+   suite against the final head.
