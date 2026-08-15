@@ -109,6 +109,7 @@ describe("PostgresWorldProjectionStore", () => {
         },
       ],
       [],
+      [],
     ]);
     const model = await new PostgresWorldProjectionStore(fake.value).readWorld([
       agent,
@@ -129,6 +130,57 @@ describe("PostgresWorldProjectionStore", () => {
       "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
     );
     expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
+  it("projects recent Mission handoffs with canonical Agent and Run provenance", async () => {
+    const reviewer = AgentSchema.parse({
+      ...agent,
+      id: "agent_55555555-5555-4555-8555-555555555555",
+      slug: "reviewer",
+      displayName: "Reviewer",
+    });
+    const task = (id: string, assignee_agent_id: string, title: string) => ({
+      id,
+      conversation_id: null,
+      project_id: "project_66666666-6666-4666-8666-666666666666",
+      mission_id: "mission_77777777-7777-4777-8777-777777777777",
+      assignee_agent_id,
+      title,
+      description: null,
+      approval_requirement: "REQUIRED",
+      idempotency_key: `mission-task:${id.slice("task_".length)}`,
+      created_at: "2026-08-15T10:00:00.000Z",
+    });
+    const fromTaskId = "task_88888888-8888-4888-8888-888888888888";
+    const toTaskId = "task_99999999-9999-4999-8999-999999999999";
+    const fake = pool([
+      [],
+      [task(fromTaskId, agent.id, "Research"), task(toTaskId, reviewer.id, "Review")],
+      [],
+      [
+        {
+          id: "event_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          mission_id: "mission_77777777-7777-4777-8777-777777777777",
+          from_task_id: fromTaskId,
+          to_task_id: toTaskId,
+          from_run_id: "run_88888888-8888-4888-8888-888888888888",
+          from_agent_id: agent.id,
+          to_agent_id: reviewer.id,
+          occurred_at: "2026-08-15T10:10:00.000Z",
+        },
+      ],
+      [],
+    ]);
+    const model = await new PostgresWorldProjectionStore(fake.value).readWorld([agent, reviewer]);
+    expect(model.handoffs).toEqual([
+      expect.objectContaining({
+        fromTaskId,
+        toTaskId,
+        fromAgentId: agent.id,
+        toAgentId: reviewer.id,
+      }),
+    ]);
+    expect(JSON.stringify(model.handoffs)).not.toMatch(/account_|binding_|session_/);
   });
 
   it("assigns an approval-gated canonical Task through an active conversation Session", async () => {

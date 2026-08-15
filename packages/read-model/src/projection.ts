@@ -2,8 +2,11 @@ import {
   type Agent,
   AgentSchema,
   AgentStatusSchema,
+  EventIdSchema,
+  MissionIdSchema,
   type ProjectionCursor,
   ProjectionCursorSchema,
+  RunIdSchema,
   type TaskIntent,
   TaskIntentSchema,
   type WorldEvent,
@@ -14,6 +17,7 @@ import * as z from "zod";
 const MAX_AGENTS = 500;
 const MAX_TASKS = 2_000;
 const MAX_EVENTS = 100_000;
+const MAX_HANDOFFS = 20;
 const TimestampSchema = z.iso.datetime();
 function safeDisplayText(maxLength: number) {
   return z
@@ -77,6 +81,18 @@ export const WorldReadModelAgentSchema = z.strictObject({
   ...AgentProjectionCoreSchema.shape,
   world: WorldPlacementSchema,
 });
+
+export const WorldHandoffSchema = z.strictObject({
+  id: EventIdSchema,
+  missionId: MissionIdSchema,
+  fromTaskId: TaskIntentSchema.shape.id,
+  toTaskId: TaskIntentSchema.shape.id,
+  fromRunId: RunIdSchema,
+  fromAgentId: AgentSchema.shape.id,
+  toAgentId: AgentSchema.shape.id,
+  occurredAt: TimestampSchema,
+});
+export type WorldHandoff = z.infer<typeof WorldHandoffSchema>;
 export type WorldReadModelAgent = z.infer<typeof WorldReadModelAgentSchema>;
 
 export const WorldReadModelSchema = z
@@ -87,11 +103,15 @@ export const WorldReadModelSchema = z
     cursor: ProjectionCursorSchema,
     agents: z.array(WorldReadModelAgentSchema).max(MAX_AGENTS),
     tasks: z.array(ReadModelTaskSchema).max(MAX_TASKS),
+    handoffs: z.array(WorldHandoffSchema).max(MAX_HANDOFFS),
   })
   .refine(
     (model) =>
       model.source !== "UNAVAILABLE" ||
-      (model.agents.length === 0 && model.tasks.length === 0 && model.cursor.lastSequence === 0),
+      (model.agents.length === 0 &&
+        model.tasks.length === 0 &&
+        model.handoffs.length === 0 &&
+        model.cursor.lastSequence === 0),
     "Unavailable read models must be empty and use the initial cursor",
   );
 export type WorldReadModel = z.infer<typeof WorldReadModelSchema>;
@@ -107,6 +127,7 @@ export const WorldViewSchema = z.strictObject({
       world: WorldPlacementSchema,
     }),
   ),
+  handoffs: z.array(WorldHandoffSchema).max(MAX_HANDOFFS),
 });
 export type WorldView = z.infer<typeof WorldViewSchema>;
 
@@ -125,6 +146,7 @@ type BuildWorldReadModelInput = {
   agents: unknown;
   tasks: unknown;
   events: unknown;
+  handoffs?: unknown;
 };
 
 const LiveRuntimeAgentStatusSchema = z.strictObject({
@@ -200,9 +222,14 @@ export function buildWorldReadModel(input: BuildWorldReadModelInput): WorldReadM
   const agents = z.array(AgentSchema).max(MAX_AGENTS).parse(input.agents);
   const tasks = z.array(TaskIntentSchema).max(MAX_TASKS).parse(input.tasks);
   const events = z.array(WorldEventSchema).max(MAX_EVENTS).parse(input.events);
+  const handoffs = z
+    .array(WorldHandoffSchema)
+    .max(MAX_HANDOFFS)
+    .parse(input.handoffs ?? []);
   assertUnique(agents, (agent) => agent.id, "Agent");
   assertUnique(tasks, (task) => task.id, "Task");
   assertUnique(events, (event) => event.id, "World event");
+  assertUnique(handoffs, (handoff) => handoff.id, "World handoff");
   assertContiguousEvents(events);
 
   const agentsById = new Map(agents.map((agent) => [agent.id, agent] as const));
@@ -214,6 +241,19 @@ export function buildWorldReadModel(input: BuildWorldReadModelInput): WorldReadM
     agents.map((agent) => [agent.id, "OFFLINE"] as const),
   );
   const currentTaskByAgentId = new Map<string, TaskIntent>();
+  for (const handoff of handoffs) {
+    const fromTask = tasksById.get(handoff.fromTaskId);
+    const toTask = tasksById.get(handoff.toTaskId);
+    if (!fromTask || !toTask) throw new Error("World handoff references unknown Task");
+    if (
+      fromTask.assigneeAgentId !== handoff.fromAgentId ||
+      toTask.assigneeAgentId !== handoff.toAgentId ||
+      !agentsById.has(handoff.fromAgentId) ||
+      !agentsById.has(handoff.toAgentId)
+    ) {
+      throw new Error("World handoff contradicts canonical Agent assignment");
+    }
+  }
 
   for (const event of events) {
     switch (event.eventType) {
@@ -307,6 +347,7 @@ export function buildWorldReadModel(input: BuildWorldReadModelInput): WorldReadM
     cursor: cursorFromEvents(events),
     agents: readAgents,
     tasks: readTasks,
+    handoffs,
   });
 }
 
@@ -318,6 +359,7 @@ export function buildUnavailableWorldReadModel(generatedAtInput: unknown): World
     cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
     agents: [],
     tasks: [],
+    handoffs: [],
   });
 }
 
@@ -370,6 +412,7 @@ export function buildLiveRuntimeWorldReadModel(
     cursor,
     agents: readAgents,
     tasks: [],
+    handoffs: [],
   });
 }
 
@@ -392,6 +435,7 @@ export function projectWorldView(input: unknown): WorldView {
     generatedAt: model.generatedAt,
     cursor: model.cursor,
     agents: model.agents.map((agent) => ({ core: coreFromAgent(agent), world: agent.world })),
+    handoffs: model.handoffs,
   });
 }
 

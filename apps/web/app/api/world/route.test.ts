@@ -15,6 +15,7 @@ describe("GET /api/world", () => {
           cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
           agents: [],
           tasks: [],
+          handoffs: [],
         }),
       async () => true,
     )(request);

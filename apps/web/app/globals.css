@@ -482,6 +482,66 @@ main {
   font-weight: 900;
 }
 
+.office-handoff-layer {
+  color: var(--accent, #75e6c6);
+  pointer-events: none;
+}
+.office-handoff-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-dasharray: 0.12 0.08;
+  stroke-linecap: round;
+  stroke-width: 5;
+  opacity: 0.82;
+  animation: office-handoff-pulse 1.8s ease-in-out infinite;
+}
+.office-handoff-feed {
+  position: absolute;
+  inset-block-end: 0.75rem;
+  inset-inline-start: 50%;
+  z-index: 4;
+  display: grid;
+  gap: 0.25rem;
+  min-inline-size: min(22rem, calc(100% - 2rem));
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  translate: -50% 0;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--panel, #101916) 88%, transparent);
+  backdrop-filter: blur(8px);
+  list-style: none;
+  font-size: 0.72rem;
+}
+.office-handoff-feed li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.office-handoff-feed time {
+  opacity: 0.66;
+}
+@keyframes office-handoff-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-handoff-path {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .office-handoff-path {
+    stroke: CanvasText;
+  }
+  .office-handoff-feed {
+    border-color: CanvasText;
+  }
+}
+
 .memory-center-launcher {
   display: grid;
   gap: var(--space-4);

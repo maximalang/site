@@ -17,6 +17,9 @@ const ids = {
   event2: "event_66666666-6666-6666-6666-666666666666",
   event3: "event_77777777-7777-7777-7777-777777777777",
   binding: "binding_88888888-8888-8888-8888-888888888888",
+  task2: "task_99999999-9999-4999-8999-999999999999",
+  mission: "mission_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  run: "run_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
 } as const;
 
 const agents = [
@@ -155,6 +158,44 @@ describe("buildWorldReadModel", () => {
     expect(world.agents.map(({ core }) => core)).toEqual(command.agents.map(({ core }) => core));
   });
 
+  it("projects a bounded canonical handoff without runtime or Account identity", () => {
+    const model = buildWorldReadModel({
+      source: "LIVE",
+      generatedAt: "2026-08-13T06:00:04.000Z",
+      agents,
+      tasks: [
+        ...tasks,
+        {
+          ...tasks[0],
+          id: ids.task2,
+          assigneeAgentId: ids.reviewer,
+          title: "Review protocol evidence",
+          idempotencyKey: "task:create:protocol-review",
+        },
+      ],
+      events,
+      handoffs: [
+        {
+          id: "event_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          missionId: ids.mission,
+          fromTaskId: ids.task,
+          toTaskId: ids.task2,
+          fromRunId: ids.run,
+          fromAgentId: ids.researcher,
+          toAgentId: ids.reviewer,
+          occurredAt: "2026-08-13T06:00:03.500Z",
+        },
+      ],
+    });
+    expect(projectWorldView(model).handoffs).toEqual(model.handoffs);
+    expect(model.handoffs[0]).toMatchObject({
+      fromAgentId: ids.researcher,
+      toAgentId: ids.reviewer,
+      fromRunId: ids.run,
+    });
+    expect(JSON.stringify(model.handoffs)).not.toMatch(/account_|binding_|session_/);
+  });
+
   it("rejects gaps, duplicate order and references outside the canonical input", () => {
     expect(() =>
       buildWorldReadModel({
@@ -250,6 +291,7 @@ describe("buildWorldReadModel", () => {
       cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
       agents: [],
       tasks: [],
+      handoffs: [],
     });
     expect(() => WorldReadModelSchema.parse({ ...model, agents: [{}] })).toThrow();
   });

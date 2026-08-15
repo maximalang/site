@@ -462,6 +462,8 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.getByRole("heading", { level: 1, name: "AI World" })).toBeVisible();
   await expect(page.getByRole("note")).toContainText("проверочные данные, не live runtime");
   await expect(page.locator("main")).toHaveCount(1);
+  await expect(page.getByText("Research Lead → Reviewer", { exact: true })).toBeVisible();
+  await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
 
   const skipLink = page.getByRole("link", { name: "К содержанию" });
   await page.keyboard.press("Tab");

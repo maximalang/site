@@ -53,6 +53,7 @@ describe("ControlCenter", () => {
       cursor: { schemaVersion: 1 as const, stream: "WORLD" as const, lastSequence: 0 },
       agents: [],
       tasks: [],
+      handoffs: [],
     }));
     render(<ControlCenter csrfToken="csrf" loadReadModel={loadReadModel} />);
 
@@ -94,6 +95,7 @@ describe("ControlCenter", () => {
           cursor: { schemaVersion: 1, stream: "WORLD", lastSequence: 0 },
           agents: [],
           tasks: [],
+          handoffs: [],
         })}
       />,
     );

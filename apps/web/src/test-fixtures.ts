@@ -35,6 +35,28 @@ export function buildContractFixture(generatedAt = "2026-08-13T06:00:04.000Z"): 
         idempotencyKey: "task:create:protocol-contract",
         createdAt: "2026-08-13T06:00:00.000Z",
       },
+      {
+        schemaVersion: 1,
+        id: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        projectId: "project_33333333-3333-3333-3333-333333333333",
+        assigneeAgentId: "agent_22222222-2222-2222-2222-222222222222",
+        title: "Review protocol contract",
+        approvalRequirement: "REQUIRED",
+        idempotencyKey: "task:create:review-protocol-contract",
+        createdAt: "2026-08-13T06:00:03.000Z",
+      },
+    ],
+    handoffs: [
+      {
+        id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc",
+        fromTaskId: "task_44444444-4444-4444-4444-444444444444",
+        toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd",
+        fromAgentId: "agent_11111111-1111-1111-1111-111111111111",
+        toAgentId: "agent_22222222-2222-2222-2222-222222222222",
+        occurredAt: "2026-08-13T06:00:03.500Z",
+      },
     ],
     events: [
       {

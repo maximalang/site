@@ -104,6 +104,17 @@ export function OpenClawOfficeWorld({
             d="M170 165c-44-26-55 35-12 45-19 43 48 48 48 5 46 2 48-57 5-54-2-39-50-37-41 4z"
           />
         </g>
+        <g className="office-handoff-layer">
+          {office.handoffs.map((handoff) => (
+            <path
+              className="office-handoff-path"
+              d={`M${handoff.fromX} ${handoff.fromY} Q${(handoff.fromX + handoff.toX) / 2} ${Math.min(handoff.fromY, handoff.toY) - 70} ${handoff.toX} ${handoff.toY}`}
+              data-handoff-cue={handoff.id}
+              key={handoff.id}
+              pathLength="1"
+            />
+          ))}
+        </g>
       </svg>
       {office.agents.map((agent) => (
         <button
@@ -126,6 +137,22 @@ export function OpenClawOfficeWorld({
           </span>
         </button>
       ))}
+      {office.handoffs.length > 0 ? (
+        <ol aria-label="Последние передачи работы" className="office-handoff-feed">
+          {office.handoffs.map((handoff) => (
+            <li key={handoff.id}>
+              <span>
+                {handoff.fromDisplayName} → {handoff.toDisplayName}
+              </span>
+              <time dateTime={handoff.occurredAt}>
+                {new Intl.DateTimeFormat("ru", { hour: "2-digit", minute: "2-digit" }).format(
+                  new Date(handoff.occurredAt),
+                )}
+              </time>
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </div>
   );
 }

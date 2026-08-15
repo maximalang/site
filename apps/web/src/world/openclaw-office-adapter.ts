@@ -61,6 +61,17 @@ export type OfficePresentationAgent = {
   currentTask?: AgentProjectionCore["currentTask"];
 };
 
+export type OfficePresentationHandoff = {
+  id: WorldView["handoffs"][number]["id"];
+  occurredAt: string;
+  fromDisplayName: string;
+  toDisplayName: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+};
+
 export type OfficePresentationModel = {
   schemaVersion: 1;
   skinId: string;
@@ -70,7 +81,10 @@ export type OfficePresentationModel = {
   cursor: WorldView["cursor"];
   zones: readonly OfficeSkinZone[];
   agents: OfficePresentationAgent[];
+  handoffs: OfficePresentationHandoff[];
 };
+
+const MAX_VISIBLE_HANDOFFS = 3;
 
 const STATUS_PRESENTATION: Record<
   AgentProjectionCore["status"],
@@ -121,6 +135,7 @@ function validateSkin(skin: OfficeSkin): Map<OfficeZone, OfficeSkinZone> {
       throw new Error(`Office skin zone exceeds the map: ${zone.id}`);
     }
   }
+
   return zones;
 }
 
@@ -186,6 +201,27 @@ export function createOfficePresentation(
     });
   }
 
+  const agentById = new Map(agents.map((agent) => [agent.agentId, agent]));
+  const handoffs = world.handoffs
+    .slice(-MAX_VISIBLE_HANDOFFS)
+    .map((handoff): OfficePresentationHandoff => {
+      const from = agentById.get(handoff.fromAgentId);
+      const to = agentById.get(handoff.toAgentId);
+      if (!from || !to) {
+        throw new Error(`Handoff references an Agent outside the office: ${handoff.id}`);
+      }
+      return {
+        id: handoff.id,
+        occurredAt: handoff.occurredAt,
+        fromDisplayName: from.displayName,
+        toDisplayName: to.displayName,
+        fromX: from.x,
+        fromY: from.y,
+        toX: to.x,
+        toY: to.y,
+      };
+    });
+
   return {
     schemaVersion: 1,
     skinId: skin.id,
@@ -195,5 +231,6 @@ export function createOfficePresentation(
     cursor: world.cursor,
     zones: skin.zones,
     agents: agents.sort((left, right) => left.agentId.localeCompare(right.agentId)),
+    handoffs,
   };
 }

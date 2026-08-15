@@ -80,6 +80,16 @@ type TaskRow = QueryResultRow & {
   created_at: Date | string;
 };
 type TaskTargetRow = QueryResultRow & { project_id: string };
+type HandoffRow = QueryResultRow & {
+  id: string;
+  mission_id: string;
+  from_task_id: string;
+  to_task_id: string;
+  from_run_id: string;
+  from_agent_id: string;
+  to_agent_id: string;
+  occurred_at: Date | string;
+};
 
 export type OpenClawWorldSnapshot = z.input<typeof SnapshotSchema>;
 export type AssignTaskInput = z.input<typeof AssignTaskSchema>;
@@ -417,7 +427,19 @@ export class PostgresWorldProjectionStore {
             ORDER BY sequence
             LIMIT 100001`,
       );
-      if (tasks.rows.length > 2_000 || events.rows.length > 100_000) {
+      const handoffs = await client.query<HandoffRow>(
+        `SELECT handoff.id, handoff.mission_id, handoff.from_task_id,
+                handoff.to_task_id, handoff.from_run_id,
+                source_task.assignee_agent_id AS from_agent_id,
+                target_task.assignee_agent_id AS to_agent_id,
+                handoff.occurred_at
+           FROM agent_world.mission_handoffs handoff
+           JOIN agent_world.tasks source_task ON source_task.id = handoff.from_task_id
+           JOIN agent_world.tasks target_task ON target_task.id = handoff.to_task_id
+          ORDER BY handoff.occurred_at DESC, handoff.sequence DESC
+          LIMIT 21`,
+      );
+      if (tasks.rows.length > 2_000 || events.rows.length > 100_000 || handoffs.rows.length > 20) {
         throw new Error("World projection exceeds the bounded replay limit");
       }
       const worldEvents = events.rows.map((row) => ({
@@ -490,6 +512,16 @@ export class PostgresWorldProjectionStore {
         agents,
         tasks: tasks.rows.map(parseTask),
         events: worldEvents,
+        handoffs: handoffs.rows.toReversed().map((row) => ({
+          id: row.id,
+          missionId: row.mission_id,
+          fromTaskId: row.from_task_id,
+          toTaskId: row.to_task_id,
+          fromRunId: row.from_run_id,
+          fromAgentId: row.from_agent_id,
+          toAgentId: row.to_agent_id,
+          occurredAt: iso(row.occurred_at),
+        })),
       });
       await client.query("COMMIT");
       return model;

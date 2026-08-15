@@ -2854,6 +2854,27 @@ try {
   ) {
     throw new Error("Mission handoff did not activate one provenance-linked downstream approval");
   }
+  const handoffWorld = await new PostgresWorldProjectionStore(pool).readWorld([
+    worldAgent,
+    AgentSchema.parse({
+      schemaVersion: 1,
+      id: hub.secondaryAgent,
+      slug: "protocol-reviewer",
+      displayName: "Protocol Reviewer",
+      role: "Independent review",
+      instructions: "Review canonical protocol evidence.",
+      isEnabled: true,
+    }),
+  ]);
+  if (
+    handoffWorld.handoffs.length !== 1 ||
+    handoffWorld.handoffs[0]?.fromTaskId !== predecessorTask.taskId ||
+    handoffWorld.handoffs[0]?.toTaskId !== downstreamTask.taskId ||
+    handoffWorld.handoffs[0]?.fromAgentId !== worldAgent.id ||
+    handoffWorld.handoffs[0]?.toAgentId !== hub.secondaryAgent
+  ) {
+    throw new Error("Canonical Mission handoff was not projected into the World read model");
+  }
 
   const scheduleTaskIds = ["task_b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1"];
   const scheduleFiringIds = ["schedule_firing_b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2"];

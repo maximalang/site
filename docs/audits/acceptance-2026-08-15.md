@@ -16,7 +16,7 @@ proven. `OPEN` means the required product surface is absent.
 | 7 | Create Agent with role, instructions, skills, tools, memory, schedule, budget and preferred execution | PARTIAL | Agent/Template, skills/tools, Agent schedules and inherited execution preferences exist. One integrated Agent creation flow for every listed setting remains open. |
 | 8 | Give an Agent a Task on the map | PASS | World selection opens the Task drawer; canonical assignment and approvals are persisted. |
 | 9 | See Account/API/Model/Mode used | PASS | Run provenance readers and Command surfaces expose canonical execution provenance without credentials. |
-| 10 | See real movement/status/handoff | PARTIAL | Real status and deterministic activity cues drive movement; dependency-complete Runs now create canonical provenance-linked handoff and downstream approval events automatically. A dedicated visible handoff cue over the World projection remains open. |
+| 10 | See real movement/status/handoff | PASS | Real status drives deterministic movement and activity cues. A dependency-complete Run now creates one provenance-linked PostgreSQL handoff, advances the canonical World stream and projects a bounded map path plus a textual `Agent → Agent` cue. The isolated PostgreSQL verifier proves persistence/projection, while unit and five-viewport Playwright/axe suites prove the accessible World presentation without decorative LLM calls. |
 | 11 | Automatically hand a Task across Agents | PARTIAL | LangGraph decisions, dependency-aware Mission Tasks and a restart-safe production supervisor now activate the next Task exactly once after all predecessor Runs complete. Policy-authorized automatic downstream approval/dispatch remains open; the executor deliberately does not bypass owner safety policy. |
 | 12 | Shared context across Agents | PASS | PostgreSQL/pgvector Context Packs are project-scoped, persisted per Run and transport-independent. |
 | 13 | Save useful output to Action Graph | PARTIAL | Native Chat commits and Codex events persist structured output and append-only events. One unified user-facing Action Graph projection remains open. |
@@ -43,7 +43,7 @@ proven. `OPEN` means the required product surface is absent.
 
 ## Next implementation order
 
-1. Dependency/handoff action executor for LangGraph Mission Tasks.
+1. Policy-authorized downstream approval/dispatch for LangGraph Mission Tasks.
 2. Product Action Graph/usage/limits/cost/context-pressure Observatory.
 3. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
 4. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.

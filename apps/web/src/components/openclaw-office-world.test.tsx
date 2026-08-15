@@ -65,4 +65,19 @@ describe("OpenClaw Office World presentation", () => {
     expect(container.querySelector("[data-action-cue='HANDOFF']")).toBeNull();
     expect(container.querySelector("[data-action-cue='MEETING']")).toBeNull();
   });
+
+  it("exposes a canonical handoff as text as well as a decorative map cue", () => {
+    const world = projectWorldView(buildContractFixture());
+    const { container } = render(
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Research Lead → Reviewer")).toBeTruthy();
+    expect(container.querySelectorAll("[data-handoff-cue]")).toHaveLength(1);
+  });
 });

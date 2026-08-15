@@ -25,6 +25,36 @@ describe("OpenClaw Office presentation adapter", () => {
     expect(first.agents[0]).not.toHaveProperty("accountId");
     expect(first.agents[0]).not.toHaveProperty("sessionId");
     expect(first.agents[0]).not.toHaveProperty("externalAgentId");
+    expect(first.handoffs).toEqual([
+      expect.objectContaining({
+        fromDisplayName: "Research Lead",
+        toDisplayName: "Reviewer",
+      }),
+    ]);
+    expect(first.handoffs[0]).not.toHaveProperty("accountId");
+  });
+
+  it("bounds canonical handoff cues and resolves their current map positions", () => {
+    const world = projectWorldView(buildContractFixture());
+    const handoff = world.handoffs[0];
+    expect(handoff).toBeDefined();
+    if (!handoff) return;
+    const presentation = createOfficePresentation(
+      {
+        ...world,
+        handoffs: Array.from({ length: 5 }, (_, index) => ({
+          ...handoff,
+          id: handoff.id,
+          occurredAt: `2026-08-13T06:00:0${index}.500Z`,
+        })),
+      },
+      DEFAULT_OFFICE_SKIN,
+    );
+
+    expect(presentation.handoffs).toHaveLength(3);
+    expect(presentation.handoffs[0]).toEqual(
+      expect.objectContaining({ fromX: expect.any(Number), toX: expect.any(Number) }),
+    );
   });
 
   it("maps real status to one of four compact presentation zones", () => {
@@ -45,7 +75,11 @@ describe("OpenClaw Office presentation adapter", () => {
 
     for (const [status, visualStatus, zone, actionCue] of cases) {
       const presentation = createOfficePresentation(
-        { ...world, agents: [{ ...fixtureAgent, core: { ...fixtureAgent.core, status } }] },
+        {
+          ...world,
+          agents: [{ ...fixtureAgent, core: { ...fixtureAgent.core, status } }],
+          handoffs: [],
+        },
         DEFAULT_OFFICE_SKIN,
       );
       expect(presentation.agents[0]).toEqual(
