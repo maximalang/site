@@ -1,6 +1,9 @@
 import { promises as dns } from "node:dns";
 import { request as httpsRequest } from "node:https";
 import { BlockList, connect, isIP } from "node:net";
+import type { IntegrationAction } from "@agent-world/read-model";
+
+const MAX_REMOTE_RESPONSE_BYTES = 32_768;
 
 export type ProbeTarget = Awaited<
   ReturnType<import("@agent-world/postgres-store").PostgresIntegrationStore["loadProbeTarget"]>
@@ -66,7 +69,12 @@ function httpsCall(
   headers: Record<string, string>,
   body?: string,
 ) {
-  return new Promise<{ status: number; body: string; contentType: string }>((resolve, reject) => {
+  return new Promise<{
+    status: number;
+    body: string;
+    contentType: string;
+    sessionId?: string;
+  }>((resolve, reject) => {
     const request = httpsRequest(
       url,
       {
@@ -77,17 +85,25 @@ function httpsCall(
       },
       (response) => {
         let content = "";
+        let receivedBytes = 0;
         response.setEncoding("utf8");
         response.on("data", (chunk: string) => {
-          if (content.length < 32_768) content += chunk;
+          receivedBytes += Buffer.byteLength(chunk, "utf8");
+          if (receivedBytes > MAX_REMOTE_RESPONSE_BYTES) {
+            request.destroy(new Error("REMOTE_RESPONSE_TOO_LARGE"));
+            return;
+          }
+          content += chunk;
         });
-        response.on("end", () =>
+        response.on("end", () => {
+          const sessionId = response.headers["mcp-session-id"];
           resolve({
             status: response.statusCode ?? 0,
             body: content,
             contentType: String(response.headers["content-type"] ?? ""),
-          }),
-        );
+            ...(typeof sessionId === "string" ? { sessionId } : {}),
+          });
+        });
       },
     );
     request.on("timeout", () => request.destroy(new Error("PROBE_TIMEOUT")));
@@ -98,7 +114,7 @@ function httpsCall(
 }
 
 function sshBanner(address: string, port: number) {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const socket = connect({ host: address, port, timeout: 5_000 });
     let banner = "";
     socket.setEncoding("utf8");
@@ -106,15 +122,211 @@ function sshBanner(address: string, port: number) {
       banner += chunk;
       if (banner.includes("\n") || banner.length > 255) {
         socket.destroy();
-        banner.startsWith("SSH-") ? resolve() : reject(new Error("SSH_BANNER_INVALID"));
+        banner.startsWith("SSH-")
+          ? resolve(banner.split(/\r?\n/, 1)[0]?.slice(0, 120) ?? "SSH")
+          : reject(new Error("SSH_BANNER_INVALID"));
       }
     });
     socket.on("timeout", () => socket.destroy(new Error("PROBE_TIMEOUT")));
     socket.on("error", reject);
     socket.on("end", () =>
-      banner.startsWith("SSH-") ? resolve() : reject(new Error("SSH_BANNER_INVALID")),
+      banner.startsWith("SSH-")
+        ? resolve(banner.split(/\r?\n/, 1)[0]?.slice(0, 120) ?? "SSH")
+        : reject(new Error("SSH_BANNER_INVALID")),
     );
   });
+}
+
+type ActionItem = { id: string; label: string; detail?: string };
+function safeText(value: unknown, max: number) {
+  const text =
+    typeof value === "string"
+      ? value
+      : typeof value === "number" && Number.isSafeInteger(value)
+        ? String(value)
+        : "";
+  return [...text]
+    .map((character) => {
+      const point = character.codePointAt(0) ?? 0;
+      return point <= 31 || point === 127 ? " " : character;
+    })
+    .join("")
+    .trim()
+    .slice(0, max);
+}
+function jsonPayload(response: { body: string; contentType: string }) {
+  const payload = response.contentType.includes("text/event-stream")
+    ? response.body
+        .split(/\r?\n/)
+        .find((line) => line.startsWith("data:"))
+        ?.slice(5)
+        .trim()
+    : response.body;
+  if (!payload) throw new Error("REMOTE_RESPONSE_INVALID");
+  return JSON.parse(payload) as Record<string, unknown>;
+}
+
+export function createNodeIntegrationAction(
+  configuration: {
+    allowedHosts: string[];
+    allowPrivateNetwork: boolean;
+  },
+  dependencies: {
+    resolve?: typeof resolveHost;
+    https?: typeof httpsCall;
+    ssh?: typeof sshBanner;
+  } = {},
+) {
+  const resolveTarget = dependencies.resolve ?? resolveHost;
+  const callHttps = dependencies.https ?? httpsCall;
+  const inspectSsh = dependencies.ssh ?? sshBanner;
+  const allowedHosts = new Set(
+    configuration.allowedHosts.map((host) => host.trim().toLowerCase()).filter(Boolean),
+  );
+  return async (
+    target: ProbeTarget,
+    action: IntegrationAction,
+    credential?: string,
+  ): Promise<{ status: "SUCCEEDED" | "FAILED"; items: ActionItem[] }> => {
+    try {
+      if (!target.isEnabled || target.health !== "READY") throw new Error("INTEGRATION_NOT_READY");
+      if (target.kind !== action.split("_", 1)[0])
+        throw new Error("INTEGRATION_ACTION_KIND_MISMATCH");
+      if (target.endpoint.transport === "SSH") {
+        if (action !== "SSH_INSPECT_HOST") throw new Error("INTEGRATION_ACTION_KIND_MISMATCH");
+        const resolved = await resolveTarget(
+          target.endpoint.host,
+          allowedHosts,
+          configuration.allowPrivateNetwork,
+        );
+        const banner = await inspectSsh(resolved.address, target.endpoint.port);
+        return {
+          status: "SUCCEEDED",
+          items: [{ id: "ssh", label: "SSH reachable", detail: banner }],
+        };
+      }
+      const url = new URL(target.endpoint.url);
+      if (url.protocol !== "https:") throw new Error("HTTPS_REQUIRED");
+      const resolved = await resolveTarget(
+        url.hostname,
+        allowedHosts,
+        configuration.allowPrivateNetwork,
+      );
+      const headers: Record<string, string> = {
+        accept: "application/json",
+        "user-agent": "agent-world-integration-action/1",
+      };
+      let response: Awaited<ReturnType<typeof httpsCall>>;
+      if (action === "MCP_LIST_TOOLS" && target.kind === "MCP") {
+        headers.accept = "application/json, text/event-stream";
+        headers["content-type"] = "application/json";
+        if (credential) headers.authorization = `Bearer ${credential}`;
+        const initialize = await callHttps(
+          url,
+          resolved.address,
+          resolved.family,
+          "POST",
+          headers,
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: "initialize",
+            method: "initialize",
+            params: {
+              protocolVersion: "2025-06-18",
+              capabilities: {},
+              clientInfo: { name: "agent-world", version: "1" },
+            },
+          }),
+        );
+        if (initialize.status < 200 || initialize.status >= 300)
+          throw new Error("REMOTE_UNHEALTHY");
+        if (initialize.sessionId) headers["mcp-session-id"] = initialize.sessionId;
+        const initialized = await callHttps(
+          url,
+          resolved.address,
+          resolved.family,
+          "POST",
+          headers,
+          JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+        );
+        if (initialized.status < 200 || initialized.status >= 300)
+          throw new Error("REMOTE_UNHEALTHY");
+        response = await callHttps(
+          url,
+          resolved.address,
+          resolved.family,
+          "POST",
+          headers,
+          JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list", params: {} }),
+        );
+        if (response.status < 200 || response.status >= 300) throw new Error("REMOTE_UNHEALTHY");
+        const payload = jsonPayload(response);
+        const tools = (payload.result as { tools?: unknown } | undefined)?.tools;
+        if (!Array.isArray(tools)) throw new Error("MCP_TOOLS_INVALID");
+        const items = tools.slice(0, 100).flatMap((tool): ActionItem[] => {
+          if (!tool || typeof tool !== "object") return [];
+          const value = tool as Record<string, unknown>;
+          const id = safeText(value.name, 120);
+          if (!id) return [];
+          const description = safeText(value.description, 240);
+          return [{ id, label: id, ...(description ? { detail: description } : {}) }];
+        });
+        return { status: "SUCCEEDED", items };
+      }
+      if (action === "N8N_LIST_WORKFLOWS" && target.kind === "N8N") {
+        url.pathname = "/api/v1/workflows";
+        url.search = "limit=100";
+        if (credential) headers["x-n8n-api-key"] = credential;
+        response = await callHttps(url, resolved.address, resolved.family, "GET", headers);
+        if (response.status < 200 || response.status >= 300) throw new Error("REMOTE_UNHEALTHY");
+        const payload = jsonPayload(response);
+        const workflows = payload.data;
+        if (!Array.isArray(workflows)) throw new Error("N8N_WORKFLOWS_INVALID");
+        return {
+          status: "SUCCEEDED",
+          items: workflows.slice(0, 100).flatMap((workflow): ActionItem[] => {
+            if (!workflow || typeof workflow !== "object") return [];
+            const value = workflow as Record<string, unknown>;
+            const id = safeText(value.id, 120);
+            const label = safeText(value.name, 240);
+            if (!id || !label) return [];
+            return [{ id, label, detail: value.active === true ? "active" : "inactive" }];
+          }),
+        };
+      }
+      if (action === "GITHUB_LIST_REPOSITORIES" && target.kind === "GITHUB") {
+        if (!credential) throw new Error("CREDENTIAL_REQUIRED");
+        headers.authorization = `Bearer ${credential}`;
+        headers.accept = "application/vnd.github+json";
+        headers["x-github-api-version"] = "2026-03-10";
+        url.pathname = "/user/repos";
+        url.search = "per_page=100&sort=updated";
+        response = await callHttps(url, resolved.address, resolved.family, "GET", headers);
+        if (response.status < 200 || response.status >= 300) throw new Error("REMOTE_UNHEALTHY");
+        const repositories = jsonPayload(response);
+        if (!Array.isArray(repositories)) throw new Error("GITHUB_REPOSITORIES_INVALID");
+        return {
+          status: "SUCCEEDED",
+          items: repositories.slice(0, 100).flatMap((repository): ActionItem[] => {
+            if (!repository || typeof repository !== "object") return [];
+            const value = repository as Record<string, unknown>;
+            const id = safeText(value.id, 120);
+            const label = safeText(value.full_name, 240);
+            if (!id || !label) return [];
+            const flags = [
+              value.private === true ? "private" : "public",
+              value.archived === true ? "archived" : "active",
+            ];
+            return [{ id, label, detail: flags.join(" · ") }];
+          }),
+        };
+      }
+      throw new Error("INTEGRATION_ACTION_KIND_MISMATCH");
+    } catch (error) {
+      const code = error instanceof Error ? error.message.slice(0, 120) : "ACTION_FAILED";
+      return { status: "FAILED", items: [{ id: "error", label: code }] };
+    }
+  };
 }
 
 export function createNodeIntegrationProbe(configuration: {

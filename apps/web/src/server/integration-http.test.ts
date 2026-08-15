@@ -31,6 +31,7 @@ describe("integration HTTP boundary", () => {
       credential: vi.fn(),
       lifecycle: vi.fn(),
       probe: vi.fn(),
+      action: vi.fn(),
     };
     const handlers = createIntegrationRouteHandlers(dependencies);
     expect((await handlers.GET(new Request("https://world.test/api/integrations"))).status).toBe(
@@ -49,6 +50,7 @@ describe("integration HTTP boundary", () => {
       credential,
       lifecycle: vi.fn(),
       probe: vi.fn(),
+      action: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const body = {
@@ -82,6 +84,7 @@ describe("integration HTTP boundary", () => {
       credential: vi.fn(),
       lifecycle,
       probe: vi.fn(),
+      action: vi.fn(),
     });
     const response = await handlers.POST(
       request({
@@ -113,6 +116,7 @@ describe("integration HTTP boundary", () => {
       credential: vi.fn(),
       lifecycle: vi.fn(),
       probe,
+      action: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const response = await handlers.POST(
@@ -123,6 +127,44 @@ describe("integration HTTP boundary", () => {
       expect.objectContaining({
         result: expect.objectContaining({ health: "READY", code: "MCP_PROBE_OK" }),
       }),
+    );
+  });
+
+  it("executes only a bounded predefined integration action", async () => {
+    const action = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      integrationId: create.id,
+      action: "MCP_LIST_TOOLS",
+      outcome: "RECORDED",
+      status: "SUCCEEDED",
+      items: [{ id: "search", label: "Search" }],
+      executedAt: registry.generatedAt,
+    });
+    const handlers = createIntegrationRouteHandlers({
+      authorize: async () => true,
+      list: vi.fn(),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action,
+      now: () => new Date(registry.generatedAt),
+    });
+    const response = await handlers.POST(
+      request({
+        operation: "ACTION",
+        action: "MCP_LIST_TOOLS",
+        integrationId: create.id,
+        commandId: "integration:action:1",
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "MCP_LIST_TOOLS", integrationId: create.id }),
+      registry.generatedAt,
+    );
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ result: expect.objectContaining({ status: "SUCCEEDED" }) }),
     );
   });
 });

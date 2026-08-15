@@ -1,4 +1,9 @@
-import { type IntegrationCreate, IntegrationRegistrySchema } from "@agent-world/read-model";
+import {
+  type IntegrationAction,
+  IntegrationActionResultSchema,
+  type IntegrationCreate,
+  IntegrationRegistrySchema,
+} from "@agent-world/read-model";
 
 export const integrationClient = {
   async list() {
@@ -57,5 +62,21 @@ export const integrationClient = {
       }),
     });
     if (!response.ok) throw new Error("Integration probe rejected");
+  },
+  async action(integrationId: string, action: IntegrationAction, csrfToken: string) {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({
+        operation: "ACTION",
+        integrationId,
+        action,
+        commandId: `integration:action:${crypto.randomUUID()}`,
+      }),
+    });
+    if (!response.ok) throw new Error("Integration action rejected");
+    const body = (await response.json()) as { result?: unknown };
+    return IntegrationActionResultSchema.parse(body.result);
   },
 };

@@ -16,6 +16,15 @@ describe("IntegrationPanel", () => {
       credential: vi.fn().mockResolvedValue(undefined),
       lifecycle: vi.fn().mockResolvedValue(undefined),
       probe: vi.fn().mockResolvedValue(undefined),
+      action: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        integrationId: "integration_11111111-1111-4111-8111-111111111111",
+        action: "MCP_LIST_TOOLS",
+        outcome: "RECORDED",
+        status: "SUCCEEDED",
+        items: [],
+        executedAt: "2026-08-15T12:00:00.000Z",
+      }),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     await screen.findByRole("heading", { name: "Интеграции" });
@@ -63,11 +72,56 @@ describe("IntegrationPanel", () => {
       credential: vi.fn(),
       lifecycle: vi.fn(),
       probe,
+      action: vi.fn(),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     fireEvent.click(await screen.findByRole("button", { name: "Проверить" }));
     await vi.waitFor(() =>
       expect(probe).toHaveBeenCalledWith(expect.stringMatching(/^integration_/), "csrf"),
+    );
+  });
+
+  it("runs the predefined action for a ready Integration and renders bounded evidence", async () => {
+    const action = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      integrationId: "integration_11111111-1111-4111-8111-111111111111",
+      action: "MCP_LIST_TOOLS",
+      outcome: "RECORDED",
+      status: "SUCCEEDED",
+      items: [{ id: "search", label: "Search", detail: "Public-source search" }],
+      executedAt: "2026-08-15T12:00:00.000Z",
+    });
+    const client = {
+      list: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        generatedAt: "2026-08-15T12:00:00.000Z",
+        integrations: [
+          {
+            id: "integration_11111111-1111-4111-8111-111111111111",
+            kind: "MCP",
+            label: "AI World MCP",
+            endpoint: { transport: "HTTPS", url: "https://world.example/api/mcp" },
+            health: "READY",
+            isEnabled: true,
+            hasCredential: true,
+            createdAt: "2026-08-15T12:00:00.000Z",
+            updatedAt: "2026-08-15T12:00:00.000Z",
+          },
+        ],
+      }),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action,
+    };
+    render(<IntegrationPanel client={client} csrfToken="csrf" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Инструменты" }));
+    expect(await screen.findByText(/Public-source search/)).toBeTruthy();
+    expect(action).toHaveBeenCalledWith(
+      "integration_11111111-1111-4111-8111-111111111111",
+      "MCP_LIST_TOOLS",
+      "csrf",
     );
   });
 });

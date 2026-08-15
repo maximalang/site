@@ -53,7 +53,7 @@ import { ModelRouteCheckResponseSchema } from "@agent-world/read-model";
 import { nextOccurrence } from "@agent-world/scheduler";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
-import { createNodeIntegrationProbe } from "./integration-probe";
+import { createNodeIntegrationAction, createNodeIntegrationProbe } from "./integration-probe";
 import { MemoryProjectionSupervisor } from "./memory-projection-supervisor";
 import { MissionHandoffSupervisor } from "./mission-handoff-supervisor";
 import { NativeChatReconciliationSupervisor } from "./native-chat-reconciliation-supervisor";
@@ -242,14 +242,16 @@ export async function createProductionRuntime(
     const hubReader = new PostgresHubReader(pool);
     const operationsReader = new PostgresOperationsReader(pool);
     const integrationStore = new PostgresIntegrationStore(pool);
-    const integrationProbe = createNodeIntegrationProbe({
+    const integrationNetworkConfiguration = {
       allowedHosts: (environment.AGENT_WORLD_INTEGRATION_ALLOWED_HOSTS ?? "")
         .split(",")
         .map((host) => host.trim())
         .filter(Boolean),
       allowPrivateNetwork:
         environment.AGENT_WORLD_INTEGRATION_PRIVATE_NETWORK_ACK === "private-network",
-    });
+    };
+    const integrationProbe = createNodeIntegrationProbe(integrationNetworkConfiguration);
+    const integrationAction = createNodeIntegrationAction(integrationNetworkConfiguration);
     const hubCommandStore = new PostgresHubCommandStore(pool);
     const memoryReader = new PostgresMemoryCenterReader(pool);
     const memoryStore = new PostgresMemoryCurationStore(pool, {
@@ -622,6 +624,20 @@ export async function createProductionRuntime(
           integrationId: input.integrationId,
           ...committed,
         };
+      },
+      executeIntegrationAction: async (input) => {
+        const command = {
+          integrationId: input.integrationId,
+          commandId: input.commandId,
+          action: input.action,
+        };
+        const prepared = await integrationStore.prepareAction(command);
+        if (!("target" in prepared)) return prepared;
+        const credential = prepared.target.credentialRef
+          ? await secretStore.read(prepared.target.credentialRef, "INTEGRATION_CREDENTIAL")
+          : undefined;
+        const result = await integrationAction(prepared.target, input.action, credential);
+        return integrationStore.commitAction(command, result, input.executedAt);
       },
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {

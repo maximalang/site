@@ -13,6 +13,15 @@ in `integration_probe_observations`; only a successful probe can set health to
 - GitHub: authenticated `GET /user` with the current versioned REST headers;
 - SSH: TCP handshake and SSH banner validation only, never a remote command.
 
+After a successful probe, the Hub exposes one predefined read-only action per
+kind: MCP `tools/list`, n8n workflow listing, GitHub repository listing, or SSH
+host inspection. Actions accept no remote path, method, command or arbitrary
+parameters. Results are normalized to at most 100 bounded items and persisted
+in `integration_action_observations`; an exact `command_id` replay reads the
+stored result instead of repeating network access. Write, workflow-trigger,
+shell, git-push and deployment actions remain outside this catalog and require
+an explicit approval-aware policy before they can be added.
+
 Remote access is deny-by-default. Add exact hostnames to
 `AGENT_WORLD_INTEGRATION_ALLOWED_HOSTS`. If any allowlisted hostname resolves to
 private, loopback or link-local space, also set

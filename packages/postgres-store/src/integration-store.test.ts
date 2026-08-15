@@ -104,4 +104,40 @@ describe("PostgresIntegrationStore", () => {
     expect(first.outcome).toBe("UPDATED");
     expect(replay.outcome).toBe("REPLAY");
   });
+
+  it("commits one bounded integration action observation and replays its exact command", async () => {
+    const command = {
+      integrationId: input.id,
+      commandId: "integration:action:1",
+      action: "MCP_LIST_TOOLS" as const,
+    };
+    const result = {
+      status: "SUCCEEDED" as const,
+      items: [{ id: "search", label: "Search" }],
+    };
+    const requestHash = createHash("sha256").update(JSON.stringify(command), "utf8").digest("hex");
+    const fake = pool([
+      [],
+      [],
+      [],
+      [],
+      [],
+      [
+        {
+          request_sha256: requestHash,
+          action: command.action,
+          status: result.status,
+          result,
+          executed_at: input.createdAt,
+        },
+      ],
+    ]);
+    const store = new PostgresIntegrationStore(fake.value);
+    await expect(store.commitAction(command, result, input.createdAt)).resolves.toEqual(
+      expect.objectContaining({ outcome: "RECORDED", items: result.items }),
+    );
+    await expect(store.prepareAction(command)).resolves.toEqual(
+      expect.objectContaining({ outcome: "REPLAY" }),
+    );
+  });
 });

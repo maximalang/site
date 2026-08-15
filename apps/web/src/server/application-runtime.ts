@@ -32,6 +32,7 @@ import type {
   HubCommandRequest,
   HubCommandResponse,
   HubReadModel,
+  IntegrationAction,
   IntegrationCreate,
   IntegrationRegistry,
   ModelRouteCheckResponse,
@@ -97,6 +98,12 @@ export type ApplicationRuntime = {
     integrationId: string;
     commandId: string;
     checkedAt: string;
+  }): Promise<unknown>;
+  executeIntegrationAction(input: {
+    integrationId: string;
+    commandId: string;
+    action: IntegrationAction;
+    executedAt: string;
   }): Promise<unknown>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;

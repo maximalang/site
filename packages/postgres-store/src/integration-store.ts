@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import {
+  type IntegrationAction,
+  IntegrationActionResultSchema,
   type IntegrationCreate,
   IntegrationCreateSchema,
   type IntegrationRegistry,
@@ -304,6 +306,117 @@ export class PostgresIntegrationStore {
       );
       await client.query("COMMIT");
       return { outcome: "RECORDED" as const, ...result, checkedAt };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async prepareAction(input: {
+    integrationId: string;
+    commandId: string;
+    action: IntegrationAction;
+  }) {
+    const requestHash = hash(input);
+    const client = await this.pool.connect();
+    try {
+      const receipt = await client.query<{
+        request_sha256: string;
+        action: IntegrationAction;
+        status: "SUCCEEDED" | "FAILED";
+        result: { status: "SUCCEEDED" | "FAILED"; items: unknown[] };
+        executed_at: Date | string;
+      }>(
+        `SELECT request_sha256, action, status, result, executed_at
+           FROM agent_world.integration_action_observations WHERE command_id = $1`,
+        [input.commandId],
+      );
+      if (receipt.rows[0]) {
+        const row = receipt.rows[0];
+        if (row.request_sha256 !== requestHash || row.action !== input.action)
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        return IntegrationActionResultSchema.parse({
+          schemaVersion: 1,
+          integrationId: input.integrationId,
+          action: input.action,
+          outcome: "REPLAY",
+          status: row.status,
+          items: row.result.items,
+          executedAt: iso(row.executed_at),
+        });
+      }
+      const target = await this.loadProbeTarget(input.integrationId);
+      if (!target.isEnabled || target.health !== "READY") throw new Error("INTEGRATION_NOT_READY");
+      const expectedKind = input.action.split("_", 1)[0];
+      if (target.kind !== expectedKind) throw new Error("INTEGRATION_ACTION_KIND_MISMATCH");
+      return { outcome: "READY" as const, target };
+    } finally {
+      client.release();
+    }
+  }
+
+  async commitAction(
+    input: { integrationId: string; commandId: string; action: IntegrationAction },
+    result: { status: "SUCCEEDED" | "FAILED"; items: unknown[] },
+    executedAt: string,
+  ) {
+    const parsed = IntegrationActionResultSchema.parse({
+      schemaVersion: 1,
+      integrationId: input.integrationId,
+      action: input.action,
+      outcome: "RECORDED",
+      ...result,
+      executedAt,
+    });
+    const requestHash = hash(input);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        input.commandId,
+      ]);
+      const existing = await client.query<{
+        request_sha256: string;
+        action: IntegrationAction;
+        status: "SUCCEEDED" | "FAILED";
+        result: { items: unknown[] };
+        executed_at: Date | string;
+      }>(
+        `SELECT request_sha256, action, status, result, executed_at
+           FROM agent_world.integration_action_observations WHERE command_id = $1`,
+        [input.commandId],
+      );
+      if (existing.rows[0]) {
+        const row = existing.rows[0];
+        if (row.request_sha256 !== requestHash || row.action !== input.action)
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        await client.query("COMMIT");
+        return IntegrationActionResultSchema.parse({
+          ...parsed,
+          outcome: "REPLAY",
+          status: row.status,
+          items: row.result.items,
+          executedAt: iso(row.executed_at),
+        });
+      }
+      await client.query(
+        `INSERT INTO agent_world.integration_action_observations
+           (command_id, request_sha256, integration_id, action, status, result, executed_at)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+        [
+          input.commandId,
+          requestHash,
+          input.integrationId,
+          input.action,
+          parsed.status,
+          JSON.stringify({ status: parsed.status, items: parsed.items }),
+          executedAt,
+        ],
+      );
+      await client.query("COMMIT");
+      return parsed;
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

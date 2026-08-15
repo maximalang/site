@@ -1,5 +1,10 @@
 "use client";
-import type { IntegrationCreate, IntegrationRegistry } from "@agent-world/read-model";
+import type {
+  IntegrationAction,
+  IntegrationActionResult,
+  IntegrationCreate,
+  IntegrationRegistry,
+} from "@agent-world/read-model";
 import { useCallback, useEffect, useState } from "react";
 import { integrationClient } from "../client/integration-api";
 
@@ -9,6 +14,7 @@ export type IntegrationClient = {
   credential(id: string, plaintext: string, csrf: string): Promise<void>;
   lifecycle(id: string, operation: "ENABLE" | "DISABLE", csrf: string): Promise<void>;
   probe(id: string, csrf: string): Promise<void>;
+  action(id: string, action: IntegrationAction, csrf: string): Promise<IntegrationActionResult>;
 };
 export function IntegrationPanel({
   csrfToken,
@@ -25,6 +31,7 @@ export function IntegrationPanel({
   const [username, setUsername] = useState("");
   const [credential, setCredential] = useState("");
   const [busy, setBusy] = useState(false);
+  const [actionResult, setActionResult] = useState<IntegrationActionResult>();
   const refresh = useCallback(
     () =>
       client
@@ -92,6 +99,17 @@ export function IntegrationPanel({
       setBusy(false);
     }
   };
+  const executeAction = async (id: string, action: IntegrationAction) => {
+    setBusy(true);
+    setError(false);
+    try {
+      setActionResult(await client.action(id, action, csrfToken));
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <section aria-labelledby="integrations-title" className="integrations-panel">
       <div className="section-heading">
@@ -102,6 +120,20 @@ export function IntegrationPanel({
         <span className="count-badge">{registry?.integrations.length ?? 0}</span>
       </div>
       {error ? <p role="alert">Команда отклонена или registry недоступен.</p> : null}
+      {actionResult ? (
+        <div className="integration-action-result" aria-live="polite">
+          <strong>{actionResult.action}</strong>
+          <span>{actionResult.status}</span>
+          <ul>
+            {actionResult.items.map((item) => (
+              <li key={item.id}>
+                {item.label}
+                {item.detail ? ` · ${item.detail}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="integration-form">
         <label>
           Тип
@@ -170,6 +202,31 @@ export function IntegrationPanel({
               onClick={() => void probe(item.id)}
             >
               Проверить
+            </button>
+            <button
+              type="button"
+              disabled={busy || !item.isEnabled || item.health !== "READY"}
+              onClick={() =>
+                void executeAction(
+                  item.id,
+                  (
+                    {
+                      MCP: "MCP_LIST_TOOLS",
+                      N8N: "N8N_LIST_WORKFLOWS",
+                      GITHUB: "GITHUB_LIST_REPOSITORIES",
+                      SSH: "SSH_INSPECT_HOST",
+                    } as const
+                  )[item.kind],
+                )
+              }
+            >
+              {item.kind === "MCP"
+                ? "Инструменты"
+                : item.kind === "N8N"
+                  ? "Workflow"
+                  : item.kind === "GITHUB"
+                    ? "Репозитории"
+                    : "Host info"}
             </button>
           </li>
         ))}

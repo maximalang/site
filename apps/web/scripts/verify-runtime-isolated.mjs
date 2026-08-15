@@ -464,6 +464,37 @@ try {
       `Integration HTTP lifecycle failed: create=${createIntegration.status} credential=${writeIntegrationCredential.status} list=${integrations.status} count=${integrationBody.integrations?.length ?? "invalid"} configured=${integrationBody.integrations?.[0]?.hasCredential ?? "invalid"}`,
     );
   }
+  await database.query(
+    "UPDATE agent_world.integration_endpoints SET health = 'READY' WHERE id = $1",
+    [integrationId],
+  );
+  const actionCommand = {
+    operation: "ACTION",
+    integrationId,
+    commandId: "integration:action:runtime",
+    action: "MCP_LIST_TOOLS",
+  };
+  const integrationAction = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify(actionCommand),
+  });
+  const integrationActionBody = await integrationAction.json();
+  const replayIntegrationAction = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify(actionCommand),
+  });
+  const replayIntegrationActionBody = await replayIntegrationAction.json();
+  if (
+    integrationAction.status !== 201 ||
+    integrationActionBody.result?.status !== "FAILED" ||
+    integrationActionBody.result?.items?.[0]?.label !== "HOST_NOT_ALLOWLISTED" ||
+    replayIntegrationAction.status !== 201 ||
+    replayIntegrationActionBody.result?.outcome !== "REPLAY"
+  ) {
+    throw new Error("Integration action was not durably recorded and replayed");
+  }
   const projectId = "project_11111111-1111-1111-1111-111111111111";
   const memoryInbox = await fetch(
     `${baseUrl}/api/memory?projectId=${encodeURIComponent(projectId)}&view=INBOX`,
@@ -759,7 +790,7 @@ try {
     [missionId],
   );
   if (
-    evidence.rows[0]?.migrations !== 36 ||
+    evidence.rows[0]?.migrations !== 37 ||
     evidence.rows[0]?.revoked_sessions !== 1 ||
     evidence.rows[0]?.mission_checkpoints < 1
   ) {
@@ -767,7 +798,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 36, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, chatGptAccountCreate: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 37, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, integrationActionReplay: true, chatGptAccountCreate: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

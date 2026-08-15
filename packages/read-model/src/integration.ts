@@ -5,6 +5,26 @@ export const IntegrationIdSchema = z
   .string()
   .regex(/^integration_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 export const IntegrationKindSchema = z.enum(["MCP", "N8N", "GITHUB", "SSH"]);
+export const IntegrationActionSchema = z.enum([
+  "MCP_LIST_TOOLS",
+  "N8N_LIST_WORKFLOWS",
+  "GITHUB_LIST_REPOSITORIES",
+  "SSH_INSPECT_HOST",
+]);
+export const IntegrationActionItemSchema = z.strictObject({
+  id: z.string().trim().min(1).max(120),
+  label: z.string().trim().min(1).max(240),
+  detail: z.string().trim().min(1).max(240).optional(),
+});
+export const IntegrationActionResultSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  integrationId: IntegrationIdSchema,
+  action: IntegrationActionSchema,
+  outcome: z.enum(["RECORDED", "REPLAY"]),
+  status: z.enum(["SUCCEEDED", "FAILED"]),
+  items: z.array(IntegrationActionItemSchema).max(100),
+  executedAt: TimestampSchema,
+});
 const HttpsEndpointSchema = z
   .string()
   .url()
@@ -73,3 +93,5 @@ export const IntegrationRegistrySchema = z.strictObject({
 });
 export type IntegrationCreate = z.infer<typeof IntegrationCreateSchema>;
 export type IntegrationRegistry = z.infer<typeof IntegrationRegistrySchema>;
+export type IntegrationAction = z.infer<typeof IntegrationActionSchema>;
+export type IntegrationActionResult = z.infer<typeof IntegrationActionResultSchema>;
