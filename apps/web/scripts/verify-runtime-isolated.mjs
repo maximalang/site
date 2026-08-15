@@ -219,6 +219,34 @@ try {
     );
   }
   const missionId = "mission_12121212-1212-1212-1212-121212121212";
+  const missionCommandBody = {
+    schemaVersion: 1,
+    id: "mission_14141414-1414-1414-1414-141414141414",
+    projectId: "project_12121212-1212-1212-1212-121212121212",
+    title: "Runtime owner Mission",
+    goal: "Prove owner Mission creation through the production HTTP boundary.",
+    status: "ACTIVE",
+    executionPolicy: "REVIEW_EACH_TASK",
+    successCriteria: [
+      {
+        id: "mission_criterion_14141414-1414-1414-1414-141414141414",
+        statement: "Mission is durably persisted.",
+        verification: "TEST",
+        status: "PENDING",
+        evidenceRefs: [],
+      },
+    ],
+    createdAt: "2026-08-15T00:00:00.000Z",
+    updatedAt: "2026-08-15T00:00:00.000Z",
+  };
+  const anonymousMissionCreate = await fetch(`${baseUrl}/api/missions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: JSON.stringify(missionCommandBody),
+  });
+  if (anonymousMissionCreate.status !== 401) {
+    throw new Error(`Anonymous Mission create returned ${anonymousMissionCreate.status}`);
+  }
   const anonymousMissionWorkflow = await fetch(`${baseUrl}/api/missions/workflow`, {
     method: "POST",
     headers: { "content-type": "application/json", origin: baseUrl },
@@ -274,6 +302,20 @@ try {
      VALUES ($1, 'runtime-mission-project', 'Runtime Mission Project')`,
     ["project_12121212-1212-1212-1212-121212121212"],
   );
+  const missionCreate = await fetch(`${baseUrl}/api/missions`, {
+    method: "POST",
+    headers: {
+      cookie,
+      "content-type": "application/json",
+      origin: baseUrl,
+      "x-agent-world-csrf": loginBody.csrfToken,
+    },
+    body: JSON.stringify(missionCommandBody),
+  });
+  const missionCreateBody = await missionCreate.json();
+  if (missionCreate.status !== 201 || missionCreateBody.mission?.id !== missionCommandBody.id) {
+    throw new Error(`Owner Mission create returned ${missionCreate.status}`);
+  }
   await database.query(
     `INSERT INTO agent_world.missions
        (id, project_id, title, goal, status, created_at, updated_at)
@@ -615,7 +657,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, missionCreateAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

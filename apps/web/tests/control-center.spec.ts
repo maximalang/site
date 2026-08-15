@@ -580,6 +580,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(hubTab).toBeFocused();
   await expect(hubTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { level: 1, name: "Canonical Hub" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Новая Mission" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
   await expect(

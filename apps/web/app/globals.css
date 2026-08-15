@@ -543,32 +543,45 @@ main {
   background: var(--surface);
 }
 
-.integrations-panel {
+.integrations-panel,
+.mission-panel {
   display: grid;
   gap: 1rem;
   padding: 1rem;
   border: 1px solid var(--line);
   background: var(--panel);
 }
-.integration-form {
+.integration-form,
+.mission-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
   align-items: end;
 }
-.integration-form label {
+.integration-form label,
+.mission-form label {
   display: grid;
   gap: 0.35rem;
   color: var(--muted);
   font-size: 0.75rem;
 }
 .integration-form input,
-.integration-form select {
+.integration-form select,
+.mission-form input,
+.mission-form select,
+.mission-form textarea {
   min-width: 0;
   padding: 0.6rem;
   border: 1px solid var(--line);
   background: var(--surface);
   color: inherit;
+}
+.mission-form textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+.mission-form details {
+  grid-column: 1 / -1;
 }
 .integration-list {
   display: grid;

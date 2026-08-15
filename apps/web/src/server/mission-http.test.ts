@@ -10,7 +10,15 @@ const mission = MissionSchema.parse({
   goal: "Complete the remaining acceptance gates.",
   status: "ACTIVE",
   executionPolicy: "REVIEW_EACH_TASK",
-  successCriteria: [{ id: "mission_criterion_11111111-1111-1111-1111-111111111111", statement: "All gates pass", verification: "TEST", status: "PENDING", evidenceRefs: [] }],
+  successCriteria: [
+    {
+      id: "mission_criterion_11111111-1111-1111-1111-111111111111",
+      statement: "All gates pass",
+      verification: "TEST",
+      status: "PENDING",
+      evidenceRefs: [],
+    },
+  ],
   createdAt: "2026-08-15T00:00:00.000Z",
   updatedAt: "2026-08-15T00:00:00.000Z",
 });
@@ -19,7 +27,11 @@ describe("createMissionRouteHandler", () => {
   it("persists one owner-authorized canonical Mission", async () => {
     const create = vi.fn().mockResolvedValue({ outcome: "CREATED", mission });
     const response = await createMissionRouteHandler({ authorize: async () => true, create })(
-      new Request("https://world.test/api/missions", { method: "POST", headers: { "content-type": "application/json", origin: "https://world.test" }, body: JSON.stringify(mission) }),
+      new Request("https://world.test/api/missions", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://world.test" },
+        body: JSON.stringify(mission),
+      }),
     );
     expect(response.status).toBe(201);
     expect(create).toHaveBeenCalledWith(mission);
@@ -27,8 +39,15 @@ describe("createMissionRouteHandler", () => {
   });
 
   it("rejects cross-origin Mission commands", async () => {
-    const response = await createMissionRouteHandler({ authorize: async () => true, create: vi.fn() })(
-      new Request("https://world.test/api/missions", { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.test" }, body: JSON.stringify(mission) }),
+    const response = await createMissionRouteHandler({
+      authorize: async () => true,
+      create: vi.fn(),
+    })(
+      new Request("https://world.test/api/missions", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://evil.test" },
+        body: JSON.stringify(mission),
+      }),
     );
     expect(response.status).toBe(400);
   });

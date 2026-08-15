@@ -11,6 +11,7 @@ import {
 import { HubRegistry } from "./hub-registry";
 import { IntegrationPanel } from "./integration-panel";
 import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
+import { MissionPanel } from "./mission-panel";
 import { ModelRouteCheckPanel } from "./model-route-check-panel";
 import { type NativeChatProfileClient, NativeChatProfilePanel } from "./native-chat-profile-panel";
 import { OperationsPanel } from "./operations-panel";
@@ -93,6 +94,7 @@ export function HubPanel({
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <MissionPanel csrfToken={csrfToken} projects={model.projects} />
       <OperationsPanel />
       <IntegrationPanel csrfToken={csrfToken} />
       <MemoryCenter
