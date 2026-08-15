@@ -33,6 +33,9 @@
     },
     {
       "path": "./packages/read-model"
+    },
+    {
+      "path": "./packages/scheduler"
     }
   ]
 }

@@ -7,4 +7,5 @@ export * from "./identity.js";
 export * from "./memory.js";
 export * from "./mission.js";
 export * from "./primitives.js";
+export * from "./schedule.js";
 export * from "./workflow.js";
