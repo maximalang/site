@@ -2,6 +2,7 @@ import type { ConversationSendResult } from "@agent-world/conversation-service";
 import type {
   AccountId,
   AgentId,
+  AgentSchedule,
   MemoryCurationDecision,
   MissionDecomposition,
   MissionId,
@@ -45,6 +46,8 @@ export type ApplicationRuntime = {
   advanceMissionWorkflow(missionId: MissionId): Promise<ProductionMissionWorkflowResult>;
   createMissionDecomposition(input: MissionDecomposition, materializedAt: string): Promise<unknown>;
   recordMissionMeeting(input: StructuredMeeting): Promise<unknown>;
+  createSchedule(input: ScheduleCreateInput, createdAt: string): Promise<unknown>;
+  readSchedules(limit: number): Promise<AgentSchedule[]>;
   decideApproval(input: ApprovalDecisionInput): Promise<unknown>;
   appendNativeChatControl(
     accountId: AccountId,
@@ -73,6 +76,19 @@ export type ApplicationRuntime = {
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
 };
+
+export type ScheduleCreateInput = Pick<
+  AgentSchedule,
+  | "id"
+  | "projectId"
+  | "agentId"
+  | "missionId"
+  | "title"
+  | "taskDescription"
+  | "cronExpression"
+  | "timezone"
+  | "isEnabled"
+>;
 
 type RuntimeState =
   | { status: "UNAVAILABLE" }

@@ -42,6 +42,7 @@ import {
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
+  PostgresScheduleStore,
   PostgresSharedContextStore,
   PostgresWorldProjectionStore,
 } from "../dist/index.js";
@@ -222,7 +223,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 31
+    ledger.rows.at(-1)?.version !== 32
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -264,6 +265,7 @@ try {
     "artifacts",
     "agents",
     "agent_skills",
+    "agent_schedules",
     "agent_templates",
     "agent_template_skills",
     "agent_template_tools",
@@ -319,6 +321,7 @@ try {
     "resource_route_observations",
     "runtime_bindings",
     "schema_migrations",
+    "schedule_firings",
     "secret_write_receipts",
     "skills",
     "structured_meetings",
@@ -2760,8 +2763,71 @@ try {
     throw new Error("Mission decomposition did not create transport-neutral dependent Tasks");
   }
 
+  const scheduleTaskIds = ["task_b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1"];
+  const scheduleFiringIds = ["schedule_firing_b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2"];
+  const scheduleEventIds = [
+    "event_b3b3b3b3-b3b3-b3b3-b3b3-b3b3b3b3b3b3",
+    "event_b4b4b4b4-b4b4-b4b4-b4b4-b4b4b4b4b4b4",
+  ];
+  const scheduleStore = new PostgresScheduleStore(
+    pool,
+    ({ after }) =>
+      after === "2026-08-13T10:00:00.000Z"
+        ? "2026-08-14T06:00:00.000Z"
+        : "2026-08-16T06:00:00.000Z",
+    {
+      taskId: () => scheduleTaskIds.shift() ?? "exhausted",
+      firingId: () => scheduleFiringIds.shift() ?? "exhausted",
+      eventId: () => scheduleEventIds.shift() ?? "exhausted",
+    },
+  );
+  const schedule = {
+    schemaVersion: 1,
+    id: "schedule_b5b5b5b5-b5b5-b5b5-b5b5-b5b5b5b5b5b5",
+    projectId: ids.project,
+    agentId: ids.agent,
+    missionId: mission.id,
+    title: "Daily protocol review",
+    taskDescription: "Review canonical protocol evidence.",
+    cronExpression: "0 9 * * *",
+    timezone: "Europe/Moscow",
+    isEnabled: true,
+    nextFireAt: "2026-08-14T06:00:00.000Z",
+    createdAt: "2026-08-13T10:00:00.000Z",
+    updatedAt: "2026-08-13T10:00:00.000Z",
+  };
+  if (
+    (await scheduleStore.create(schedule)).outcome !== "CREATED" ||
+    (await scheduleStore.create(schedule)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Agent Schedule creation idempotency drifted");
+  }
+  const fired = await scheduleStore.materializeDue("2026-08-15T10:00:00.000Z");
+  const replayedDue = await scheduleStore.materializeDue("2026-08-15T10:00:00.000Z");
+  const scheduleEvidence = await pool.query(
+    `SELECT schedule.next_fire_at, firing.scheduled_for, task.mission_id,
+            task.conversation_id, approval.state
+       FROM agent_world.agent_schedules schedule
+       JOIN agent_world.schedule_firings firing ON firing.schedule_id = schedule.id
+       JOIN agent_world.tasks task ON task.id = firing.task_id
+       JOIN agent_world.approvals approval ON approval.task_id = task.id
+      WHERE schedule.id = $1`,
+    [schedule.id],
+  );
+  if (
+    fired.length !== 1 ||
+    replayedDue.length !== 0 ||
+    scheduleEvidence.rows[0]?.next_fire_at?.toISOString() !== "2026-08-16T06:00:00.000Z" ||
+    scheduleEvidence.rows[0]?.scheduled_for?.toISOString() !== schedule.nextFireAt ||
+    scheduleEvidence.rows[0]?.mission_id !== mission.id ||
+    scheduleEvidence.rows[0]?.conversation_id !== null ||
+    scheduleEvidence.rows[0]?.state !== "PENDING"
+  ) {
+    throw new Error("Restart-safe Agent Schedule firing did not materialize one canonical Task");
+  }
+
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 17, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 17, scheduleScenarios: 5, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

@@ -26,5 +26,6 @@ export * from "./run-context-pack-provider.js";
 export * from "./run-dispatch-store.js";
 export * from "./run-provenance-reader.js";
 export * from "./runtime-message-store.js";
+export * from "./schedule-store.js";
 export * from "./shared-context-store.js";
 export * from "./world-projection-store.js";

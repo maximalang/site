@@ -41,16 +41,19 @@ import {
   PostgresRunDispatchStore,
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
+  PostgresScheduleStore,
   PostgresWorldProjectionStore,
   RouteResolutionError,
   SecretStoreError,
 } from "@agent-world/postgres-store";
 import { ModelRouteCheckResponseSchema } from "@agent-world/read-model";
+import { nextOccurrence } from "@agent-world/scheduler";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
 import { MemoryProjectionSupervisor } from "./memory-projection-supervisor";
 import { NativeChatReconciliationSupervisor } from "./native-chat-reconciliation-supervisor";
 import { OwnerSessionManager } from "./owner-session";
+import { ScheduleSupervisor } from "./schedule-supervisor";
 import { TaskRunSupervisor } from "./task-run-supervisor";
 
 type RuntimeEnvironment = Record<string, string | undefined>;
@@ -185,6 +188,7 @@ export async function createProductionRuntime(
   let taskRunSupervisor: TaskRunSupervisor | undefined;
   let memoryProjectionSupervisor: MemoryProjectionSupervisor | undefined;
   let nativeChatReconciliationSupervisor: NativeChatReconciliationSupervisor | undefined;
+  let scheduleSupervisor: ScheduleSupervisor | undefined;
   let missionCheckpointPool: Pool | undefined;
   let missionWorkflow: ProductionMissionWorkflow | undefined;
   try {
@@ -211,6 +215,17 @@ export async function createProductionRuntime(
     const missionStore = new PostgresMissionStore(pool, {
       eventId: () => EventIdSchema.parse(`event_${randomUUID()}`),
     });
+    const scheduleStore = new PostgresScheduleStore(pool, nextOccurrence, {
+      taskId: () => `task_${randomUUID()}`,
+      firingId: () => `schedule_firing_${randomUUID()}`,
+      eventId: () => `event_${randomUUID()}`,
+    });
+    scheduleSupervisor = new ScheduleSupervisor({
+      store: scheduleStore,
+      record: (event) => record("schedule-supervisor", event),
+      intervalMs: Number(environment.AGENT_WORLD_SCHEDULE_POLL_MS ?? "30000"),
+    });
+    scheduleSupervisor.start();
     missionCheckpointPool = new Pool({
       ...parseDatabasePoolConfig(environment),
       application_name: "agent-world-langgraph",
@@ -455,6 +470,23 @@ export async function createProductionRuntime(
         return { proposal: proposal.outcome, materialization };
       },
       recordMissionMeeting: (input) => missionStore.recordMeeting(input),
+      createSchedule: (input, createdAt) => {
+        const nextFireAt = input.isEnabled
+          ? nextOccurrence({
+              expression: input.cronExpression,
+              timezone: input.timezone,
+              after: createdAt,
+            })
+          : undefined;
+        return scheduleStore.create({
+          schemaVersion: 1,
+          ...input,
+          ...(nextFireAt === undefined ? {} : { nextFireAt }),
+          createdAt,
+          updatedAt: createdAt,
+        });
+      },
+      readSchedules: (limit) => scheduleStore.list(limit),
       decideApproval: async (input) => {
         const decision = await approvalStore.decide(input);
         if (decision.approval.type !== "APPROVED") {
@@ -524,6 +556,7 @@ export async function createProductionRuntime(
         await taskRunSupervisor?.stop();
         await memoryProjectionSupervisor?.stop();
         await nativeChatReconciliationSupervisor?.stop();
+        await scheduleSupervisor?.stop();
         await missionWorkflow?.stop();
         await Promise.allSettled([readAdapter?.stop(), writeAdapter?.stop()]);
         await pool.end();
@@ -533,6 +566,7 @@ export async function createProductionRuntime(
     await taskRunSupervisor?.stop();
     await memoryProjectionSupervisor?.stop();
     await nativeChatReconciliationSupervisor?.stop();
+    await scheduleSupervisor?.stop();
     if (missionWorkflow) {
       await missionWorkflow.stop().catch(() => undefined);
     } else {

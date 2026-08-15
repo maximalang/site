@@ -51,6 +51,13 @@ export const applicationMissionCollaborationDependencies = {
     runtime().recordMissionMeeting(input),
 };
 
+export const applicationScheduleDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  list: (limit: number) => runtime().readSchedules(limit),
+  create: (input: Parameters<ReturnType<typeof runtime>["createSchedule"]>[0], createdAt: string) =>
+    runtime().createSchedule(input, createdAt),
+};
+
 export const applicationApprovalDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   decide: (input: Parameters<ReturnType<typeof runtime>["decideApproval"]>[0]) =>
