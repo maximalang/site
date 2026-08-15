@@ -88,6 +88,13 @@ export const ModelGatewayResultSchema = z
     content: z.string().max(1_000_000),
     toolCalls: z.array(ModelGatewayToolCallSchema).max(64),
     usage: ModelGatewayUsageSchema,
+    monetaryCost: z
+      .strictObject({
+        amountUsd: z.number().finite().nonnegative().max(1_000_000_000),
+        source: z.literal("LITELLM_RESPONSE_HEADER"),
+        estimated: z.literal(true),
+      })
+      .optional(),
   })
   .superRefine((result, context) => {
     if (result.finishReason === "TOOL_CALLS" && result.toolCalls.length === 0) {

@@ -95,6 +95,12 @@ function parseRetryAfter(value: string | null): number | undefined {
     : undefined;
 }
 
+function parseResponseCost(value: string | null): number | undefined {
+  if (value === null || value.length > 64 || !/^\d+(?:\.\d+)?$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1_000_000_000 ? parsed : undefined;
+}
+
 function statusFailure(response: Response): ModelGatewayFailure {
   if (response.status === 401 || response.status === 403) {
     return new ModelGatewayFailure("UPSTREAM_AUTH", "Model gateway rejected credentials");
@@ -301,6 +307,7 @@ export class LiteLlmModelGateway implements ModelGateway {
       );
     }
     const toolCalls = (choice.message.tool_calls ?? []).map(normalizeToolCall);
+    const responseCost = parseResponseCost(response.headers.get("x-litellm-response-cost"));
     try {
       return ModelGatewayResultSchema.parse({
         schemaVersion: 1,
@@ -310,6 +317,15 @@ export class LiteLlmModelGateway implements ModelGateway {
         finishReason: mapFinishReason(choice.finish_reason),
         content: choice.message.content ?? "",
         toolCalls,
+        ...(responseCost === undefined
+          ? {}
+          : {
+              monetaryCost: {
+                amountUsd: responseCost,
+                source: "LITELLM_RESPONSE_HEADER",
+                estimated: true,
+              },
+            }),
         usage: {
           inputTokens: upstream.usage.prompt_tokens,
           outputTokens: upstream.usage.completion_tokens,

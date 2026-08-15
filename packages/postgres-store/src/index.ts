@@ -18,6 +18,7 @@ export * from "./migration.js";
 export * from "./mission-handoff-store.js";
 export * from "./mission-store.js";
 export * from "./model-route-resolver.js";
+export * from "./model-execution-store.js";
 export * from "./native-chat-control-store.js";
 export * from "./native-chat-launch-store.js";
 export * from "./native-chat-resource-reader.js";

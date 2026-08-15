@@ -363,7 +363,7 @@ export class PostgresApprovalRunStore {
               WHERE s.conversation_id = $1
                 AND s.agent_id = $2
                 AND s.ended_at IS NULL
-                AND s.adapter_kind IN ('OPENCLAW', 'CODEX')
+                AND s.adapter_kind IN ('OPENCLAW', 'CODEX', 'API_MODEL', 'LOCAL_MODEL')
                 AND s.adapter_kind = $3
                 AND b.route_id = $4
                 AND b.is_enabled = true

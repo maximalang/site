@@ -156,7 +156,9 @@ describe("PostgresApprovalRunStore", () => {
     const activeSessionQuery = fake.query.mock.calls
       .map(([sql]) => String(sql))
       .find((sql) => sql.includes("FROM agent_world.conversation_sessions"));
-    expect(activeSessionQuery).toContain("s.adapter_kind IN ('OPENCLAW', 'CODEX')");
+    expect(activeSessionQuery).toContain(
+      "s.adapter_kind IN ('OPENCLAW', 'CODEX', 'API_MODEL', 'LOCAL_MODEL')",
+    );
     expect(activeSessionQuery).not.toContain("s.adapter_kind = 'OPENCLAW'");
   });
 

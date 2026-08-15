@@ -3,7 +3,12 @@ import { CodexTaskExecutionAdapter } from "@agent-world/codex-adapter";
 import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
 import { ContextItemIdSchema, EventIdSchema, RunIdSchema } from "@agent-world/domain";
 import { GraphitiMemoryAdapter, HttpGraphitiMcpTransport } from "@agent-world/graphiti-adapter";
-import { LiteLlmModelGateway, LiteLlmProjectionReconciler } from "@agent-world/model-gateway";
+import {
+  DurableModelExecutionDispatcher,
+  LiteLlmModelGateway,
+  LiteLlmProjectionReconciler,
+  ModelTaskExecutionAdapter,
+} from "@agent-world/model-gateway";
 import {
   type OpenClawCredential,
   OpenClawReadAdapter,
@@ -33,6 +38,7 @@ import {
   PostgresMemoryProjectionStore,
   PostgresMissionHandoffStore,
   PostgresMissionStore,
+  PostgresModelExecutionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -372,6 +378,28 @@ export async function createProductionRuntime(
         executionId: () => `codex_execution_${randomUUID()}`,
       }),
     });
+    const modelExecutionStore = new PostgresModelExecutionStore(pool);
+    const modelDispatcher = modelGateway
+      ? new DurableModelExecutionDispatcher({
+          gateway: modelGateway,
+          store: modelExecutionStore,
+          executionId: () => `model_execution_${randomUUID()}`,
+        })
+      : undefined;
+    const apiModelAdapter = modelDispatcher
+      ? new ModelTaskExecutionAdapter({
+          kind: "API_MODEL",
+          resolver: modelExecutionStore,
+          dispatcher: modelDispatcher,
+        })
+      : undefined;
+    const localModelAdapter = modelDispatcher
+      ? new ModelTaskExecutionAdapter({
+          kind: "LOCAL_MODEL",
+          resolver: modelExecutionStore,
+          dispatcher: modelDispatcher,
+        })
+      : undefined;
     if (configuration.bindings.length > 0) {
       await worldStore.applyOpenClawSnapshot({
         observedAt: new Date().toISOString(),
@@ -454,6 +482,8 @@ export async function createProductionRuntime(
       adapters: {
         resolve: (kind) => {
           if (kind === "CODEX") return codexAdapter;
+          if (kind === "API_MODEL") return apiModelAdapter;
+          if (kind === "LOCAL_MODEL") return localModelAdapter;
           return kind === "OPENCLAW" && writeAdapter?.state === "READY" ? writeAdapter : undefined;
         },
       },

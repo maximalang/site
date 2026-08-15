@@ -294,7 +294,7 @@ export class PostgresWorldProjectionStore {
           WHERE c.id = $1
             AND c.agent_id = $2
             AND s.ended_at IS NULL
-            AND s.adapter_kind IN ('OPENCLAW', 'CODEX')
+            AND s.adapter_kind IN ('OPENCLAW', 'CODEX', 'API_MODEL', 'LOCAL_MODEL')
             AND b.is_enabled = true
           FOR SHARE OF c, s, b`,
         [command.conversationId, command.agentId],

@@ -47,7 +47,13 @@ describe("LiteLlmModelGateway", () => {
               completion_tokens_details: { reasoning_tokens: 1 },
             },
           }),
-          { status: 200, headers: { "content-type": "application/json" } },
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+              "x-litellm-response-cost": "0.00042",
+            },
+          },
         ),
     );
     const gateway = createGateway(fetchMock);
@@ -63,6 +69,11 @@ describe("LiteLlmModelGateway", () => {
         totalTokens: 7,
         cachedInputTokens: 2,
         reasoningOutputTokens: 1,
+      },
+      monetaryCost: {
+        amountUsd: 0.00042,
+        source: "LITELLM_RESPONSE_HEADER",
+        estimated: true,
       },
     });
 

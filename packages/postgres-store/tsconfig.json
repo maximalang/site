@@ -20,6 +20,9 @@
       "path": "../domain"
     },
     {
+      "path": "../model-gateway"
+    },
+    {
       "path": "../read-model"
     }
   ]

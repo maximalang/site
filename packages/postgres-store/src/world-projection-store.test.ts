@@ -228,7 +228,9 @@ describe("PostgresWorldProjectionStore", () => {
     const activeSessionQuery = fake.query.mock.calls
       .map(([sql]) => String(sql))
       .find((sql) => sql.includes("FROM agent_world.conversations"));
-    expect(activeSessionQuery).toContain("s.adapter_kind IN ('OPENCLAW', 'CODEX')");
+    expect(activeSessionQuery).toContain(
+      "s.adapter_kind IN ('OPENCLAW', 'CODEX', 'API_MODEL', 'LOCAL_MODEL')",
+    );
   });
 
   it("reports crossed task and idempotency identities as a conflict", async () => {

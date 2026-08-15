@@ -50,6 +50,7 @@ describe("discoverMigrations", () => {
       { version: 35, name: "0035_integration_registry.sql" },
       { version: 36, name: "0036_integration_probe_observations.sql" },
       { version: 37, name: "0037_integration_action_observations.sql" },
+      { version: 38, name: "0038_model_execution_jobs.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -105,6 +106,7 @@ describe("discoverMigrations", () => {
     expect(migrations[36]?.sql).toContain(
       "CREATE TABLE agent_world.integration_action_observations",
     );
+    expect(migrations[37]?.sql).toContain("CREATE TABLE agent_world.model_execution_jobs");
     expect(migrations[30]?.sql).toContain(
       "CREATE TABLE agent_world.structured_meeting_criterion_assessments",
     );

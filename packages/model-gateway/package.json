@@ -18,6 +18,7 @@
     "test:live": "node scripts/verify-litellm-live.mjs"
   },
   "dependencies": {
+    "@agent-world/conversation-service": "0.0.0",
     "@agent-world/domain": "0.0.0",
     "zod": "4.4.3"
   }
