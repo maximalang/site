@@ -37,6 +37,7 @@ import {
   PostgresNativeChatLaunchStore,
   PostgresNativeChatResourceReader,
   PostgresOpenClawConfigurationReader,
+  PostgresOperationsReader,
   PostgresOwnerSessionStore,
   PostgresRunContextPackProvider,
   PostgresRunDispatchStore,
@@ -237,6 +238,7 @@ export async function createProductionRuntime(
     missionWorkflow = await createProductionMissionWorkflow(missionCheckpointPool, missionStore);
     const activeMissionWorkflow = missionWorkflow;
     const hubReader = new PostgresHubReader(pool);
+    const operationsReader = new PostgresOperationsReader(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
     const memoryReader = new PostgresMemoryCenterReader(pool);
     const memoryStore = new PostgresMemoryCurationStore(pool, {
@@ -571,6 +573,7 @@ export async function createProductionRuntime(
       readMemoryNetwork: (projectId, limit) => memoryReader.network(projectId, limit),
       decideMemory: (input) => memoryStore.decide(input),
       readHub: () => hubReader.read(),
+      readOperations: () => operationsReader.read(),
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
         await taskRunSupervisor?.stop();

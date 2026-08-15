@@ -37,6 +37,7 @@ import {
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
   PostgresNativeChatResourceReader,
+  PostgresOperationsReader,
   PostgresOwnerSessionStore,
   PostgresResourceBrokerStore,
   PostgresRunContextPackProvider,
@@ -2988,6 +2989,22 @@ try {
     scheduleEvidence.rows[0]?.state !== "PENDING"
   ) {
     throw new Error("Restart-safe Agent Schedule firing did not materialize one canonical Task");
+  }
+  const operations = await new PostgresOperationsReader(
+    pool,
+    () => new Date("2026-08-15T12:00:00.000Z"),
+  ).read();
+  if (
+    operations.actionGraph.nodes.length === 0 ||
+    operations.actionGraph.edges.length === 0 ||
+    operations.observatory.tokens.input === 0 ||
+    operations.observatory.context.budgetTokens === 0 ||
+    operations.observatory.routeSignals.length === 0 ||
+    operations.observatory.monetaryCost.status !== "UNAVAILABLE"
+  ) {
+    throw new Error(
+      "Operations read model did not project graph and truthful observability evidence",
+    );
   }
 
   process.stdout.write(

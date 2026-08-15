@@ -198,6 +198,10 @@ try {
   if (anonymousHub.status !== 401) {
     throw new Error(`Anonymous Hub request returned ${anonymousHub.status}`);
   }
+  const anonymousOperations = await fetch(`${baseUrl}/api/operations`);
+  if (anonymousOperations.status !== 401) {
+    throw new Error(`Anonymous Operations request returned ${anonymousOperations.status}`);
+  }
   const anonymousMemory = await fetch(
     `${baseUrl}/api/memory?projectId=project_11111111-1111-1111-1111-111111111111&view=INBOX`,
   );
@@ -315,6 +319,15 @@ try {
   }
   if (/credential|configurationRef|sourceRef|instructions|binding_|session_/.test(serializedHub)) {
     throw new Error("Authorized Hub leaked a private or runtime locator");
+  }
+  const operations = await fetch(`${baseUrl}/api/operations`, { headers: { cookie } });
+  const operationsBody = await operations.json();
+  if (
+    operations.status !== 200 ||
+    !Array.isArray(operationsBody.actionGraph?.nodes) ||
+    operationsBody.observatory?.monetaryCost?.status !== "UNAVAILABLE"
+  ) {
+    throw new Error("Authorized Operations did not return a truthful bounded projection");
   }
   const projectId = "project_11111111-1111-1111-1111-111111111111";
   const memoryInbox = await fetch(
@@ -556,7 +569,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 34, authLifecycle: true, worldAuth: true, hubAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 34, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

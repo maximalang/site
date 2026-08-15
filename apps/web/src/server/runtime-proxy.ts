@@ -131,6 +131,10 @@ export function authorizeApplicationRequest(request: Request): Promise<boolean> 
   }
 }
 
+export function readApplicationOperations() {
+  return runtime().readOperations();
+}
+
 export function readApplicationWorld() {
   return runtime().readWorld();
 }

@@ -34,6 +34,7 @@ function runtime() {
     readMemoryNetwork: vi.fn(),
     decideMemory: vi.fn(),
     readHub: vi.fn(),
+    readOperations: vi.fn(),
     readWorld: vi.fn(),
     stop: vi.fn(async () => undefined),
   };

@@ -2,6 +2,7 @@ import {
   ExecutionPreferenceLayerSchema,
   ExecutionPreferenceReadModelSchema,
   HubReadModelSchema,
+  OperationsReadModelSchema,
   resolveExecutionPreferences,
 } from "@agent-world/read-model";
 import AxeBuilder from "@axe-core/playwright";
@@ -115,6 +116,18 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       },
     ],
   });
+  const operationsFixture = OperationsReadModelSchema.parse({
+    schemaVersion: 1,
+    generatedAt: "2026-08-13T06:00:04.000Z",
+    actionGraph: { nodes: [], edges: [] },
+    observatory: {
+      runs: { total: 0, completed: 0, failed: 0 },
+      tokens: { input: 0, cachedInput: 0, output: 0 },
+      context: { estimatedTokens: 0, budgetTokens: 0, pressure: 0 },
+      monetaryCost: { status: "UNAVAILABLE" },
+      routeSignals: [],
+    },
+  });
   const systemPreferences = ExecutionPreferenceLayerSchema.parse({
     schemaVersion: 1,
     scope: { kind: "SYSTEM" },
@@ -156,6 +169,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       contentType: "application/json",
       status: 200,
     }),
+  );
+  await page.route("**/api/operations", (route) =>
+    route.fulfill({ body: JSON.stringify(operationsFixture), contentType: "application/json" }),
   );
   await page.route("**/api/schedules**", async (route) => {
     if (route.request().method() === "GET") {

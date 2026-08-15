@@ -32,6 +32,7 @@ import type {
   HubCommandResponse,
   HubReadModel,
   ModelRouteCheckResponse,
+  OperationsReadModel,
   WorldReadModel,
 } from "@agent-world/read-model";
 import type { OwnerSessionManager } from "./owner-session";
@@ -73,6 +74,7 @@ export type ApplicationRuntime = {
   readMemoryNetwork(projectId: string, limit: number): Promise<unknown>;
   decideMemory(input: MemoryCurationDecision): Promise<unknown>;
   readHub(): Promise<HubReadModel>;
+  readOperations(): Promise<OperationsReadModel>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
 };
