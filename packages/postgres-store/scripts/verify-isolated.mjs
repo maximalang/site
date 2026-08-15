@@ -31,6 +31,7 @@ import {
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
   PostgresMemoryProjectionStore,
+  PostgresMissionHandoffStore,
   PostgresMissionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
@@ -223,7 +224,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 32
+    ledger.rows.at(-1)?.version !== 33
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -311,6 +312,8 @@ try {
     "mission_decomposition_dependencies",
     "mission_decompositions",
     "mission_decomposition_tasks",
+    "mission_handoff_activations",
+    "mission_handoffs",
     "mission_success_criteria",
     "mission_task_dependencies",
     "rag_document_chunks",
@@ -2752,13 +2755,23 @@ try {
       ORDER BY task.id`,
     [mission.id],
   );
+  const initialMissionApprovals = await pool.query(
+    `SELECT count(*)::integer AS count
+       FROM agent_world.world_events event
+       JOIN agent_world.tasks task ON task.id = event.task_id
+      WHERE task.mission_id = $1
+        AND event.event_type = 'APPROVAL_STATE_CHANGED'
+        AND event.approval_state = 'PENDING'`,
+    [mission.id],
+  );
   if (
     materializedTasks.rows.length !== 2 ||
     materializedTasks.rows.some(
       ({ conversation_id, mission_id, state }) =>
         conversation_id !== null || mission_id !== mission.id || state !== "PENDING",
     ) ||
-    materializedTasks.rows[1]?.depends_on_task_id !== decomposition.tasks[0].taskId
+    materializedTasks.rows[1]?.depends_on_task_id !== decomposition.tasks[0].taskId ||
+    initialMissionApprovals.rows[0]?.count !== 1
   ) {
     throw new Error("Mission decomposition did not create transport-neutral dependent Tasks");
   }
@@ -2773,6 +2786,73 @@ try {
     throw new Error("Mission dependency guard accepted an incomplete downstream Task");
   } catch (error) {
     if (error?.code !== "DEPENDENCIES_INCOMPLETE") throw error;
+  }
+  const predecessorTask = decomposition.tasks[0];
+  const downstreamTask = decomposition.tasks[1];
+  await pool.query(
+    `UPDATE agent_world.approvals
+        SET state = 'APPROVED', decided_at = $2, decision_command_id = $3
+      WHERE task_id = $1`,
+    [
+      predecessorTask.taskId,
+      "2026-08-13T13:10:00.000Z",
+      `mission-root-approval:${predecessorTask.taskId.slice("task_".length)}`,
+    ],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runs
+       (id, task_id, conversation_id, agent_id, approval_id, adapter_kind,
+        binding_id, session_id, route_id, account_id, execution_mode,
+        status, attempt, dispatch_idempotency_key, external_run_id,
+        created_at, started_at, completed_at)
+     VALUES ($1, $2, NULL, $3, $4, 'NATIVE_CHATGPT', NULL, NULL, $5, $6, 'CHAT',
+             'COMPLETED', 1, $7, $8, $9, $9, $10)`,
+    [
+      `run_${predecessorTask.taskId.slice("task_".length)}`,
+      predecessorTask.taskId,
+      predecessorTask.assigneeAgentId,
+      `approval_${predecessorTask.taskId.slice("task_".length)}`,
+      nativeChat.route,
+      codex.account,
+      `mission-root-run:${predecessorTask.taskId.slice("task_".length)}`,
+      `mission-root-external:${predecessorTask.taskId.slice("task_".length)}`,
+      "2026-08-13T13:10:00.000Z",
+      "2026-08-13T13:15:00.000Z",
+    ],
+  );
+  const handoffEventIds = [
+    "event_d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1",
+    "event_d2d2d2d2-d2d2-d2d2-d2d2-d2d2d2d2d2d2",
+  ];
+  const handoffStore = new PostgresMissionHandoffStore(pool, {
+    eventId: () => handoffEventIds.shift() ?? "exhausted",
+  });
+  const activatedHandoffs = await handoffStore.activateReady("2026-08-13T13:20:00.000Z", 10);
+  const replayedHandoffs = await handoffStore.activateReady("2026-08-13T13:20:00.000Z", 10);
+  const handoffEvidence = await pool.query(
+    `SELECT handoff.from_task_id, handoff.to_task_id, handoff.from_run_id,
+            approval.requested_at, approval.expires_at,
+            (SELECT count(*)::integer FROM agent_world.world_events event
+              WHERE event.task_id = handoff.to_task_id
+                AND event.event_type = 'APPROVAL_STATE_CHANGED'
+                AND event.approval_state = 'PENDING') AS pending_events
+       FROM agent_world.mission_handoffs handoff
+       JOIN agent_world.approvals approval ON approval.id = handoff.approval_id
+      WHERE handoff.to_task_id = $1`,
+    [downstreamTask.taskId],
+  );
+  if (
+    activatedHandoffs.length !== 1 ||
+    replayedHandoffs.length !== 0 ||
+    handoffEvidence.rows[0]?.from_task_id !== predecessorTask.taskId ||
+    handoffEvidence.rows[0]?.to_task_id !== downstreamTask.taskId ||
+    handoffEvidence.rows[0]?.from_run_id !==
+      `run_${predecessorTask.taskId.slice("task_".length)}` ||
+    handoffEvidence.rows[0]?.requested_at?.toISOString() !== "2026-08-13T13:20:00.000Z" ||
+    handoffEvidence.rows[0]?.expires_at?.toISOString() !== "2026-08-13T13:35:00.000Z" ||
+    handoffEvidence.rows[0]?.pending_events !== 1
+  ) {
+    throw new Error("Mission handoff did not activate one provenance-linked downstream approval");
   }
 
   const scheduleTaskIds = ["task_b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1"];
@@ -2839,7 +2919,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 18, scheduleScenarios: 5, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 22, scheduleScenarios: 5, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

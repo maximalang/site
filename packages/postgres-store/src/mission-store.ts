@@ -666,15 +666,17 @@ export class PostgresMissionStore {
           agentId: taskProposal.assigneeAgentId,
           taskId: taskProposal.taskId,
         });
-        await this.appendWorldTaskEvent(client, {
-          eventType: "APPROVAL_STATE_CHANGED",
-          occurredAt: materializedAt,
-          commandId: idempotencyKey,
-          agentId: taskProposal.assigneeAgentId,
-          taskId: taskProposal.taskId,
-          approvalId,
-          expiresAt,
-        });
+        if (taskProposal.dependsOn.length === 0) {
+          await this.appendWorldTaskEvent(client, {
+            eventType: "APPROVAL_STATE_CHANGED",
+            occurredAt: materializedAt,
+            commandId: idempotencyKey,
+            agentId: taskProposal.assigneeAgentId,
+            taskId: taskProposal.taskId,
+            approvalId,
+            expiresAt,
+          });
+        }
       }
       for (const taskProposal of decomposition.tasks) {
         for (const dependencyKey of taskProposal.dependsOn) {

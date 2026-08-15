@@ -30,6 +30,7 @@ import {
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
   PostgresMemoryProjectionStore,
+  PostgresMissionHandoffStore,
   PostgresMissionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
@@ -51,6 +52,7 @@ import { nextOccurrence } from "@agent-world/scheduler";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
 import { MemoryProjectionSupervisor } from "./memory-projection-supervisor";
+import { MissionHandoffSupervisor } from "./mission-handoff-supervisor";
 import { NativeChatReconciliationSupervisor } from "./native-chat-reconciliation-supervisor";
 import { OwnerSessionManager } from "./owner-session";
 import { ScheduleSupervisor } from "./schedule-supervisor";
@@ -187,6 +189,7 @@ export async function createProductionRuntime(
   let writeAdapter: OpenClawWriteAdapter | undefined;
   let taskRunSupervisor: TaskRunSupervisor | undefined;
   let memoryProjectionSupervisor: MemoryProjectionSupervisor | undefined;
+  let missionHandoffSupervisor: MissionHandoffSupervisor | undefined;
   let nativeChatReconciliationSupervisor: NativeChatReconciliationSupervisor | undefined;
   let scheduleSupervisor: ScheduleSupervisor | undefined;
   let missionCheckpointPool: Pool | undefined;
@@ -215,6 +218,15 @@ export async function createProductionRuntime(
     const missionStore = new PostgresMissionStore(pool, {
       eventId: () => EventIdSchema.parse(`event_${randomUUID()}`),
     });
+    const missionHandoffStore = new PostgresMissionHandoffStore(pool, {
+      eventId: () => `event_${randomUUID()}`,
+    });
+    missionHandoffSupervisor = new MissionHandoffSupervisor({
+      store: missionHandoffStore,
+      record: (event) => record("mission-handoff-supervisor", event),
+      intervalMs: Number(environment.AGENT_WORLD_MISSION_HANDOFF_POLL_MS ?? "5000"),
+    });
+    missionHandoffSupervisor.start();
     const scheduleStore = new PostgresScheduleStore(pool, nextOccurrence, {
       taskId: () => `task_${randomUUID()}`,
       firingId: () => `schedule_firing_${randomUUID()}`,
@@ -555,6 +567,7 @@ export async function createProductionRuntime(
       stop: async () => {
         await taskRunSupervisor?.stop();
         await memoryProjectionSupervisor?.stop();
+        await missionHandoffSupervisor?.stop();
         await nativeChatReconciliationSupervisor?.stop();
         await scheduleSupervisor?.stop();
         await missionWorkflow?.stop();
@@ -565,6 +578,7 @@ export async function createProductionRuntime(
   } catch (error) {
     await taskRunSupervisor?.stop();
     await memoryProjectionSupervisor?.stop();
+    await missionHandoffSupervisor?.stop();
     await nativeChatReconciliationSupervisor?.stop();
     await scheduleSupervisor?.stop();
     if (missionWorkflow) {

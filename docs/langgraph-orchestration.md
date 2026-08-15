@@ -9,9 +9,13 @@ schema.
 The workflow stores canonical IDs and bounded orchestration state under a
 LangGraph `thread_id` equal to the Mission ID. Nodes return one declarative
 pending action and never dispatch a transport or mutate product state. The
-caller must apply that action through the canonical domain/store boundary and
-then invoke the graph with the resulting Task/Run/Event IDs. This makes replay
-safe: restoring a checkpoint cannot repeat an external side effect by itself.
+production runtime applies selected actions only through canonical
+domain/store boundaries. Mission decomposition atomically materializes
+transport-neutral Tasks and dependency edges. A restart-safe PostgreSQL
+supervisor activates a downstream approval only after every predecessor has a
+canonical `COMPLETED` Run, records one provenance-linked handoff edge per
+dependency and renews the bounded approval window. Restoring a checkpoint or
+repeating a supervisor tick therefore cannot repeat an external side effect.
 
 The production saver uses the separate `agent_world_langgraph` schema in the
 same PostgreSQL database. Its `setup()` migrations run explicitly when the
@@ -32,6 +36,7 @@ Current source contracts:
 - functional API recovery semantics:
   <https://docs.langchain.com/oss/javascript/langgraph/use-functional-api>
 
-Mission decomposition, canonical action application, structured meetings and
-the owner Mission UI remain subsequent slices; the workflow package must not be
-presented as their completion.
+Mission decomposition, canonical Task materialization and structured meetings
+are implemented. Automatic handoff activation is implemented without bypassing
+approval policy; policy-authorized downstream dispatch and the complete owner
+Mission UI remain separate acceptance gaps.

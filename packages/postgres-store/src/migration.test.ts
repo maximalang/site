@@ -45,6 +45,7 @@ describe("discoverMigrations", () => {
       { version: 30, name: "0030_mission_task_materialization.sql" },
       { version: 31, name: "0031_mission_review_evidence.sql" },
       { version: 32, name: "0032_agent_schedules.sql" },
+      { version: 33, name: "0033_mission_handoffs.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -90,6 +91,8 @@ describe("discoverMigrations", () => {
     expect(migrations[27]?.sql).toContain("CREATE TABLE agent_world.resource_broker_events");
     expect(migrations[28]?.sql).toContain("CREATE TABLE agent_world.structured_meetings");
     expect(migrations[29]?.sql).toContain("CREATE TABLE agent_world.mission_task_dependencies");
+    expect(migrations[32]?.sql).toContain("CREATE TABLE agent_world.mission_handoffs");
+    expect(migrations[32]?.sql).toContain("CREATE TABLE agent_world.mission_handoff_activations");
     expect(migrations[30]?.sql).toContain(
       "CREATE TABLE agent_world.structured_meeting_criterion_assessments",
     );

@@ -14,6 +14,7 @@ export * from "./memory-center-reader.js";
 export * from "./memory-curation-store.js";
 export * from "./memory-projection-store.js";
 export * from "./migration.js";
+export * from "./mission-handoff-store.js";
 export * from "./mission-store.js";
 export * from "./model-route-resolver.js";
 export * from "./native-chat-control-store.js";
