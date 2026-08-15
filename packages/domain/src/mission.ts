@@ -39,6 +39,9 @@ export const MissionSuccessCriterionSchema = z.strictObject({
 });
 export type MissionSuccessCriterion = z.infer<typeof MissionSuccessCriterionSchema>;
 
+export const MissionExecutionPolicySchema = z.enum(["REVIEW_EACH_TASK", "AUTO_SAFE_HANDOFF"]);
+export type MissionExecutionPolicy = z.infer<typeof MissionExecutionPolicySchema>;
+
 export const MissionSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
@@ -47,6 +50,7 @@ export const MissionSchema = z
     title: z.string().trim().min(1).max(200),
     goal: z.string().trim().min(1).max(20_000),
     status: z.enum(["DRAFT", "ACTIVE", "SUCCEEDED", "FAILED", "CANCELLED"]),
+    executionPolicy: MissionExecutionPolicySchema.default("REVIEW_EACH_TASK"),
     successCriteria: z.array(MissionSuccessCriterionSchema).min(1).max(100),
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,

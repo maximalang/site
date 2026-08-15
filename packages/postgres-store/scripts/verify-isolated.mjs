@@ -224,7 +224,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 33
+    ledger.rows.at(-1)?.version !== 34
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -1226,6 +1226,7 @@ try {
     title: "Verify the canonical protocol",
     goal: "Complete protocol verification with replayable evidence.",
     status: "ACTIVE",
+    executionPolicy: "AUTO_SAFE_HANDOFF",
     successCriteria: [
       {
         id: "mission_criterion_20202020-2020-2020-2020-202020202020",
@@ -2874,6 +2875,56 @@ try {
     handoffWorld.handoffs[0]?.toAgentId !== hub.secondaryAgent
   ) {
     throw new Error("Canonical Mission handoff was not projected into the World read model");
+  }
+  const policyCandidates = await handoffStore.listPolicyAuthorized(10);
+  if (
+    policyCandidates.length !== 1 ||
+    policyCandidates[0]?.taskId !== downstreamTask.taskId ||
+    policyCandidates[0]?.approvalId !== `approval_${downstreamTask.taskId.slice("task_".length)}`
+  ) {
+    throw new Error("Mission policy did not expose exactly one durable auto-approval candidate");
+  }
+  const autoApprovalEventIds = [
+    "event_d3d3d3d3-d3d3-d3d3-d3d3-d3d3d3d3d3d3",
+    "event_d4d4d4d4-d4d4-d4d4-d4d4-d4d4d4d4d4d4",
+  ];
+  await new PostgresResourceBrokerStore(pool).recordObservation({
+    routeId: nativeChat.route,
+    observedAt: "2026-08-13T13:20:00.500Z",
+    expiresAt: "2026-08-13T13:30:00.000Z",
+    isAvailable: true,
+    quality: 0.9,
+    remainingLimits: 0.9,
+    cost: 0.8,
+    speed: 0.8,
+    load: 0.9,
+    sourceKind: "HEALTHCHECK",
+    sourceRef: "mission-auto-handoff:isolated-ready",
+  });
+  const autoApprovalStore = new PostgresApprovalRunStore(pool, {
+    eventId: () => autoApprovalEventIds.shift() ?? "exhausted",
+  });
+  const autoApproval = await autoApprovalStore.decide({
+    taskId: downstreamTask.taskId,
+    approvalId: `approval_${downstreamTask.taskId.slice("task_".length)}`,
+    decision: "APPROVE",
+    commandId: `mission-auto-approve:${downstreamTask.taskId.slice("task_".length)}`,
+    decidedAt: "2026-08-13T13:20:01.000Z",
+  });
+  const replayedAutoApproval = await autoApprovalStore.decide({
+    taskId: downstreamTask.taskId,
+    approvalId: `approval_${downstreamTask.taskId.slice("task_".length)}`,
+    decision: "APPROVE",
+    commandId: `mission-auto-approve:${downstreamTask.taskId.slice("task_".length)}`,
+    decidedAt: "2026-08-13T13:20:01.000Z",
+  });
+  if (
+    autoApproval.outcome !== "DECIDED" ||
+    autoApproval.run?.status !== "DISPATCH_PENDING" ||
+    replayedAutoApproval.outcome !== "REPLAY" ||
+    (await handoffStore.listPolicyAuthorized(10)).length !== 0
+  ) {
+    throw new Error("Policy-authorized handoff did not create one replay-safe downstream Run");
   }
 
   const scheduleTaskIds = ["task_b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1"];

@@ -2,7 +2,11 @@ export type MissionHandoffTelemetry = {
   event: "mission_handoff_activation";
   outcome: "COMPLETED" | "FAILED";
   handoffCount: number;
+  approvalCount: number;
+  approvalFailureCount: number;
 };
+
+type PolicyAuthorizedHandoff = { taskId: string; missionId: string; approvalId: string };
 
 export class MissionHandoffSupervisor {
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -12,7 +16,11 @@ export class MissionHandoffSupervisor {
 
   constructor(
     private readonly options: {
-      store: { activateReady(now: string, limit: number): Promise<unknown[]> };
+      store: {
+        activateReady(now: string, limit: number): Promise<unknown[]>;
+        listPolicyAuthorized(limit: number): Promise<PolicyAuthorizedHandoff[]>;
+      };
+      approve(handoff: PolicyAuthorizedHandoff, decidedAt: string): Promise<unknown>;
       record(event: MissionHandoffTelemetry): void;
       intervalMs?: number;
       batchSize?: number;
@@ -55,18 +63,30 @@ export class MissionHandoffSupervisor {
   }
 
   private async run(): Promise<void> {
+    const now = (this.options.now ?? (() => new Date().toISOString()))();
     try {
-      const handoffs = await this.options.store.activateReady(
-        (this.options.now ?? (() => new Date().toISOString()))(),
-        this.batchSize,
+      const handoffs = await this.options.store.activateReady(now, this.batchSize);
+      const candidates = await this.options.store.listPolicyAuthorized(this.batchSize);
+      const approvals = await Promise.allSettled(
+        candidates.map((candidate) => this.options.approve(candidate, now)),
       );
       this.safeRecord({
         event: "mission_handoff_activation",
-        outcome: "COMPLETED",
+        outcome: approvals.some((approval) => approval.status === "rejected")
+          ? "FAILED"
+          : "COMPLETED",
         handoffCount: handoffs.length,
+        approvalCount: approvals.filter((approval) => approval.status === "fulfilled").length,
+        approvalFailureCount: approvals.filter((approval) => approval.status === "rejected").length,
       });
     } catch {
-      this.safeRecord({ event: "mission_handoff_activation", outcome: "FAILED", handoffCount: 0 });
+      this.safeRecord({
+        event: "mission_handoff_activation",
+        outcome: "FAILED",
+        handoffCount: 0,
+        approvalCount: 0,
+        approvalFailureCount: 0,
+      });
     }
   }
 

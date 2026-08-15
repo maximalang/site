@@ -17,12 +17,51 @@ type CandidateRow = QueryResultRow & {
   approval_id: string;
 };
 type PredecessorRow = QueryResultRow & { depends_on_task_id: string; run_id: string };
+type PolicyCandidateRow = QueryResultRow & {
+  task_id: string;
+  mission_id: string;
+  approval_id: string;
+};
+
+export type PolicyAuthorizedHandoff = {
+  taskId: ReturnType<typeof TaskIdSchema.parse>;
+  missionId: ReturnType<typeof MissionIdSchema.parse>;
+  approvalId: ReturnType<typeof ApprovalIdSchema.parse>;
+};
 
 export class PostgresMissionHandoffStore {
   constructor(
     private readonly pool: TransactionPool,
     private readonly identities: { eventId(): string },
   ) {}
+
+  async listPolicyAuthorized(limitInput = 25): Promise<PolicyAuthorizedHandoff[]> {
+    const limit = Math.min(Math.max(Math.trunc(limitInput), 1), 100);
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<PolicyCandidateRow>(
+        `SELECT task.id AS task_id, task.mission_id, approval.id AS approval_id
+           FROM agent_world.mission_handoff_activations activation
+           JOIN agent_world.tasks task ON task.id = activation.task_id
+           JOIN agent_world.missions mission ON mission.id = task.mission_id
+           JOIN agent_world.approvals approval ON approval.id = activation.approval_id
+          WHERE mission.status = 'ACTIVE'
+            AND mission.execution_policy = 'AUTO_SAFE_HANDOFF'
+            AND approval.state = 'PENDING'
+            AND NOT EXISTS (SELECT 1 FROM agent_world.runs run WHERE run.task_id = task.id)
+          ORDER BY activation.activated_at, task.id
+          LIMIT $1`,
+        [limit],
+      );
+      return result.rows.map((row) => ({
+        taskId: TaskIdSchema.parse(row.task_id),
+        missionId: MissionIdSchema.parse(row.mission_id),
+        approvalId: ApprovalIdSchema.parse(row.approval_id),
+      }));
+    } finally {
+      client.release();
+    }
+  }
 
   async activateReady(nowInput: unknown, limitInput = 25) {
     const now = TimestampSchema.parse(nowInput);

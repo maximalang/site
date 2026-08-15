@@ -74,4 +74,29 @@ describe("PostgresMissionHandoffStore", () => {
     ).resolves.toEqual([]);
     expect(fake.query).toHaveBeenLastCalledWith("COMMIT");
   });
+
+  it("selects only durable policy-authorized handoffs for repeatable approval", async () => {
+    const fake = pool([
+      [
+        {
+          task_id: "task_22222222-2222-4222-8222-222222222222",
+          mission_id: "mission_33333333-3333-4333-8333-333333333333",
+          approval_id: "approval_22222222-2222-4222-8222-222222222222",
+        },
+      ],
+    ]);
+    await expect(
+      new PostgresMissionHandoffStore(fake.value, {
+        eventId: () => "invalid",
+      }).listPolicyAuthorized(10),
+    ).resolves.toEqual([
+      {
+        taskId: "task_22222222-2222-4222-8222-222222222222",
+        missionId: "mission_33333333-3333-4333-8333-333333333333",
+        approvalId: "approval_22222222-2222-4222-8222-222222222222",
+      },
+    ]);
+    expect(String(fake.query.mock.calls[0]?.[0])).toContain("AUTO_SAFE_HANDOFF");
+    expect(fake.release).toHaveBeenCalledOnce();
+  });
 });

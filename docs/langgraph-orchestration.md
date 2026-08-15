@@ -37,6 +37,8 @@ Current source contracts:
   <https://docs.langchain.com/oss/javascript/langgraph/use-functional-api>
 
 Mission decomposition, canonical Task materialization and structured meetings
-are implemented. Automatic handoff activation is implemented without bypassing
-approval policy; policy-authorized downstream dispatch and the complete owner
-Mission UI remain separate acceptance gaps.
+are implemented. Automatic handoff activation never bypasses policy:
+`REVIEW_EACH_TASK` is the default, while an explicit `AUTO_SAFE_HANDOFF` Mission
+policy authorizes a repeatable PostgreSQL candidate to enter the same approval,
+Resource Broker, canonical Run and adapter-dispatch path used by owner-approved
+work. The complete owner Mission UI remains a separate product gap.

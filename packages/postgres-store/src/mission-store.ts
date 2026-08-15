@@ -54,6 +54,7 @@ type MissionRow = QueryResultRow & {
   title: string;
   goal: string;
   status: string;
+  execution_policy: string;
   created_at: Date | string;
   updated_at: Date | string;
   success_criteria: unknown;
@@ -99,6 +100,7 @@ function missionFromRow(row: MissionRow): Mission {
     title: row.title,
     goal: row.goal,
     status: row.status,
+    executionPolicy: row.execution_policy,
     successCriteria: row.success_criteria,
     createdAt: timestamp(row.created_at),
     updatedAt: timestamp(row.updated_at),
@@ -132,7 +134,7 @@ function assignmentFromRow(row: AssignmentRow): AgentInstanceAssignment {
   });
 }
 
-const SELECT_MISSION = `SELECT m.id, m.project_id, m.title, m.goal, m.status,
+const SELECT_MISSION = `SELECT m.id, m.project_id, m.title, m.goal, m.status, m.execution_policy,
        m.created_at, m.updated_at,
        COALESCE(jsonb_agg(jsonb_build_object(
          'id', c.id,
@@ -182,14 +184,15 @@ export class PostgresMissionStore {
       }
       await client.query(
         `INSERT INTO agent_world.missions
-           (id, project_id, title, goal, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           (id, project_id, title, goal, status, execution_policy, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           mission.id,
           mission.projectId,
           mission.title,
           mission.goal,
           mission.status,
+          mission.executionPolicy,
           mission.createdAt,
           mission.updatedAt,
         ],

@@ -12,27 +12,27 @@ const ids = {
 
 describe("Mission and Agent Template contracts", () => {
   it("keeps Mission success evidence and template identity separate from Agent", () => {
-    expect(
-      MissionSchema.parse({
-        schemaVersion: 1,
-        id: ids.mission,
-        projectId: ids.project,
-        title: "Ship AI World",
-        goal: "Satisfy the production acceptance criteria.",
-        status: "ACTIVE",
-        successCriteria: [
-          {
-            id: ids.criterion,
-            statement: "Runtime replay is deterministic.",
-            verification: "TEST",
-            status: "PENDING",
-            evidenceRefs: [],
-          },
-        ],
-        createdAt: "2026-08-15T00:00:00.000Z",
-        updatedAt: "2026-08-15T00:00:00.000Z",
-      }),
-    ).not.toHaveProperty("accountId");
+    const mission = MissionSchema.parse({
+      schemaVersion: 1,
+      id: ids.mission,
+      projectId: ids.project,
+      title: "Ship AI World",
+      goal: "Satisfy the production acceptance criteria.",
+      status: "ACTIVE",
+      successCriteria: [
+        {
+          id: ids.criterion,
+          statement: "Runtime replay is deterministic.",
+          verification: "TEST",
+          status: "PENDING",
+          evidenceRefs: [],
+        },
+      ],
+      createdAt: "2026-08-15T00:00:00.000Z",
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    expect(mission).not.toHaveProperty("accountId");
+    expect(mission.executionPolicy).toBe("REVIEW_EACH_TASK");
     expect(
       AgentTemplateSchema.parse({
         schemaVersion: 1,
@@ -58,6 +58,33 @@ describe("Mission and Agent Template contracts", () => {
         createdAt: "2026-08-15T00:00:00.000Z",
       }),
     ).not.toHaveProperty("accountId");
+  });
+
+  it("requires an explicit safe Mission policy value for automatic handoffs", () => {
+    const mission = MissionSchema.parse({
+      schemaVersion: 1,
+      id: ids.mission,
+      projectId: ids.project,
+      title: "Ship AI World",
+      goal: "Satisfy acceptance.",
+      status: "ACTIVE",
+      executionPolicy: "AUTO_SAFE_HANDOFF",
+      successCriteria: [
+        {
+          id: ids.criterion,
+          statement: "Runtime replay is deterministic.",
+          verification: "TEST",
+          status: "PENDING",
+          evidenceRefs: [],
+        },
+      ],
+      createdAt: "2026-08-15T00:00:00.000Z",
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    });
+    expect(mission.executionPolicy).toBe("AUTO_SAFE_HANDOFF");
+    expect(MissionSchema.safeParse({ ...mission, executionPolicy: "AUTO_UNSAFE" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects false Mission success, duplicate criteria and partial template links", () => {

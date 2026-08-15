@@ -17,7 +17,7 @@ proven. `OPEN` means the required product surface is absent.
 | 8 | Give an Agent a Task on the map | PASS | World selection opens the Task drawer; canonical assignment and approvals are persisted. |
 | 9 | See Account/API/Model/Mode used | PASS | Run provenance readers and Command surfaces expose canonical execution provenance without credentials. |
 | 10 | See real movement/status/handoff | PASS | Real status drives deterministic movement and activity cues. A dependency-complete Run now creates one provenance-linked PostgreSQL handoff, advances the canonical World stream and projects a bounded map path plus a textual `Agent → Agent` cue. The isolated PostgreSQL verifier proves persistence/projection, while unit and five-viewport Playwright/axe suites prove the accessible World presentation without decorative LLM calls. |
-| 11 | Automatically hand a Task across Agents | PARTIAL | LangGraph decisions, dependency-aware Mission Tasks and a restart-safe production supervisor now activate the next Task exactly once after all predecessor Runs complete. Policy-authorized automatic downstream approval/dispatch remains open; the executor deliberately does not bypass owner safety policy. |
+| 11 | Automatically hand a Task across Agents | PASS | LangGraph decisions and dependency-aware Mission Tasks feed a restart-safe supervisor. `REVIEW_EACH_TASK` is the migration-safe default; an explicit PostgreSQL `AUTO_SAFE_HANDOFF` Mission policy repeatedly selects only activated dependency-complete Tasks, invokes the shared approval/Resource Broker boundary with a deterministic command ID and leaves the shared Run supervisor to dispatch the selected adapter. The isolated PostgreSQL verifier proves one downstream Run, exact replay and no residual candidate. |
 | 12 | Shared context across Agents | PASS | PostgreSQL/pgvector Context Packs are project-scoped, persisted per Run and transport-independent. |
 | 13 | Save useful output to Action Graph | PARTIAL | Native Chat commits and Codex events persist structured output and append-only events. One unified user-facing Action Graph projection remains open. |
 | 14 | Extract Memory candidates automatically | PASS | Native Chat `commit_result` creates provenance-linked Memory Inbox proposals transactionally. |
@@ -43,7 +43,7 @@ proven. `OPEN` means the required product surface is absent.
 
 ## Next implementation order
 
-1. Policy-authorized downstream approval/dispatch for LangGraph Mission Tasks.
-2. Product Action Graph/usage/limits/cost/context-pressure Observatory.
-3. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
+1. Product Action Graph/usage/limits/cost/context-pressure Observatory.
+2. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
+3. Integrated owner Mission and Agent creation flows.
 4. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.

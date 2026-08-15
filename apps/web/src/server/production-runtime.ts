@@ -218,15 +218,6 @@ export async function createProductionRuntime(
     const missionStore = new PostgresMissionStore(pool, {
       eventId: () => EventIdSchema.parse(`event_${randomUUID()}`),
     });
-    const missionHandoffStore = new PostgresMissionHandoffStore(pool, {
-      eventId: () => `event_${randomUUID()}`,
-    });
-    missionHandoffSupervisor = new MissionHandoffSupervisor({
-      store: missionHandoffStore,
-      record: (event) => record("mission-handoff-supervisor", event),
-      intervalMs: Number(environment.AGENT_WORLD_MISSION_HANDOFF_POLL_MS ?? "5000"),
-    });
-    missionHandoffSupervisor.start();
     const scheduleStore = new PostgresScheduleStore(pool, nextOccurrence, {
       taskId: () => `task_${randomUUID()}`,
       firingId: () => `schedule_firing_${randomUUID()}`,
@@ -458,6 +449,23 @@ export async function createProductionRuntime(
       telemetry: { record: (event) => record("task-run-supervisor", event) },
     });
     taskRunSupervisor.start();
+    const missionHandoffStore = new PostgresMissionHandoffStore(pool, {
+      eventId: () => `event_${randomUUID()}`,
+    });
+    missionHandoffSupervisor = new MissionHandoffSupervisor({
+      store: missionHandoffStore,
+      approve: ({ taskId, approvalId }, decidedAt) =>
+        approvalStore.decide({
+          taskId,
+          approvalId,
+          decision: "APPROVE",
+          commandId: `mission-auto-approve:${taskId.slice("task_".length)}`,
+          decidedAt,
+        }),
+      record: (event) => record("mission-handoff-supervisor", event),
+      intervalMs: Number(environment.AGENT_WORLD_MISSION_HANDOFF_POLL_MS ?? "5000"),
+    });
+    missionHandoffSupervisor.start();
 
     return {
       auth,
