@@ -10,10 +10,12 @@ describe("AgentProvisioningPanel", () => {
   it("creates one Template-backed Agent Instance with skills, tools, memory and budget policy", async () => {
     const user = userEvent.setup();
     const execute = vi.fn().mockResolvedValue(undefined);
+    const onProvisioned = vi.fn();
     render(
       <AgentProvisioningPanel
         csrfToken="csrf"
         client={{ execute }}
+        onProvisioned={onProvisioned}
         projects={[{ projectId: "project_11111111-1111-1111-1111-111111111111", name: "AI World" }]}
         skills={[
           { skillId: "skill_11111111-1111-1111-1111-111111111111", displayName: "Research" },
@@ -45,5 +47,7 @@ describe("AgentProvisioningPanel", () => {
       "csrf",
     );
     expect(await screen.findByText("Agent Instance создан")).not.toBeNull();
+    expect(onProvisioned).toHaveBeenCalledWith(expect.stringMatching(/^agent_/));
+    expect(screen.getByRole("button", { name: "Настроить расписание" })).not.toBeNull();
   });
 });

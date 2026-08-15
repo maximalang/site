@@ -58,6 +58,29 @@ const created = AgentScheduleSchema.parse({
 afterEach(cleanup);
 
 describe("SchedulePanel", () => {
+  it("focuses a newly provisioned Agent handed off by the Hub", async () => {
+    const newAgentId = "agent_66666666-6666-4666-8666-666666666666";
+    const refreshedHub = HubReadModelSchema.parse({
+      ...hub,
+      agents: [
+        ...hub.agents,
+        { ...hub.agents[0], agentId: newAgentId, slug: "reviewer", displayName: "Reviewer" },
+      ],
+      projects: [{ ...hub.projects[0], agentIds: [agentId, newAgentId] }],
+    });
+    render(
+      <SchedulePanel
+        client={{ load: async () => [], create: vi.fn() }}
+        csrfToken="csrf"
+        focusAgentId={newAgentId}
+        hub={refreshedHub}
+      />,
+    );
+    await waitFor(() =>
+      expect((screen.getByLabelText("Agent") as HTMLSelectElement).value).toBe(newAgentId),
+    );
+  });
+
   it("creates a transport-neutral schedule in Simple mode and renders it", async () => {
     const user = userEvent.setup();
     const create = vi.fn(async (_input: CreateScheduleInput, _csrfToken: string) => created);

@@ -19,10 +19,12 @@ export function SchedulePanel({
   hub,
   csrfToken,
   client = defaultClient,
+  focusAgentId,
 }: {
   hub: HubReadModel;
   csrfToken: string;
   client?: ScheduleClient;
+  focusAgentId?: string;
 }) {
   const [schedules, setSchedules] = useState<AgentSchedule[]>();
   const [status, setStatus] = useState<"IDLE" | "SAVING" | "SAVED" | "ERROR">("IDLE");
@@ -43,8 +45,12 @@ export function SchedulePanel({
   const [isEnabled, setIsEnabled] = useState(true);
 
   useEffect(() => {
-    if (!agents.some((agent) => agent.agentId === agentId)) setAgentId(agents[0]?.agentId ?? "");
-  }, [agentId, agents]);
+    if (focusAgentId && agents.some((agent) => agent.agentId === focusAgentId)) {
+      setAgentId(focusAgentId);
+    } else if (!agents.some((agent) => agent.agentId === agentId)) {
+      setAgentId(agents[0]?.agentId ?? "");
+    }
+  }, [agentId, agents, focusAgentId]);
   useEffect(() => {
     let active = true;
     void client

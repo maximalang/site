@@ -13,7 +13,7 @@ proven. `OPEN` means the required product surface is absent.
 | 4 | Add a ChatGPT Account once | PARTIAL | Canonical Account commands and Native Chat OAuth mapping exist; a complete owner UI and real Plus connection proof remain. |
 | 5 | Add API provider/key | PASS | Owner-only Hub/provider credential flow stores encrypted secrets and never returns plaintext. |
 | 6 | See models without duplicates | PASS | Canonical Model plus multiple Route model is enforced in PostgreSQL and the Hub projection. |
-| 7 | Create Agent with role, instructions, skills, tools, memory, schedule, budget and preferred execution | PARTIAL | The native Hub now atomically provisions one immutable Agent Template plus one project-scoped Agent Instance with role, instructions, skill/tool links and Agent-level memory-context, token-budget and preferred-mode policies; isolated PostgreSQL, production HTTP and browser tests prove the path. Durable schedules are configurable in the same Hub, but the creation workflow does not yet hand the new Agent directly into schedule configuration. |
+| 7 | Create Agent with role, instructions, skills, tools, memory, schedule, budget and preferred execution | PASS | The native Hub atomically provisions one immutable Agent Template plus one project-scoped Agent Instance with role, instructions, skill/tool links and Agent-level memory-context, token-budget and preferred-mode policies. It then refreshes the canonical Hub snapshot, focuses the new Agent in the durable Schedule panel and offers a direct schedule action. Isolated PostgreSQL, production HTTP, component and five-viewport browser tests prove the path while Account remains a separate Resource Broker concern. |
 | 8 | Give an Agent a Task on the map | PASS | World selection opens the Task drawer; canonical assignment and approvals are persisted. |
 | 9 | See Account/API/Model/Mode used | PASS | Run provenance readers and Command surfaces expose canonical execution provenance without credentials. |
 | 10 | See real movement/status/handoff | PASS | Real status drives deterministic movement and activity cues. A dependency-complete Run now creates one provenance-linked PostgreSQL handoff, advances the canonical World stream and projects a bounded map path plus a textual `Agent → Agent` cue. The isolated PostgreSQL verifier proves persistence/projection, while unit and five-viewport Playwright/axe suites prove the accessible World presentation without decorative LLM calls. |
@@ -45,5 +45,4 @@ proven. `OPEN` means the required product surface is absent.
 
 1. Product Action Graph/usage/limits/cost/context-pressure Observatory.
 2. Product-native integrations registry for MCP, n8n, GitHub and SSH/VDS.
-3. Link newly provisioned Agents directly into optional schedule configuration.
-4. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.
+3. Full Playwright/Compose/live-gate rerun and criterion-by-criterion closure.

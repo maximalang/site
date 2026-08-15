@@ -42,6 +42,7 @@ export function HubPanel({
   const [model, setModel] = useState<HubReadModel>();
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [provisionedAgentId, setProvisionedAgentId] = useState<string>();
 
   useEffect(() => {
     let active = true;
@@ -98,6 +99,10 @@ export function HubPanel({
       <MissionPanel csrfToken={csrfToken} projects={model.projects} />
       <AgentProvisioningPanel
         csrfToken={csrfToken}
+        onProvisioned={(agentId) => {
+          setProvisionedAgentId(agentId);
+          setAttempt((value) => value + 1);
+        }}
         projects={model.projects}
         skills={model.skills}
         tools={model.tools}
@@ -118,6 +123,7 @@ export function HubPanel({
         {...(scheduleClient ? { client: scheduleClient } : {})}
         csrfToken={csrfToken}
         hub={model}
+        {...(provisionedAgentId ? { focusAgentId: provisionedAgentId } : {})}
       />
       <ProviderCredentialForm csrfToken={csrfToken} model={model} />
       <ModelRouteCheckPanel csrfToken={csrfToken} model={model} />

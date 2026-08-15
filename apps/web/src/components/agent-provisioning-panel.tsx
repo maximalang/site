@@ -10,12 +10,14 @@ export function AgentProvisioningPanel({
   tools,
   csrfToken,
   client = { execute: executeHubCommand },
+  onProvisioned,
 }: {
   projects: Array<{ projectId: string; name: string }>;
   skills: Array<{ skillId: string; displayName: string }>;
   tools: Array<{ toolId: string; displayName: string }>;
   csrfToken: string;
   client?: { execute(command: AgentCommand, csrfToken: string): Promise<unknown> };
+  onProvisioned?: (agentId: string) => void;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.projectId ?? "");
   const [displayName, setDisplayName] = useState("");
@@ -28,6 +30,7 @@ export function AgentProvisioningPanel({
   const [context, setContext] = useState<"AUTO" | "LEAN" | "BALANCED" | "RICH">("AUTO");
   const [budget, setBudget] = useState<"AUTO" | "ECONOMY" | "BALANCED" | "QUALITY">("AUTO");
   const [state, setState] = useState<"IDLE" | "SAVING" | "SAVED" | "ERROR">("IDLE");
+  const [createdAgentId, setCreatedAgentId] = useState<string>();
   const toggle = (values: string[], value: string, checked: boolean) =>
     [...new Set(checked ? [...values, value] : values.filter((id) => id !== value))].sort();
   const submit = async () => {
@@ -55,6 +58,8 @@ export function AgentProvisioningPanel({
         } as AgentCommand,
         csrfToken,
       );
+      setCreatedAgentId(`agent_${uuid}`);
+      onProvisioned?.(`agent_${uuid}`);
       setState("SAVED");
     } catch {
       setState("ERROR");
@@ -69,6 +74,14 @@ export function AgentProvisioningPanel({
         </div>
       </div>
       {state === "SAVED" ? <p role="status">Agent Instance создан</p> : null}
+      {createdAgentId ? (
+        <button
+          type="button"
+          onClick={() => document.getElementById("schedule-panel-title")?.scrollIntoView()}
+        >
+          Настроить расписание
+        </button>
+      ) : null}
       {state === "ERROR" ? <p role="alert">Agent не создан.</p> : null}
       {projects.length === 0 ? (
         <p>Сначала создайте Project.</p>
