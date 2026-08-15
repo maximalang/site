@@ -26,7 +26,12 @@ const model = OperationsReadModelSchema.parse({
     runs: { total: 1, completed: 1, failed: 0 },
     tokens: { input: 100, cachedInput: 40, output: 20 },
     context: { estimatedTokens: 80, budgetTokens: 200, pressure: 0.4 },
-    monetaryCost: { status: "UNAVAILABLE" },
+    monetaryCost: {
+      status: "ESTIMATED",
+      amountUsd: 0.00042,
+      source: "LITELLM_RESPONSE_HEADER",
+      jobCount: 1,
+    },
     routeSignals: [],
   },
 });
@@ -35,8 +40,9 @@ describe("OperationsPanel", () => {
   it("shows truthful simple metrics and opt-in advanced provenance", async () => {
     render(<OperationsPanel load={async () => model} />);
     expect(await screen.findByText("Verify evidence")).toBeTruthy();
-    expect(screen.getByText("Нет достоверных данных")).toBeTruthy();
+    expect(screen.getByText("≈ $0.000420")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByText(/Cached input: 40/)).toBeTruthy();
+    expect(screen.getByText(/LiteLLM response estimate/)).toBeTruthy();
   });
 });

@@ -2,7 +2,9 @@ import {
   AccountSchema,
   AgentSchema,
   AgentTemplateIdSchema,
+  BindingIdSchema,
   CanonicalModelSchema,
+  ConversationIdSchema,
   ExecutionRouteSchema,
   HubCommandIdSchema,
   MissionIdSchema,
@@ -10,6 +12,7 @@ import {
   ProjectSchema,
   ProviderSchema,
   ReasoningEffortSchema,
+  SessionIdSchema,
   SkillSchema,
   ToolSchema,
 } from "@agent-world/domain";
@@ -19,6 +22,20 @@ const commandBase = {
   schemaVersion: z.literal(1),
   commandId: HubCommandIdSchema,
 };
+
+const ExternalRuntimeReferenceSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(512)
+  .refine(
+    (value) =>
+      [...value].every((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint >= 32 && codePoint !== 127;
+      }),
+    "Runtime reference must not contain control characters",
+  );
 
 const ProviderCreateCommandSchema = z.strictObject({
   ...commandBase,
@@ -80,6 +97,27 @@ const CodexRouteCreateCommandSchema = z.strictObject({
   modelRouteId: ModelRouteSchema.shape.id,
   label: ExecutionRouteSchema.shape.label,
   reasoningEffort: ReasoningEffortSchema.optional(),
+});
+
+const ModelExecutionRouteCreateCommandSchema = z.strictObject({
+  ...commandBase,
+  kind: z.literal("MODEL_EXECUTION_ROUTE_CREATE"),
+  routeId: ExecutionRouteSchema.shape.id,
+  modelRouteId: ModelRouteSchema.shape.id,
+  label: ExecutionRouteSchema.shape.label,
+});
+
+const AgentRouteBindCommandSchema = z.strictObject({
+  ...commandBase,
+  kind: z.literal("AGENT_ROUTE_BIND"),
+  bindingId: BindingIdSchema,
+  sessionId: SessionIdSchema,
+  agentId: AgentSchema.shape.id,
+  conversationId: ConversationIdSchema,
+  routeId: ExecutionRouteSchema.shape.id,
+  externalAgentId: ExternalRuntimeReferenceSchema,
+  externalSessionRef: ExternalRuntimeReferenceSchema,
+  startedAt: z.iso.datetime({ offset: true }),
 });
 
 const AgentCreateCommandSchema = z.strictObject({
@@ -158,6 +196,8 @@ export const HubCommandRequestSchema = z.discriminatedUnion("kind", [
   CanonicalModelCreateCommandSchema,
   ModelRouteCreateCommandSchema,
   CodexRouteCreateCommandSchema,
+  ModelExecutionRouteCreateCommandSchema,
+  AgentRouteBindCommandSchema,
   AgentCreateCommandSchema,
   SkillCreateCommandSchema,
   ToolCreateCommandSchema,
@@ -171,6 +211,11 @@ const HubCommandResourceSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("CANONICAL_MODEL"), id: CanonicalModelSchema.shape.id }),
   z.strictObject({ kind: z.literal("MODEL_ROUTE"), id: ModelRouteSchema.shape.id }),
   z.strictObject({ kind: z.literal("EXECUTION_ROUTE"), id: ExecutionRouteSchema.shape.id }),
+  z.strictObject({
+    kind: z.literal("AGENT_ROUTE_BINDING"),
+    id: BindingIdSchema,
+    sessionId: SessionIdSchema,
+  }),
   z.strictObject({ kind: z.literal("AGENT"), id: AgentSchema.shape.id }),
   z.strictObject({ kind: z.literal("SKILL"), id: SkillSchema.shape.id }),
   z.strictObject({ kind: z.literal("TOOL"), id: ToolSchema.shape.id }),

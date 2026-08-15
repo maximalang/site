@@ -48,6 +48,8 @@ describe("PostgresOperationsReader", () => {
           input_tokens: "100",
           cached_input_tokens: "40",
           output_tokens: "20",
+          cost_usd: "0.00042",
+          cost_jobs: "1",
         },
       ],
       [{ estimated_tokens: "80", budget_tokens: "200" }],
@@ -71,6 +73,12 @@ describe("PostgresOperationsReader", () => {
       () => new Date("2026-08-15T12:00:00.000Z"),
     ).read();
     expect(model.observatory.context.pressure).toBe(0.4);
+    expect(model.observatory.monetaryCost).toEqual({
+      status: "ESTIMATED",
+      amountUsd: 0.00042,
+      source: "LITELLM_RESPONSE_HEADER",
+      jobCount: 1,
+    });
     expect(model.observatory.routeSignals[0]).toEqual(
       expect.objectContaining({ isFresh: true, costEfficiency: 0.7 }),
     );

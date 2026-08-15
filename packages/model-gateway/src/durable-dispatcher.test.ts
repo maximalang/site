@@ -35,7 +35,9 @@ describe("DurableModelExecutionDispatcher", () => {
       },
     });
     const store = {
-      prepare: vi.fn().mockResolvedValue({ outcome: "EXECUTE", externalRunId: "model-execution-1" }),
+      prepare: vi
+        .fn()
+        .mockResolvedValue({ outcome: "EXECUTE", externalRunId: "model-execution-1" }),
       complete: vi.fn().mockResolvedValue(undefined),
       fail: vi.fn(),
       observe: vi.fn(),
@@ -82,13 +84,18 @@ describe("DurableModelExecutionDispatcher", () => {
 
   it("persists a bounded terminal failure instead of leaving a retryable unknown outcome", async () => {
     const store = {
-      prepare: vi.fn().mockResolvedValue({ outcome: "EXECUTE", externalRunId: "model-execution-1" }),
+      prepare: vi
+        .fn()
+        .mockResolvedValue({ outcome: "EXECUTE", externalRunId: "model-execution-1" }),
       complete: vi.fn(),
       fail: vi.fn().mockResolvedValue(undefined),
       observe: vi.fn(),
     };
     const dispatcher = new DurableModelExecutionDispatcher({
-      gateway: { complete: vi.fn().mockRejectedValue(new Error("secret provider body")), health: vi.fn() },
+      gateway: {
+        complete: vi.fn().mockRejectedValue(new Error("secret provider body")),
+        health: vi.fn(),
+      },
       store,
       now: () => new Date("2026-08-15T12:00:00.000Z"),
       executionId: () => "model-execution-1",

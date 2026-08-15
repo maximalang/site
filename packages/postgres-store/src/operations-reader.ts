@@ -42,12 +42,13 @@ export class PostgresOperationsReader {
       const runs = await client.query<Row>(
         `SELECT run.id, run.task_id, run.agent_id, run.status, run.adapter_kind,
                 run.created_at, task.title,
-                COALESCE(codex.structured_result, native.structured_result) AS structured_result,
+                COALESCE(codex.structured_result, native.structured_result, model.result) AS structured_result,
                 codex.final_output
            FROM agent_world.runs run
            JOIN agent_world.tasks task ON task.id = run.task_id
            LEFT JOIN agent_world.codex_execution_jobs codex ON codex.run_id = run.id
            LEFT JOIN agent_world.native_chat_results native ON native.run_id = run.id
+           LEFT JOIN agent_world.model_execution_jobs model ON model.run_id = run.id
           ORDER BY run.created_at DESC, run.id DESC LIMIT 201`,
       );
       const handoffs = await client.query<Row>(
@@ -59,13 +60,26 @@ export class PostgresOperationsReader {
         throw new Error("Operations graph exceeds its bounded read limit");
       }
       const usage = await client.query<Row>(
-        `SELECT count(*)::bigint AS total,
-                count(*) FILTER (WHERE status = 'COMPLETED')::bigint AS completed,
-                count(*) FILTER (WHERE status = 'FAILED')::bigint AS failed,
+        `WITH token_usage AS (
+           SELECT input_tokens, cached_input_tokens, output_tokens
+             FROM agent_world.codex_execution_jobs
+            WHERE input_tokens IS NOT NULL
+           UNION ALL
+           SELECT input_tokens, cached_input_tokens, output_tokens
+             FROM agent_world.model_execution_jobs
+            WHERE input_tokens IS NOT NULL
+         )
+         SELECT (SELECT count(*)::bigint FROM agent_world.runs) AS total,
+                (SELECT count(*)::bigint FROM agent_world.runs WHERE status = 'COMPLETED') AS completed,
+                (SELECT count(*)::bigint FROM agent_world.runs WHERE status = 'FAILED') AS failed,
                 COALESCE(sum(input_tokens), 0)::bigint AS input_tokens,
                 COALESCE(sum(cached_input_tokens), 0)::bigint AS cached_input_tokens,
-                COALESCE(sum(output_tokens), 0)::bigint AS output_tokens
-           FROM agent_world.codex_execution_jobs`,
+                COALESCE(sum(output_tokens), 0)::bigint AS output_tokens,
+                (SELECT COALESCE(sum(cost_usd), 0)::text
+                   FROM agent_world.model_execution_jobs WHERE cost_usd IS NOT NULL) AS cost_usd,
+                (SELECT count(*)::bigint
+                   FROM agent_world.model_execution_jobs WHERE cost_usd IS NOT NULL) AS cost_jobs
+           FROM token_usage`,
       );
       const context = await client.query<Row>(
         `SELECT COALESCE(sum(estimated_tokens), 0)::bigint AS estimated_tokens,
@@ -86,6 +100,11 @@ export class PostgresOperationsReader {
       const contextRow = context.rows[0] ?? {};
       const estimatedTokens = count(contextRow.estimated_tokens);
       const budgetTokens = count(contextRow.budget_tokens);
+      const costJobs = count(usageRow.cost_jobs);
+      const amountUsd = Number(usageRow.cost_usd ?? 0);
+      if (!Number.isFinite(amountUsd) || amountUsd < 0) {
+        throw new Error("Invalid monetary cost aggregate");
+      }
       return OperationsReadModelSchema.parse({
         schemaVersion: 1,
         generatedAt,
@@ -152,7 +171,15 @@ export class PostgresOperationsReader {
             budgetTokens,
             pressure: budgetTokens === 0 ? 0 : Math.min(1, estimatedTokens / budgetTokens),
           },
-          monetaryCost: { status: "UNAVAILABLE" },
+          monetaryCost:
+            costJobs === 0
+              ? { status: "UNAVAILABLE" }
+              : {
+                  status: "ESTIMATED",
+                  amountUsd,
+                  source: "LITELLM_RESPONSE_HEADER",
+                  jobCount: costJobs,
+                },
           routeSignals: signals.rows.map((row) => ({
             routeId: row.route_id,
             isAvailable: row.is_available,

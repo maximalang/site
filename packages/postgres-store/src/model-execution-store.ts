@@ -1,4 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  ContextItemIdSchema,
+  EventIdSchema,
+  MemoryProposalIdSchema,
+  StructuredAgentOutputSchema,
+} from "@agent-world/domain";
 import {
   type DurableModelExecutionStore,
   ModelGatewayResultSchema,
@@ -31,7 +37,22 @@ const hash = (value: unknown) =>
 export class PostgresModelExecutionStore
   implements DurableModelExecutionStore, ModelTaskBindingResolver
 {
-  constructor(private readonly pool: TransactionPool) {}
+  private readonly contextItemId: () => string;
+  private readonly memoryProposalId: () => string;
+  private readonly memoryEventId: () => string;
+
+  constructor(
+    private readonly pool: TransactionPool,
+    ids: {
+      contextItemId?: () => string;
+      memoryProposalId?: () => string;
+      memoryEventId?: () => string;
+    } = {},
+  ) {
+    this.contextItemId = ids.contextItemId ?? (() => `context_item_${randomUUID()}`);
+    this.memoryProposalId = ids.memoryProposalId ?? (() => `memory_proposal_${randomUUID()}`);
+    this.memoryEventId = ids.memoryEventId ?? (() => `event_${randomUUID()}`);
+  }
 
   async resolve(input: { bindingId: string; agentId: string; adapterKind: string }) {
     const client = await this.pool.connect();
@@ -129,6 +150,7 @@ export class PostgresModelExecutionStore
     const result = ModelGatewayResultSchema.parse(resultValue);
     const client = await this.pool.connect();
     try {
+      await client.query("BEGIN");
       const updated = await client.query<{ id: string }>(
         `UPDATE agent_world.model_execution_jobs
             SET status = 'COMPLETED', result = $2::jsonb,
@@ -149,14 +171,130 @@ export class PostgresModelExecutionStore
         ],
       );
       if (updated.rows.length !== 1) throw new Error("MODEL_EXECUTION_NOT_EXECUTING");
+      let structuredResult: ReturnType<typeof StructuredAgentOutputSchema.parse> | undefined;
+      try {
+        const parsed = StructuredAgentOutputSchema.safeParse(JSON.parse(result.content));
+        if (parsed.success) structuredResult = parsed.data;
+      } catch {
+        // Raw result remains canonical evidence; only validated output enters shared context.
+      }
+      if (structuredResult) {
+        await this.materializeStructuredResult(
+          client,
+          externalRunId,
+          structuredResult,
+          completedAt,
+        );
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }
   }
 
+  private async materializeStructuredResult(
+    client: Awaited<ReturnType<TransactionPool["connect"]>>,
+    externalRunId: string,
+    result: ReturnType<typeof StructuredAgentOutputSchema.parse>,
+    occurredAt: string,
+  ) {
+    const provenance = await client.query<{
+      run_id: string;
+      task_id: string;
+      agent_id: string;
+      project_id: string;
+    }>(
+      `SELECT job.run_id, job.task_id, job.agent_id, task.project_id
+         FROM agent_world.model_execution_jobs job
+         JOIN agent_world.tasks task ON task.id = job.task_id
+        WHERE job.id = $1`,
+      [externalRunId],
+    );
+    const row = provenance.rows[0];
+    if (!row) throw new Error("MODEL_EXECUTION_NOT_FOUND");
+    const contextItemId = ContextItemIdSchema.parse(this.contextItemId());
+    const summaryHash = hash(result.summary);
+    const context = await client.query<{ id: string }>(
+      `INSERT INTO agent_world.context_items
+         (id, project_id, kind, temperature, content, summary, content_sha256,
+          estimated_tokens, importance, provenance_kind, run_id, agent_id, task_id, created_at)
+       VALUES ($1, $2, 'AGENT_RESULT', 'HOT', $3, $3, $4, $5, $6,
+               'RUN', $7, $8, $9, $10)
+       ON CONFLICT (project_id, kind, content_sha256, provenance_kind,
+                    event_id, message_id, run_id, artifact_id, document_chunk_id)
+       DO NOTHING RETURNING id`,
+      [
+        contextItemId,
+        row.project_id,
+        result.summary,
+        summaryHash,
+        Math.max(1, Math.min(100_000, Math.ceil(result.summary.length / 4))),
+        result.confidence,
+        row.run_id,
+        row.agent_id,
+        row.task_id,
+        occurredAt,
+      ],
+    );
+    if (!context.rows[0]) return;
+    for (const candidate of result.memoryCandidates) {
+      const proposalId = MemoryProposalIdSchema.parse(this.memoryProposalId());
+      const contentHash = hash(candidate.statement);
+      const request = {
+        projectId: row.project_id,
+        sourceContextItemId: contextItemId,
+        content: candidate.statement,
+        contentHash,
+        importance: candidate.importance,
+        createdAt: occurredAt,
+      };
+      const proposal = await client.query<{ id: string }>(
+        `INSERT INTO agent_world.memory_proposals
+           (id, project_id, source_context_item_id, content, content_sha256,
+            estimated_tokens, importance, status, request_sha256, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8, $9)
+         ON CONFLICT (project_id, source_context_item_id, content_sha256) DO NOTHING
+         RETURNING id`,
+        [
+          proposalId,
+          row.project_id,
+          contextItemId,
+          candidate.statement,
+          contentHash,
+          Math.max(1, Math.min(10_000, Math.ceil(candidate.statement.length / 4))),
+          candidate.importance,
+          hash(request),
+          occurredAt,
+        ],
+      );
+      if (!proposal.rows[0]) continue;
+      await client.query(
+        `INSERT INTO agent_world.memory_events
+           (id, event_type, project_id, proposal_id, source_context_item_id,
+            content, payload_sha256, occurred_at)
+         VALUES ($1, 'MEMORY_PROPOSED', $2, $3, $4, $5, $6, $7)`,
+        [
+          EventIdSchema.parse(this.memoryEventId()),
+          row.project_id,
+          proposalId,
+          contextItemId,
+          candidate.statement,
+          hash({ eventType: "MEMORY_PROPOSED", request }),
+          occurredAt,
+        ],
+      );
+    }
+  }
+
   async fail(externalRunIdValue: string, failureCode: string, completedAt: string) {
     const externalRunId = ExternalRunIdSchema.parse(externalRunIdValue);
-    const code = z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/).parse(failureCode);
+    const code = z
+      .string()
+      .regex(/^[A-Z][A-Z0-9_]{0,63}$/)
+      .parse(failureCode);
     const client = await this.pool.connect();
     try {
       const updated = await client.query<{ id: string }>(
@@ -183,7 +321,10 @@ export class PostgresModelExecutionStore
       );
       const row = result.rows[0];
       if (!row) throw new Error("MODEL_EXECUTION_NOT_FOUND");
-      if (row.status === "EXECUTING" && Date.parse(observedAt) >= Date.parse(iso(row.deadline_at))) {
+      if (
+        row.status === "EXECUTING" &&
+        Date.parse(observedAt) >= Date.parse(iso(row.deadline_at))
+      ) {
         await client.query(
           `UPDATE agent_world.model_execution_jobs
               SET status = 'FAILED', failure_code = 'INTERRUPTED_OUTCOME_UNKNOWN', completed_at = $2

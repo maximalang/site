@@ -71,7 +71,11 @@ export function OperationsPanel({
         </div>
         <div>
           <dt>Денежная стоимость</dt>
-          <dd>Нет достоверных данных</dd>
+          <dd>
+            {observatory.monetaryCost.status === "ESTIMATED"
+              ? `≈ $${observatory.monetaryCost.amountUsd.toFixed(6)}`
+              : "Нет достоверных данных"}
+          </dd>
         </div>
       </dl>
       <ol aria-label="Action Graph" className="action-graph-list">
@@ -92,6 +96,9 @@ export function OperationsPanel({
             {observatory.context.budgetTokens.toLocaleString("ru")}
           </p>
           <p>Edges: {actionGraph.edges.length}</p>
+          {observatory.monetaryCost.status === "ESTIMATED" ? (
+            <p>Cost source: LiteLLM response estimate · {observatory.monetaryCost.jobCount} jobs</p>
+          ) : null}
           <ul>
             {observatory.routeSignals.map((signal) => (
               <li key={signal.routeId}>

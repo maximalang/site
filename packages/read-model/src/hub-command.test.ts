@@ -7,6 +7,51 @@ const base = {
 } as const;
 
 describe("Hub control-plane command contracts", () => {
+  it("accepts model execution route and agent binding commands", () => {
+    expect(
+      HubCommandRequestSchema.parse({
+        schemaVersion: 1,
+        commandId: "hub_command_81818181-8181-4181-8181-818181818181",
+        kind: "MODEL_EXECUTION_ROUTE_CREATE",
+        routeId: "route_82828282-8282-4282-8282-828282828282",
+        modelRouteId: "model_route_83838383-8383-4383-8383-838383838383",
+        label: "Primary API route",
+      }).kind,
+    ).toBe("MODEL_EXECUTION_ROUTE_CREATE");
+    expect(
+      HubCommandRequestSchema.parse({
+        schemaVersion: 1,
+        commandId: "hub_command_84848484-8484-4484-8484-848484848484",
+        kind: "AGENT_ROUTE_BIND",
+        bindingId: "binding_85858585-8585-4585-8585-858585858585",
+        sessionId: "session_86868686-8686-4686-8686-868686868686",
+        agentId: "agent_87878787-8787-4787-8787-878787878787",
+        conversationId: "conversation_88888888-8888-4888-8888-888888888888",
+        routeId: "route_82828282-8282-4282-8282-828282828282",
+        externalAgentId: "agent:primary-api",
+        externalSessionRef: "session:primary-api",
+        startedAt: "2026-08-15T12:00:00.000Z",
+      }).kind,
+    ).toBe("AGENT_ROUTE_BIND");
+  });
+
+  it("rejects control characters in model execution binding references", () => {
+    const command = {
+      schemaVersion: 1,
+      commandId: "hub_command_84848484-8484-4484-8484-848484848484",
+      kind: "AGENT_ROUTE_BIND",
+      bindingId: "binding_85858585-8585-4585-8585-858585858585",
+      sessionId: "session_86868686-8686-4686-8686-868686868686",
+      agentId: "agent_87878787-8787-4787-8787-878787878787",
+      conversationId: "conversation_88888888-8888-4888-8888-888888888888",
+      routeId: "route_82828282-8282-4282-8282-828282828282",
+      externalAgentId: "agent\nunsafe",
+      externalSessionRef: "session:primary-api",
+      startedAt: "2026-08-15T12:00:00.000Z",
+    };
+    expect(HubCommandRequestSchema.safeParse(command).success).toBe(false);
+  });
+
   it.each([
     {
       ...base,

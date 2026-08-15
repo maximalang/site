@@ -34,6 +34,7 @@ import {
   PostgresMemoryProjectionStore,
   PostgresMissionHandoffStore,
   PostgresMissionStore,
+  PostgresModelExecutionStore,
   PostgresModelRouteResolver,
   PostgresNativeChatControlStore,
   PostgresNativeChatLaunchStore,
@@ -226,7 +227,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 38
+    ledger.rows.at(-1)?.version !== 39
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -1128,6 +1129,212 @@ try {
   if ((await hubCommandStore.execute(provisionAgent)).outcome !== "CREATED") {
     throw new Error("Hub command did not provision the Agent Template and Instance");
   }
+  const apiExecutionRouteId = "route_b8b8b8b8-b8b8-48b8-88b8-b8b8b8b8b8b8";
+  const apiBindingId = "binding_b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9";
+  const apiSessionId = "session_babababa-baba-4aba-8aba-babababababa";
+  const apiConversationId = "conversation_bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc";
+  await pool.query(
+    `INSERT INTO agent_world.conversations (id, agent_id, project_id, title, created_at)
+     VALUES ($1, $2, $3, 'API execution proof', '2026-08-13T12:02:00.000Z')`,
+    [apiConversationId, provisionedAgentId, ids.project],
+  );
+  const createApiRoute = HubCommandRequestSchema.parse({
+    schemaVersion: 1,
+    commandId: "hub_command_b8b8b8b8-b8b8-48b8-88b8-b8b8b8b8b8b8",
+    kind: "MODEL_EXECUTION_ROUTE_CREATE",
+    routeId: apiExecutionRouteId,
+    modelRouteId: hub.primaryModelRoute,
+    label: "Primary API execution",
+  });
+  if ((await hubCommandStore.execute(createApiRoute)).outcome !== "CREATED") {
+    throw new Error("Hub command did not create an eligible API execution route");
+  }
+  const bindApiAgent = HubCommandRequestSchema.parse({
+    schemaVersion: 1,
+    commandId: "hub_command_b9b9b9b9-b9b9-49b9-89b9-b9b9b9b9b9b9",
+    kind: "AGENT_ROUTE_BIND",
+    bindingId: apiBindingId,
+    sessionId: apiSessionId,
+    agentId: provisionedAgentId,
+    conversationId: apiConversationId,
+    routeId: apiExecutionRouteId,
+    externalAgentId: "api-model:atomic-provisioned-agent",
+    externalSessionRef: "api-model:isolated-session",
+    startedAt: "2026-08-13T12:03:00.000Z",
+  });
+  if ((await hubCommandStore.execute(bindApiAgent)).outcome !== "CREATED") {
+    throw new Error("Hub command did not bind the Agent to its API execution session");
+  }
+  const apiBindingEvidence = await pool.query(
+    `SELECT route.mode, route.adapter_kind, route.model_route_id,
+            binding.agent_id, session.conversation_id, session.ended_at
+       FROM agent_world.execution_routes route
+       JOIN agent_world.runtime_bindings binding ON binding.route_id = route.id
+       JOIN agent_world.conversation_sessions session ON session.binding_id = binding.id
+      WHERE route.id = $1 AND binding.id = $2 AND session.id = $3`,
+    [apiExecutionRouteId, apiBindingId, apiSessionId],
+  );
+  if (
+    apiBindingEvidence.rows[0]?.mode !== "API" ||
+    apiBindingEvidence.rows[0]?.adapter_kind !== "API_MODEL" ||
+    apiBindingEvidence.rows[0]?.model_route_id !== hub.primaryModelRoute ||
+    apiBindingEvidence.rows[0]?.agent_id !== provisionedAgentId ||
+    apiBindingEvidence.rows[0]?.conversation_id !== apiConversationId ||
+    apiBindingEvidence.rows[0]?.ended_at !== null
+  ) {
+    throw new Error("API execution route binding provenance drifted after commit");
+  }
+  const apiTaskId = "task_bdbdbdbd-bdbd-4dbd-8dbd-bdbdbdbdbdbd";
+  const apiApprovalId = "approval_bdbdbdbd-bdbd-4dbd-8dbd-bdbdbdbdbdbd";
+  const apiRunId = "run_bebebebe-bebe-4ebe-8ebe-bebebebebebe";
+  const apiExecutionId = "model_execution_bfbfbfbf-bfbf-4fbf-8fbf-bfbfbfbfbfbf";
+  await pool.query(
+    `INSERT INTO agent_world.tasks
+       (id, conversation_id, project_id, assignee_agent_id, title, description,
+        approval_requirement, idempotency_key, created_at)
+     VALUES ($1, $2, $3, $4, 'Prove API execution', 'Persist exact usage and cost.',
+             'REQUIRED', 'task:api-model-lifecycle', '2026-08-13T12:04:00.000Z')`,
+    [apiTaskId, apiConversationId, ids.project, provisionedAgentId],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.approvals
+       (id, task_id, state, requested_at, expires_at, decided_at, decision_command_id)
+     VALUES ($1, $2, 'APPROVED', '2026-08-13T12:04:00.000Z',
+             '2026-08-14T12:04:00.000Z', '2026-08-13T12:05:00.000Z',
+             'approve:api-model-lifecycle')`,
+    [apiApprovalId, apiTaskId],
+  );
+  await pool.query(
+    `INSERT INTO agent_world.runs
+       (id, task_id, conversation_id, agent_id, approval_id, adapter_kind,
+        binding_id, session_id, status, dispatch_idempotency_key, created_at)
+     VALUES ($1, $2, $3, $4, $5, 'API_MODEL', $6, $7, 'DISPATCH_PENDING',
+             'run:api-model-lifecycle', '2026-08-13T12:06:00.000Z')`,
+    [
+      apiRunId,
+      apiTaskId,
+      apiConversationId,
+      provisionedAgentId,
+      apiApprovalId,
+      apiBindingId,
+      apiSessionId,
+    ],
+  );
+  const modelExecutionRequest = {
+    schemaVersion: 1,
+    adapterKind: "API_MODEL",
+    runId: apiRunId,
+    taskId: apiTaskId,
+    agentId: provisionedAgentId,
+    bindingId: apiBindingId,
+    sessionId: apiSessionId,
+    routeId: apiExecutionRouteId,
+    modelRouteId: hub.primaryModelRoute,
+    idempotencyKey: "api-model:isolated-lifecycle",
+    prompt: "Return a structured verification result.",
+    maxOutputTokens: 1024,
+  };
+  const modelExecutionStore = new PostgresModelExecutionStore(pool, {
+    contextItemId: () => "context_item_c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1",
+    memoryProposalId: () => "memory_proposal_c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2",
+    memoryEventId: () => "event_c3c3c3c3-c3c3-43c3-83c3-c3c3c3c3c3c3",
+  });
+  const modelResolution = await modelExecutionStore.resolve({
+    bindingId: apiBindingId,
+    agentId: provisionedAgentId,
+    adapterKind: "API_MODEL",
+  });
+  if (
+    modelResolution.routeId !== apiExecutionRouteId ||
+    modelResolution.modelRouteId !== hub.primaryModelRoute ||
+    modelResolution.mode !== "API"
+  ) {
+    throw new Error("Model execution binding resolver lost canonical route provenance");
+  }
+  const preparedModelExecution = await modelExecutionStore.prepare(
+    modelExecutionRequest,
+    apiExecutionId,
+    "2026-08-13T12:07:00.000Z",
+  );
+  if (preparedModelExecution.outcome !== "EXECUTE") {
+    throw new Error("First model execution preparation did not claim the paid call exactly once");
+  }
+  await modelExecutionStore.complete(
+    apiExecutionId,
+    {
+      schemaVersion: 1,
+      runId: apiRunId,
+      modelRouteId: hub.primaryModelRoute,
+      upstreamRequestId: "litellm-isolated-request",
+      finishReason: "STOP",
+      content: JSON.stringify({
+        schemaVersion: 1,
+        fullOutput: "API execution persisted with canonical provenance.",
+        summary: "API execution persisted.",
+        findings: ["Durable model execution is restart-safe."],
+        decisions: [],
+        actions: ["Recorded usage and estimated cost."],
+        artifacts: [],
+        openQuestions: [],
+        nextActions: [],
+        memoryCandidates: [
+          {
+            statement: "API model results enter shared memory only after schema validation.",
+            confidence: 1,
+            importance: 0.9,
+          },
+        ],
+        confidence: 1,
+      }),
+      toolCalls: [],
+      usage: { inputTokens: 120, cachedInputTokens: 20, outputTokens: 30, totalTokens: 150 },
+      monetaryCost: { amountUsd: 0.00042, source: "LITELLM_RESPONSE_HEADER", estimated: true },
+    },
+    "2026-08-13T12:08:00.000Z",
+  );
+  const replayedModelExecution = await new PostgresModelExecutionStore(pool).prepare(
+    modelExecutionRequest,
+    "model_execution_c0c0c0c0-c0c0-40c0-80c0-c0c0c0c0c0c0",
+    "2026-08-13T12:09:00.000Z",
+  );
+  const observedModelExecution = await new PostgresModelExecutionStore(pool).observe(
+    apiExecutionId,
+    "2026-08-13T12:10:00.000Z",
+  );
+  const modelExecutionEvidence = await pool.query(
+    `SELECT status, input_tokens, cached_input_tokens, output_tokens,
+            cost_usd::text, cost_source, cost_estimated,
+            result->>'upstreamRequestId' AS upstream_request_id,
+            (SELECT count(*)::integer FROM agent_world.context_items context
+              WHERE context.run_id = jobs.run_id AND context.kind = 'AGENT_RESULT') AS result_context,
+            (SELECT count(*)::integer FROM agent_world.memory_proposals proposal
+              WHERE proposal.source_context_item_id =
+                'context_item_c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1') AS memory_proposals,
+            (SELECT count(*)::integer FROM agent_world.memory_events event
+              WHERE event.proposal_id =
+                'memory_proposal_c2c2c2c2-c2c2-42c2-82c2-c2c2c2c2c2c2') AS memory_events
+       FROM agent_world.model_execution_jobs jobs WHERE id = $1`,
+    [apiExecutionId],
+  );
+  if (
+    replayedModelExecution.outcome !== "REPLAY" ||
+    replayedModelExecution.externalRunId !== apiExecutionId ||
+    replayedModelExecution.acceptedAt !== "2026-08-13T12:07:00.000Z" ||
+    observedModelExecution.status !== "COMPLETED" ||
+    modelExecutionEvidence.rows[0]?.status !== "COMPLETED" ||
+    modelExecutionEvidence.rows[0]?.input_tokens !== "120" ||
+    modelExecutionEvidence.rows[0]?.cached_input_tokens !== "20" ||
+    modelExecutionEvidence.rows[0]?.output_tokens !== "30" ||
+    Number(modelExecutionEvidence.rows[0]?.cost_usd) !== 0.00042 ||
+    modelExecutionEvidence.rows[0]?.cost_source !== "LITELLM_RESPONSE_HEADER" ||
+    modelExecutionEvidence.rows[0]?.cost_estimated !== true ||
+    modelExecutionEvidence.rows[0]?.upstream_request_id !== "litellm-isolated-request" ||
+    modelExecutionEvidence.rows[0]?.result_context !== 1 ||
+    modelExecutionEvidence.rows[0]?.memory_proposals !== 1 ||
+    modelExecutionEvidence.rows[0]?.memory_events !== 1
+  ) {
+    throw new Error("Restarted model execution store did not replay exact usage/cost provenance");
+  }
   const commandEvidence = await pool.query(
     `SELECT
        (SELECT count(*)::integer FROM agent_world.providers WHERE id = $1) AS providers,
@@ -1147,7 +1354,7 @@ try {
   );
   if (
     commandEvidence.rows[0]?.providers !== 1 ||
-    commandEvidence.rows[0]?.receipts !== 2 ||
+    commandEvidence.rows[0]?.receipts !== 4 ||
     commandEvidence.rows[0]?.rejected_routes !== 0 ||
     commandEvidence.rows[0]?.assignments !== 1 ||
     commandEvidence.rows[0]?.preferences !== 1
@@ -3033,7 +3240,16 @@ try {
     operations.observatory.tokens.input === 0 ||
     operations.observatory.context.budgetTokens === 0 ||
     operations.observatory.routeSignals.length === 0 ||
-    operations.observatory.monetaryCost.status !== "UNAVAILABLE"
+    operations.observatory.monetaryCost.status !== "ESTIMATED" ||
+    operations.observatory.monetaryCost.amountUsd !== 0.00042 ||
+    operations.observatory.monetaryCost.source !== "LITELLM_RESPONSE_HEADER" ||
+    !operations.actionGraph.nodes.some(
+      (node) =>
+        node.kind === "RUN" &&
+        node.id === apiRunId &&
+        node.adapterKind === "API_MODEL" &&
+        node.resultSummary?.includes("API execution persisted"),
+    )
   ) {
     throw new Error(
       "Operations read model did not project graph and truthful observability evidence",

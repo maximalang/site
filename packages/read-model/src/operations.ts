@@ -26,7 +26,7 @@ export const ActionGraphNodeSchema = z.discriminatedUnion("kind", [
     taskId: TaskIdSchema,
     agentId: AgentIdSchema,
     status: z.enum(["DISPATCH_PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]),
-    adapterKind: z.enum(["OPENCLAW", "CODEX", "NATIVE_CHATGPT"]),
+    adapterKind: z.enum(["OPENCLAW", "CODEX", "API_MODEL", "LOCAL_MODEL", "NATIVE_CHATGPT"]),
     occurredAt: TimestampSchema,
     resultSummary: z.string().trim().min(1).max(2_000).optional(),
   }),
@@ -80,7 +80,15 @@ export const OperationsReadModelSchema = z.strictObject({
       budgetTokens: CountSchema,
       pressure: UnitIntervalSchema,
     }),
-    monetaryCost: z.strictObject({ status: z.literal("UNAVAILABLE") }),
+    monetaryCost: z.discriminatedUnion("status", [
+      z.strictObject({ status: z.literal("UNAVAILABLE") }),
+      z.strictObject({
+        status: z.literal("ESTIMATED"),
+        amountUsd: z.number().finite().nonnegative().max(1_000_000_000),
+        source: z.literal("LITELLM_RESPONSE_HEADER"),
+        jobCount: CountSchema,
+      }),
+    ]),
     routeSignals: z.array(RouteSignalSchema).max(200),
   }),
 });

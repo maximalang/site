@@ -1,14 +1,7 @@
 import { OpaqueExternalIdSchema, TimestampSchema } from "@agent-world/domain";
 import * as z from "zod";
-import {
-  type ModelGateway,
-  ModelGatewayFailure,
-  ModelGatewayResultSchema,
-} from "./contract.js";
-import {
-  type ModelTaskExecutionRequest,
-  ModelTaskExecutionRequestSchema,
-} from "./task-adapter.js";
+import { type ModelGateway, ModelGatewayFailure, ModelGatewayResultSchema } from "./contract.js";
+import { type ModelTaskExecutionRequest, ModelTaskExecutionRequestSchema } from "./task-adapter.js";
 
 const PreparationSchema = z.discriminatedUnion("outcome", [
   z.strictObject({ outcome: z.literal("EXECUTE"), externalRunId: OpaqueExternalIdSchema }),
