@@ -1,9 +1,11 @@
 import {
   AccountSchema,
   AgentSchema,
+  AgentTemplateIdSchema,
   CanonicalModelSchema,
   ExecutionRouteSchema,
   HubCommandIdSchema,
+  MissionIdSchema,
   ModelRouteSchema,
   ProjectSchema,
   ProviderSchema,
@@ -89,6 +91,33 @@ const AgentCreateCommandSchema = z.strictObject({
   role: AgentSchema.shape.role,
   instructions: AgentSchema.shape.instructions,
   preferredRouteId: AgentSchema.shape.preferredRouteId,
+  provisioning: z
+    .strictObject({
+      templateId: AgentTemplateIdSchema,
+      templateVersion: z.number().int().positive().max(1_000_000),
+      projectId: ProjectSchema.shape.id,
+      missionId: MissionIdSchema.optional(),
+      skillIds: z
+        .array(SkillSchema.shape.id)
+        .max(500)
+        .refine(
+          (ids) => ids.every((id, index) => index === 0 || String(ids[index - 1]) < String(id)),
+          "Skill IDs must be unique and sorted",
+        ),
+      toolIds: z
+        .array(ToolSchema.shape.id)
+        .max(500)
+        .refine(
+          (ids) => ids.every((id, index) => index === 0 || String(ids[index - 1]) < String(id)),
+          "Tool IDs must be unique and sorted",
+        ),
+      preferences: z.strictObject({
+        mode: z.enum(["AUTO", "CHAT", "WORK", "CODEX", "API", "LOCAL"]),
+        context: z.enum(["AUTO", "LEAN", "BALANCED", "RICH"]),
+        budget: z.enum(["AUTO", "ECONOMY", "BALANCED", "QUALITY"]),
+      }),
+    })
+    .optional(),
 });
 
 const SkillCreateCommandSchema = z.strictObject({

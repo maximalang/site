@@ -1105,22 +1105,51 @@ try {
     ),
     "Hub command accepted duplicate remote Model discovery",
   );
+  const provisionedAgentId = "agent_b7b7b7b7-b7b7-b7b7-b7b7-b7b7b7b7b7b7";
+  const provisionAgent = HubCommandRequestSchema.parse({
+    schemaVersion: 1,
+    commandId: "hub_command_b7b7b7b7-b7b7-b7b7-b7b7-b7b7b7b7b7b7",
+    kind: "AGENT_CREATE",
+    agentId: provisionedAgentId,
+    slug: "atomic-provisioned-agent",
+    displayName: "Atomic Provisioned Agent",
+    role: "Verify atomic provisioning",
+    instructions: "Use the canonical PostgreSQL state only.",
+    provisioning: {
+      templateId: "agent_template_b7b7b7b7-b7b7-b7b7-b7b7-b7b7b7b7b7b7",
+      templateVersion: 1,
+      projectId: ids.project,
+      skillIds: [hub.skill],
+      toolIds: [hub.tool],
+      preferences: { mode: "AUTO", context: "RICH", budget: "QUALITY" },
+    },
+  });
+  if ((await hubCommandStore.execute(provisionAgent)).outcome !== "CREATED") {
+    throw new Error("Hub command did not provision the Agent Template and Instance");
+  }
   const commandEvidence = await pool.query(
     `SELECT
        (SELECT count(*)::integer FROM agent_world.providers WHERE id = $1) AS providers,
        (SELECT count(*)::integer FROM agent_world.hub_command_receipts) AS receipts,
        (SELECT count(*)::integer FROM agent_world.model_routes
-         WHERE id IN ($2, $3)) AS rejected_routes`,
+         WHERE id IN ($2, $3)) AS rejected_routes,
+       (SELECT count(*)::integer FROM agent_world.agent_instance_assignments
+         WHERE agent_id = $4) AS assignments,
+       (SELECT count(*)::integer FROM agent_world.execution_preference_overrides
+         WHERE agent_id = $4 AND context_policy = 'RICH' AND budget_policy = 'QUALITY') AS preferences`,
     [
       providerCreate.providerId,
       "model_route_b4b4b4b4-b4b4-b4b4-b4b4-b4b4b4b4b4b4",
       "model_route_b6b6b6b6-b6b6-b6b6-b6b6-b6b6b6b6b6b6",
+      provisionedAgentId,
     ],
   );
   if (
     commandEvidence.rows[0]?.providers !== 1 ||
-    commandEvidence.rows[0]?.receipts !== 1 ||
-    commandEvidence.rows[0]?.rejected_routes !== 0
+    commandEvidence.rows[0]?.receipts !== 2 ||
+    commandEvidence.rows[0]?.rejected_routes !== 0 ||
+    commandEvidence.rows[0]?.assignments !== 1 ||
+    commandEvidence.rows[0]?.preferences !== 1
   ) {
     throw new Error("Hub command transaction or receipt authority drifted");
   }

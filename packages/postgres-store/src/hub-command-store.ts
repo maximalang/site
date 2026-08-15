@@ -273,10 +273,50 @@ export class PostgresHubCommandStore {
         return created(command.commandId, { kind: "EXECUTION_ROUTE", id: command.routeId });
       }
       case "AGENT_CREATE":
+        if (command.provisioning) {
+          await client.query(
+            `INSERT INTO agent_world.agent_templates
+               (id, version, slug, display_name, role, instructions, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              command.provisioning.templateId,
+              command.provisioning.templateVersion,
+              command.slug,
+              command.displayName,
+              command.role,
+              command.instructions,
+              this.now().toISOString(),
+            ],
+          );
+          if (command.provisioning.skillIds.length > 0) {
+            await client.query(
+              `INSERT INTO agent_world.agent_template_skills
+                 (agent_template_id, agent_template_version, skill_id)
+               SELECT $1, $2, unnest($3::text[])`,
+              [
+                command.provisioning.templateId,
+                command.provisioning.templateVersion,
+                command.provisioning.skillIds,
+              ],
+            );
+          }
+          if (command.provisioning.toolIds.length > 0) {
+            await client.query(
+              `INSERT INTO agent_world.agent_template_tools
+                 (agent_template_id, agent_template_version, tool_id)
+               SELECT $1, $2, unnest($3::text[])`,
+              [
+                command.provisioning.templateId,
+                command.provisioning.templateVersion,
+                command.provisioning.toolIds,
+              ],
+            );
+          }
+        }
         await client.query(
           `INSERT INTO agent_world.agents
-             (id, slug, display_name, role, instructions, preferred_route_id)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+             (id, slug, display_name, role, instructions, preferred_route_id, template_id, template_version)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             command.agentId,
             command.slug,
@@ -284,8 +324,43 @@ export class PostgresHubCommandStore {
             command.role,
             command.instructions,
             command.preferredRouteId ?? null,
+            command.provisioning?.templateId ?? null,
+            command.provisioning?.templateVersion ?? null,
           ],
         );
+        if (command.provisioning) {
+          const createdAt = this.now().toISOString();
+          await client.query(
+            `INSERT INTO agent_world.project_agents (project_id, agent_id, created_at)
+             VALUES ($1, $2, $3)`,
+            [command.provisioning.projectId, command.agentId, createdAt],
+          );
+          await client.query(
+            `INSERT INTO agent_world.agent_instance_assignments
+               (agent_id, template_id, template_version, project_id, mission_id, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              command.agentId,
+              command.provisioning.templateId,
+              command.provisioning.templateVersion,
+              command.provisioning.projectId,
+              command.provisioning.missionId ?? null,
+              createdAt,
+            ],
+          );
+          await client.query(
+            `INSERT INTO agent_world.execution_preference_overrides
+               (scope_kind, agent_id, mode, context_policy, budget_policy, updated_at)
+             VALUES ('AGENT', $1, $2, $3, $4, $5)`,
+            [
+              command.agentId,
+              command.provisioning.preferences.mode,
+              command.provisioning.preferences.context,
+              command.provisioning.preferences.budget,
+              createdAt,
+            ],
+          );
+        }
         return created(command.commandId, { kind: "AGENT", id: command.agentId });
       case "SKILL_CREATE":
         await client.query(

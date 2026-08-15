@@ -4,6 +4,7 @@ import type { AgentId } from "@agent-world/domain";
 import type { HubReadModel } from "@agent-world/read-model";
 import { useEffect, useState } from "react";
 import { loadHubReadModel } from "../client/hub-api";
+import { AgentProvisioningPanel } from "./agent-provisioning-panel";
 import {
   type ExecutionPreferenceClient,
   ExecutionPreferencesPanel,
@@ -95,6 +96,12 @@ export function HubPanel({
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
       <MissionPanel csrfToken={csrfToken} projects={model.projects} />
+      <AgentProvisioningPanel
+        csrfToken={csrfToken}
+        projects={model.projects}
+        skills={model.skills}
+        tools={model.tools}
+      />
       <OperationsPanel />
       <IntegrationPanel csrfToken={csrfToken} />
       <MemoryCenter

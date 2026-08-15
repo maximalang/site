@@ -504,6 +504,32 @@ try {
   if (replayProvider.status !== 200 || (await replayProvider.json()).outcome !== "REPLAY") {
     throw new Error("Authorized Hub command did not replay the committed Provider command");
   }
+  const provisionedAgentId = "agent_15151515-1515-4515-8515-151515151515";
+  const provisionAgent = await fetch(`${baseUrl}/api/hub/commands`, {
+    method: "POST",
+    headers: hubCommandHeaders,
+    body: JSON.stringify({
+      schemaVersion: 1,
+      commandId: "hub_command_15151515-1515-4515-8515-151515151515",
+      kind: "AGENT_CREATE",
+      agentId: provisionedAgentId,
+      slug: "runtime-provisioned-agent",
+      displayName: "Runtime Provisioned Agent",
+      role: "Prove atomic provisioning",
+      instructions: "Use canonical runtime evidence.",
+      provisioning: {
+        templateId: "agent_template_15151515-1515-4515-8515-151515151515",
+        templateVersion: 1,
+        projectId: "project_12121212-1212-1212-1212-121212121212",
+        skillIds: [],
+        toolIds: [],
+        preferences: { mode: "AUTO", context: "RICH", budget: "QUALITY" },
+      },
+    }),
+  });
+  if (provisionAgent.status !== 201 || (await provisionAgent.json()).outcome !== "CREATED") {
+    throw new Error(`Owner Agent provisioning returned ${provisionAgent.status}`);
+  }
   const conflictingProvider = await fetch(`${baseUrl}/api/hub/commands`, {
     method: "POST",
     headers: hubCommandHeaders,
@@ -520,7 +546,8 @@ try {
   if (
     updatedHub.status !== 200 ||
     updatedHubBody.providers?.filter(({ providerId }) => providerId === hubCommandBody.providerId)
-      .length !== 1
+      .length !== 1 ||
+    updatedHubBody.agents?.filter(({ agentId }) => agentId === provisionedAgentId).length !== 1
   ) {
     throw new Error("Hub read model did not expose exactly one command-created Provider");
   }
@@ -657,7 +684,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, missionCreateAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

@@ -544,7 +544,8 @@ main {
 }
 
 .integrations-panel,
-.mission-panel {
+.mission-panel,
+.agent-provisioning-panel {
   display: grid;
   gap: 1rem;
   padding: 1rem;
@@ -552,14 +553,16 @@ main {
   background: var(--panel);
 }
 .integration-form,
-.mission-form {
+.mission-form,
+.agent-provisioning-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
   align-items: end;
 }
 .integration-form label,
-.mission-form label {
+.mission-form label,
+.agent-provisioning-form label {
   display: grid;
   gap: 0.35rem;
   color: var(--muted);
@@ -575,6 +578,20 @@ main {
   border: 1px solid var(--line);
   background: var(--surface);
   color: inherit;
+}
+.agent-provisioning-form input,
+.agent-provisioning-form select,
+.agent-provisioning-form textarea {
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+}
+.agent-provisioning-form textarea,
+.agent-provisioning-form details,
+.agent-provisioning-form fieldset {
+  grid-column: 1 / -1;
 }
 .mission-form textarea {
   min-height: 5rem;

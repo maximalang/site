@@ -112,6 +112,30 @@ describe("Hub control-plane command contracts", () => {
     expect(parsed).not.toHaveProperty("health");
   });
 
+  it("accepts atomic Agent Template and instance provisioning", () => {
+    const parsed = HubCommandRequestSchema.parse({
+      ...base,
+      kind: "AGENT_CREATE",
+      agentId: "agent_11111111-1111-1111-1111-111111111111",
+      slug: "researcher-instance",
+      displayName: "Researcher",
+      role: "Evidence-first research",
+      instructions: "Use canonical evidence.",
+      provisioning: {
+        templateId: "agent_template_11111111-1111-1111-1111-111111111111",
+        templateVersion: 1,
+        projectId: "project_11111111-1111-1111-1111-111111111111",
+        skillIds: ["skill_11111111-1111-1111-1111-111111111111"],
+        toolIds: ["tool_11111111-1111-1111-1111-111111111111"],
+        preferences: { mode: "AUTO", context: "BALANCED", budget: "QUALITY" },
+      },
+    });
+    expect(parsed.kind).toBe("AGENT_CREATE");
+    if (parsed.kind === "AGENT_CREATE") {
+      expect(parsed.provisioning?.preferences.budget).toBe("QUALITY");
+    }
+  });
+
   it("rejects raw credentials, Tool configuration and provider-specific drift", () => {
     const account = {
       ...base,
