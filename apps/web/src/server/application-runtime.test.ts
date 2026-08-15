@@ -35,6 +35,9 @@ function runtime() {
     decideMemory: vi.fn(),
     readHub: vi.fn(),
     readOperations: vi.fn(),
+    readIntegrations: vi.fn(),
+    createIntegration: vi.fn(),
+    writeIntegrationCredential: vi.fn(),
     readWorld: vi.fn(),
     stop: vi.fn(async () => undefined),
   };

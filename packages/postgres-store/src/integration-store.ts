@@ -125,4 +125,23 @@ export class PostgresIntegrationStore {
       client.release();
     }
   }
+
+  async bindCredential(integrationId: string, secretRef: string, updatedAt: string): Promise<void> {
+    if (secretRef !== `secret-store:integrations/${integrationId}/credential`) {
+      throw new Error("INTEGRATION_CREDENTIAL_REFERENCE_INVALID");
+    }
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<{ id: string }>(
+        `UPDATE agent_world.integration_endpoints
+            SET credential_ref = $2, health = 'READY', updated_at = $3
+          WHERE id = $1 AND updated_at <= $3
+        RETURNING id`,
+        [integrationId, secretRef, updatedAt],
+      );
+      if (result.rows.length !== 1) throw new Error("INTEGRATION_NOT_FOUND");
+    } finally {
+      client.release();
+    }
+  }
 }

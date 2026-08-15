@@ -123,6 +123,20 @@ export const applicationMemoryDependencies = {
     runtime().decideMemory(input),
 };
 
+export const applicationIntegrationDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  list: () => runtime().readIntegrations(),
+  create: (input: Parameters<ReturnType<typeof runtime>["createIntegration"]>[0]) =>
+    runtime().createIntegration(input),
+  credential: (
+    input: Omit<
+      Parameters<ReturnType<typeof runtime>["writeIntegrationCredential"]>[0],
+      "writtenAt"
+    >,
+    writtenAt: string,
+  ) => runtime().writeIntegrationCredential({ ...input, writtenAt }),
+};
+
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {
   try {
     return runtime().auth.authorize(request);

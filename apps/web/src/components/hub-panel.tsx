@@ -9,6 +9,7 @@ import {
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
+import { IntegrationPanel } from "./integration-panel";
 import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { ModelRouteCheckPanel } from "./model-route-check-panel";
 import { type NativeChatProfileClient, NativeChatProfilePanel } from "./native-chat-profile-panel";
@@ -93,6 +94,7 @@ export function HubPanel({
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
       <OperationsPanel />
+      <IntegrationPanel csrfToken={csrfToken} />
       <MemoryCenter
         {...(memoryClient ? { client: memoryClient } : {})}
         csrfToken={csrfToken}

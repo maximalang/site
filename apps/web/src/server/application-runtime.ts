@@ -31,6 +31,8 @@ import type {
   HubCommandRequest,
   HubCommandResponse,
   HubReadModel,
+  IntegrationCreate,
+  IntegrationRegistry,
   ModelRouteCheckResponse,
   OperationsReadModel,
   WorldReadModel,
@@ -75,6 +77,14 @@ export type ApplicationRuntime = {
   decideMemory(input: MemoryCurationDecision): Promise<unknown>;
   readHub(): Promise<HubReadModel>;
   readOperations(): Promise<OperationsReadModel>;
+  readIntegrations(): Promise<IntegrationRegistry>;
+  createIntegration(input: IntegrationCreate): Promise<unknown>;
+  writeIntegrationCredential(input: {
+    integrationId: string;
+    commandId: string;
+    plaintext: string;
+    writtenAt: string;
+  }): Promise<unknown>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
 };

@@ -3036,9 +3036,26 @@ try {
   ) {
     throw new Error("Integration registry command replay drifted");
   }
+  const integrationSecretRef = `secret-store:integrations/${mcpIntegration.id}/credential`;
+  await secretStore.write({
+    commandId: "integration:credential:mcp-isolated",
+    secretRef: integrationSecretRef,
+    purpose: "INTEGRATION_CREDENTIAL",
+    plaintext: "isolated-mcp-token",
+    writtenAt: "2026-08-15T11:02:00.000Z",
+  });
+  await integrationStore.bindCredential(
+    mcpIntegration.id,
+    integrationSecretRef,
+    "2026-08-15T11:02:00.000Z",
+  );
   const integrationRegistry = await integrationStore.list();
   if (
     integrationRegistry.integrations.length !== 2 ||
+    integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.hasCredential !==
+      true ||
+    (await secretStore.read(integrationSecretRef, "INTEGRATION_CREDENTIAL")) !==
+      "isolated-mcp-token" ||
     JSON.stringify(integrationRegistry).includes("secret-store:")
   ) {
     throw new Error("Integration registry did not preserve safe MCP and SSH boundaries");

@@ -202,6 +202,10 @@ try {
   if (anonymousOperations.status !== 401) {
     throw new Error(`Anonymous Operations request returned ${anonymousOperations.status}`);
   }
+  const anonymousIntegrations = await fetch(`${baseUrl}/api/integrations`);
+  if (anonymousIntegrations.status !== 401) {
+    throw new Error(`Anonymous Integrations request returned ${anonymousIntegrations.status}`);
+  }
   const anonymousMemory = await fetch(
     `${baseUrl}/api/memory?projectId=project_11111111-1111-1111-1111-111111111111&view=INBOX`,
   );
@@ -328,6 +332,48 @@ try {
     operationsBody.observatory?.monetaryCost?.status !== "UNAVAILABLE"
   ) {
     throw new Error("Authorized Operations did not return a truthful bounded projection");
+  }
+  const integrationId = "integration_14141414-1414-4414-8414-141414141414";
+  const integrationHeaders = {
+    cookie,
+    "content-type": "application/json",
+    origin: baseUrl,
+    "x-agent-world-csrf": loginBody.csrfToken,
+  };
+  const createIntegration = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      id: integrationId,
+      commandId: "integration:create:runtime",
+      kind: "MCP",
+      label: "Runtime MCP",
+      endpoint: { transport: "HTTPS", url: "https://world.example/api/mcp" },
+      createdAt: "2026-08-15T00:00:00.000Z",
+    }),
+  });
+  const writeIntegrationCredential = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      operation: "CREDENTIAL",
+      integrationId,
+      commandId: "integration:credential:runtime",
+      plaintext: "runtime-integration-secret",
+    }),
+  });
+  const integrations = await fetch(`${baseUrl}/api/integrations`, { headers: { cookie } });
+  const integrationBody = await integrations.json();
+  if (
+    createIntegration.status !== 201 ||
+    writeIntegrationCredential.status !== 201 ||
+    integrations.status !== 200 ||
+    integrationBody.integrations?.[0]?.hasCredential !== true ||
+    JSON.stringify(integrationBody).includes("runtime-integration-secret")
+  ) {
+    throw new Error(
+      `Integration HTTP lifecycle failed: create=${createIntegration.status} credential=${writeIntegrationCredential.status} list=${integrations.status} count=${integrationBody.integrations?.length ?? "invalid"} configured=${integrationBody.integrations?.[0]?.hasCredential ?? "invalid"}`,
+    );
   }
   const projectId = "project_11111111-1111-1111-1111-111111111111";
   const memoryInbox = await fetch(
@@ -569,7 +615,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

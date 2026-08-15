@@ -27,6 +27,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresIntegrationStore,
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
   PostgresMemoryProjectionStore,
@@ -239,6 +240,7 @@ export async function createProductionRuntime(
     const activeMissionWorkflow = missionWorkflow;
     const hubReader = new PostgresHubReader(pool);
     const operationsReader = new PostgresOperationsReader(pool);
+    const integrationStore = new PostgresIntegrationStore(pool);
     const hubCommandStore = new PostgresHubCommandStore(pool);
     const memoryReader = new PostgresMemoryCenterReader(pool);
     const memoryStore = new PostgresMemoryCurationStore(pool, {
@@ -574,6 +576,20 @@ export async function createProductionRuntime(
       decideMemory: (input) => memoryStore.decide(input),
       readHub: () => hubReader.read(),
       readOperations: () => operationsReader.read(),
+      readIntegrations: () => integrationStore.list(),
+      createIntegration: (input) => integrationStore.create(input),
+      writeIntegrationCredential: async (input) => {
+        const secretRef = `secret-store:integrations/${input.integrationId}/credential`;
+        const receipt = await secretStore.write({
+          commandId: input.commandId,
+          secretRef,
+          purpose: "INTEGRATION_CREDENTIAL",
+          plaintext: input.plaintext,
+          writtenAt: input.writtenAt,
+        });
+        await integrationStore.bindCredential(input.integrationId, secretRef, input.writtenAt);
+        return receipt;
+      },
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {
         await taskRunSupervisor?.stop();

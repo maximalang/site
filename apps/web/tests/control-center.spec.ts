@@ -173,6 +173,16 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await page.route("**/api/operations", (route) =>
     route.fulfill({ body: JSON.stringify(operationsFixture), contentType: "application/json" }),
   );
+  await page.route("**/api/integrations", (route) =>
+    route.fulfill({
+      body: JSON.stringify({
+        schemaVersion: 1,
+        generatedAt: "2026-08-13T06:00:04.000Z",
+        integrations: [],
+      }),
+      contentType: "application/json",
+    }),
+  );
   await page.route("**/api/schedules**", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
@@ -576,6 +586,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     page.getByRole("heading", { level: 2, name: "Execution preferences" }),
   ).toBeVisible();
   await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
+  await expect(page.getByRole("heading", { level: 2, name: "Интеграции" })).toBeVisible();
 
   const memorySection = page.locator("section.memory-center-launcher");
   await memorySection.getByRole("button", { name: "Открыть Memory Center" }).click();

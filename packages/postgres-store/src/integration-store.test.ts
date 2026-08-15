@@ -61,4 +61,19 @@ describe("PostgresIntegrationStore", () => {
     expect(registry.integrations[0]).toEqual(expect.objectContaining({ hasCredential: true }));
     expect(JSON.stringify(registry)).not.toContain("secret-store:");
   });
+
+  it("binds only the deterministic encrypted credential reference", async () => {
+    const fake = pool([[{ id: input.id }]]);
+    const store = new PostgresIntegrationStore(fake.value);
+    await expect(
+      store.bindCredential(
+        input.id,
+        `secret-store:integrations/${input.id}/credential`,
+        "2026-08-15T12:01:00.000Z",
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      store.bindCredential(input.id, "secret-store:other/credential", input.createdAt),
+    ).rejects.toThrow(/reference/i);
+  });
 });
