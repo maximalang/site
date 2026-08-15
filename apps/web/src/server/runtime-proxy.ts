@@ -156,6 +156,13 @@ export const applicationIntegrationDependencies = {
     >,
     executedAt: string,
   ) => runtime().executeIntegrationAction({ ...input, executedAt }),
+  registerTool: (
+    input: Omit<
+      Parameters<ReturnType<typeof runtime>["createIntegrationToolAllowlist"]>[0],
+      "createdAt"
+    >,
+    createdAt: string,
+  ) => runtime().createIntegrationToolAllowlist({ ...input, createdAt }),
   requestMutation: (
     input: Omit<
       Parameters<ReturnType<typeof runtime>["requestIntegrationMutation"]>[0],

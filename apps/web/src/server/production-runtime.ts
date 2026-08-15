@@ -678,6 +678,31 @@ export async function createProductionRuntime(
         const result = await integrationAction(prepared.target, input.action, credential);
         return integrationStore.commitAction(command, result, input.executedAt);
       },
+      createIntegrationToolAllowlist: async (input) => {
+        const command = {
+          integrationId: input.integrationId,
+          commandId: `${input.commandId}:discovery`,
+          action: "MCP_LIST_TOOLS" as const,
+        };
+        const prepared = await integrationStore.prepareAction(command);
+        const discovery =
+          "target" in prepared
+            ? await (async () => {
+                const credential = prepared.target.credentialRef
+                  ? await secretStore.read(prepared.target.credentialRef, "INTEGRATION_CREDENTIAL")
+                  : undefined;
+                const result = await integrationAction(prepared.target, command.action, credential);
+                return integrationStore.commitAction(command, result, input.createdAt);
+              })()
+            : prepared;
+        if (
+          discovery.status !== "SUCCEEDED" ||
+          !discovery.items.some((item) => item.id === input.toolName)
+        ) {
+          throw new Error("INTEGRATION_TOOL_NOT_DISCOVERED");
+        }
+        return integrationStore.createToolAllowlist(input);
+      },
       requestIntegrationMutation: ({
         requestId,
         integrationId,

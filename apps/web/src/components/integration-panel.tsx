@@ -6,6 +6,7 @@ import type {
   IntegrationMutation,
   IntegrationMutationReceipt,
   IntegrationRegistry,
+  IntegrationToolAllowlistCreate,
 } from "@agent-world/read-model";
 import { useCallback, useEffect, useState } from "react";
 import { integrationClient } from "../client/integration-api";
@@ -17,6 +18,10 @@ export type IntegrationClient = {
   lifecycle(id: string, operation: "ENABLE" | "DISABLE", csrf: string): Promise<void>;
   probe(id: string, csrf: string): Promise<void>;
   action(id: string, action: IntegrationAction, csrf: string): Promise<IntegrationActionResult>;
+  registerTool(
+    input: Omit<IntegrationToolAllowlistCreate, "createdAt">,
+    csrf: string,
+  ): Promise<void>;
   requestMutation(
     id: string,
     mutation: IntegrationMutation,
@@ -49,6 +54,9 @@ export function IntegrationPanel({
   const [githubRepository, setGithubRepository] = useState("");
   const [githubWorkflow, setGithubWorkflow] = useState("deploy.yml");
   const [githubRef, setGithubRef] = useState("main");
+  const [mcpToolLabel, setMcpToolLabel] = useState("");
+  const [mcpToolName, setMcpToolName] = useState("");
+  const [mcpFixedArguments, setMcpFixedArguments] = useState("{}");
   const refresh = useCallback(
     () =>
       client
@@ -150,6 +158,49 @@ export function IntegrationPanel({
       setBusy(false);
     }
   };
+  const registerMcpTool = async (integrationId: string) => {
+    setBusy(true);
+    setError(false);
+    try {
+      const uuid = crypto.randomUUID();
+      const fixedArguments = JSON.parse(mcpFixedArguments) as unknown;
+      if (!fixedArguments || Array.isArray(fixedArguments) || typeof fixedArguments !== "object")
+        throw new Error("Fixed arguments must be an object");
+      await client.registerTool(
+        {
+          id: `integration_tool_${uuid}`,
+          integrationId,
+          commandId: `integration:tool:create:${uuid}`,
+          label: mcpToolLabel,
+          toolName: mcpToolName,
+          fixedArguments: fixedArguments as IntegrationToolAllowlistCreate["fixedArguments"],
+        },
+        csrfToken,
+      );
+      await refresh();
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const requestMcpTool = async (integrationId: string, toolAllowlistId: string) => {
+    setBusy(true);
+    setError(false);
+    try {
+      setMutationReceipt(
+        await client.requestMutation(
+          integrationId,
+          { kind: "MCP_CALL_REGISTERED_TOOL", toolAllowlistId },
+          csrfToken,
+        ),
+      );
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
   const decideMutation = async (decision: "APPROVE" | "DENY") => {
     if (!mutationReceipt) return;
     setBusy(true);
@@ -190,7 +241,7 @@ export function IntegrationPanel({
       ) : null}
       {mutationReceipt ? (
         <div className="integration-action-result" aria-live="polite">
-          <strong>GitHub workflow dispatch</strong>
+          <strong>Подтверждение внешней write-команды</strong>
           <span>{mutationReceipt.state}</span>
           {mutationReceipt.state === "PENDING" ? (
             <div>
@@ -308,6 +359,57 @@ export function IntegrationPanel({
                 >
                   Запросить запуск
                 </button>
+              </details>
+            ) : null}
+            {item.kind === "MCP" ? (
+              <details>
+                <summary>Advanced · разрешённые write-инструменты</summary>
+                <label>
+                  Название
+                  <input
+                    value={mcpToolLabel}
+                    onChange={(event) => setMcpToolLabel(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Точное имя инструмента
+                  <input
+                    value={mcpToolName}
+                    onChange={(event) => setMcpToolName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Фиксированные аргументы JSON
+                  <textarea
+                    value={mcpFixedArguments}
+                    onChange={(event) => setMcpFixedArguments(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={busy || item.health !== "READY" || !mcpToolLabel || !mcpToolName}
+                  onClick={() => void registerMcpTool(item.id)}
+                >
+                  Проверить и зарегистрировать
+                </button>
+                <ul>
+                  {(registry.toolAllowlist ?? [])
+                    .filter((tool) => tool.integrationId === item.id)
+                    .map((tool) => (
+                      <li key={tool.id}>
+                        <span>
+                          {tool.label} · {tool.toolName}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy || !tool.isEnabled || item.health !== "READY"}
+                          onClick={() => void requestMcpTool(item.id, tool.id)}
+                        >
+                          Запросить вызов
+                        </button>
+                      </li>
+                    ))}
+                </ul>
               </details>
             ) : null}
             <button

@@ -228,7 +228,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 41
+    ledger.rows.at(-1)?.version !== 42
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -3327,6 +3327,55 @@ try {
   if (committedProbe.outcome !== "RECORDED" || replayedProbe.outcome !== "REPLAY") {
     throw new Error("Integration probe observation replay drifted");
   }
+  await pool.query(
+    `UPDATE agent_world.integration_endpoints
+        SET health = 'READY', updated_at = '2026-08-15T11:05:30.000Z'
+      WHERE id = $1`,
+    [mcpIntegration.id],
+  );
+  const toolAllowlist = {
+    id: "integration_tool_e6e6e6e6-e6e6-46e6-86e6-e6e6e6e6e6e6",
+    integrationId: mcpIntegration.id,
+    commandId: "integration:tool:create:isolated",
+    label: "Publish review artifact",
+    toolName: "artifact.publish",
+    fixedArguments: { channel: "review" },
+    createdAt: "2026-08-15T11:05:45.000Z",
+  };
+  if (
+    (await integrationStore.createToolAllowlist(toolAllowlist)).outcome !== "CREATED" ||
+    (await integrationStore.createToolAllowlist(toolAllowlist)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Integration tool allowlist replay drifted");
+  }
+  const mutationStore = new PostgresIntegrationMutationStore(pool);
+  const mcpMutation = {
+    requestId: "integration_mutation_e7e7e7e7-e7e7-47e7-87e7-e7e7e7e7e7e7",
+    integrationId: mcpIntegration.id,
+    commandId: "integration:mutation:request:mcp-tool",
+    mutation: { kind: "MCP_CALL_REGISTERED_TOOL", toolAllowlistId: toolAllowlist.id },
+    requestedAt: "2026-08-15T11:05:50.000Z",
+  };
+  await mutationStore.request(mcpMutation);
+  const approvedMcp = await mutationStore.decide({
+    requestId: mcpMutation.requestId,
+    commandId: "integration:mutation:approve:mcp-tool",
+    decision: "APPROVE",
+    decidedAt: "2026-08-15T11:05:55.000Z",
+  });
+  if (
+    approvedMcp.execution?.mutation.kind !== "MCP_CALL_REGISTERED_TOOL" ||
+    approvedMcp.execution.mutation.toolName !== toolAllowlist.toolName ||
+    JSON.stringify(approvedMcp.execution.mutation.fixedArguments) !==
+      JSON.stringify(toolAllowlist.fixedArguments)
+  ) {
+    throw new Error("Approved MCP mutation did not resolve registry-owned arguments");
+  }
+  await mutationStore.complete({
+    requestId: mcpMutation.requestId,
+    state: "SUCCEEDED",
+    completedAt: "2026-08-15T11:05:59.000Z",
+  });
   const githubSecretRef = `secret-store:integrations/${githubIntegration.id}/credential`;
   await secretStore.write({
     commandId: "integration:credential:github-isolated",
@@ -3346,7 +3395,6 @@ try {
       WHERE id = $1`,
     [githubIntegration.id],
   );
-  const mutationStore = new PostgresIntegrationMutationStore(pool);
   const deniedMutation = {
     requestId: "integration_mutation_e4e4e4e4-e4e4-44e4-84e4-e4e4e4e4e4e4",
     integrationId: githubIntegration.id,
@@ -3416,12 +3464,13 @@ try {
   const integrationRegistry = await integrationStore.list();
   if (
     integrationRegistry.integrations.length !== 3 ||
+    integrationRegistry.toolAllowlist?.length !== 1 ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.hasCredential !==
       true ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.isEnabled !==
       true ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.health !==
-      "ERROR" ||
+      "READY" ||
     (await secretStore.read(integrationSecretRef, "INTEGRATION_CREDENTIAL")) !==
       "isolated-mcp-token" ||
     JSON.stringify(integrationRegistry).includes("secret-store:")

@@ -7,6 +7,7 @@ import {
   IntegrationMutationRequestIdSchema,
   IntegrationMutationSchema,
   IntegrationRegistrySchema,
+  IntegrationToolAllowlistCreateSchema,
 } from "@agent-world/read-model";
 import * as z from "zod";
 import { hasSameOriginHost } from "./request-security";
@@ -47,6 +48,13 @@ const MutationDecisionSchema = z.strictObject({
   commandId: z.string().trim().min(1).max(512),
   decision: z.enum(["APPROVE", "DENY"]),
 });
+const RegisterToolSchema = IntegrationToolAllowlistCreateSchema.omit({ createdAt: true }).extend({
+  operation: z.literal("REGISTER_TOOL"),
+});
+const RegisterToolResultSchema = z.strictObject({
+  outcome: z.enum(["CREATED", "REPLAY"]),
+  toolAllowlistId: IntegrationToolAllowlistCreateSchema.shape.id,
+});
 const ProbeResultSchema = z.strictObject({
   schemaVersion: z.literal(1),
   integrationId: IntegrationIdSchema,
@@ -64,6 +72,10 @@ export type IntegrationHttpDependencies = {
   lifecycle(input: z.infer<typeof LifecycleSchema>, updatedAt: string): Promise<unknown>;
   probe(input: z.infer<typeof ProbeSchema>, checkedAt: string): Promise<unknown>;
   action(input: z.infer<typeof ActionSchema>, executedAt: string): Promise<unknown>;
+  registerTool?(
+    input: Omit<z.infer<typeof RegisterToolSchema>, "operation">,
+    createdAt: string,
+  ): Promise<unknown>;
   requestMutation(
     input: z.infer<typeof MutationRequestSchema>,
     requestedAt: string,
@@ -119,15 +131,27 @@ export function createIntegrationRouteHandlers(dependencies: IntegrationHttpDepe
                   ? IntegrationActionResultSchema.parse(
                       await dependencies.action(ActionSchema.parse(raw), now),
                     )
-                  : raw.operation === "REQUEST_MUTATION"
-                    ? IntegrationMutationReceiptSchema.parse(
-                        await dependencies.requestMutation(MutationRequestSchema.parse(raw), now),
+                  : raw.operation === "REGISTER_TOOL" && dependencies.registerTool
+                    ? RegisterToolResultSchema.parse(
+                        await dependencies.registerTool(
+                          (({ operation: _operation, ...command }) => command)(
+                            RegisterToolSchema.parse(raw),
+                          ),
+                          now,
+                        ),
                       )
-                    : raw.operation === "DECIDE_MUTATION"
+                    : raw.operation === "REQUEST_MUTATION"
                       ? IntegrationMutationReceiptSchema.parse(
-                          await dependencies.decideMutation(MutationDecisionSchema.parse(raw), now),
+                          await dependencies.requestMutation(MutationRequestSchema.parse(raw), now),
                         )
-                      : await dependencies.create(IntegrationCreateSchema.parse(raw));
+                      : raw.operation === "DECIDE_MUTATION"
+                        ? IntegrationMutationReceiptSchema.parse(
+                            await dependencies.decideMutation(
+                              MutationDecisionSchema.parse(raw),
+                              now,
+                            ),
+                          )
+                        : await dependencies.create(IntegrationCreateSchema.parse(raw));
         return Response.json({ schemaVersion: 1, result }, { headers, status: 201 });
       } catch {
         return error("INTEGRATION_COMMAND_REJECTED", 409);

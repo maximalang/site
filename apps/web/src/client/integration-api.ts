@@ -5,6 +5,7 @@ import {
   type IntegrationMutation,
   IntegrationMutationReceiptSchema,
   IntegrationRegistrySchema,
+  type IntegrationToolAllowlistCreate,
 } from "@agent-world/read-model";
 
 export const integrationClient = {
@@ -80,6 +81,15 @@ export const integrationClient = {
     if (!response.ok) throw new Error("Integration action rejected");
     const body = (await response.json()) as { result?: unknown };
     return IntegrationActionResultSchema.parse(body.result);
+  },
+  async registerTool(input: Omit<IntegrationToolAllowlistCreate, "createdAt">, csrfToken: string) {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({ operation: "REGISTER_TOOL", ...input }),
+    });
+    if (!response.ok) throw new Error("Integration tool registration rejected");
   },
   async requestMutation(integrationId: string, mutation: IntegrationMutation, csrfToken: string) {
     const uuid = crypto.randomUUID();

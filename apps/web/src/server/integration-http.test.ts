@@ -178,6 +178,42 @@ describe("integration HTTP boundary", () => {
     );
   });
 
+  it("registers an MCP tool separately from requesting its write invocation", async () => {
+    const registerTool = vi.fn().mockResolvedValue({
+      outcome: "CREATED",
+      toolAllowlistId: "integration_tool_11111111-1111-1111-1111-111111111111",
+    });
+    const handlers = createIntegrationRouteHandlers({
+      authorize: async () => true,
+      list: vi.fn(),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action: vi.fn(),
+      registerTool,
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
+      now: () => new Date(registry.generatedAt),
+    });
+    const response = await handlers.POST(
+      request({
+        operation: "REGISTER_TOOL",
+        id: "integration_tool_11111111-1111-1111-1111-111111111111",
+        integrationId: create.id,
+        commandId: "integration:tool:create:1",
+        label: "Publish review artifact",
+        toolName: "artifact.publish",
+        fixedArguments: { channel: "review" },
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(registerTool.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ toolName: "artifact.publish" }),
+    );
+    expect(registerTool.mock.calls[0]?.[0]).not.toHaveProperty("operation");
+  });
+
   it("keeps mutation request and explicit owner approval as separate commands", async () => {
     const mutation = {
       kind: "GITHUB_DISPATCH_WORKFLOW" as const,

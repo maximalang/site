@@ -7,6 +7,9 @@ import {
   type IntegrationRegistry,
   IntegrationRegistrySchema,
   IntegrationSummarySchema,
+  type IntegrationToolAllowlistCreate,
+  IntegrationToolAllowlistCreateSchema,
+  IntegrationToolAllowlistSummarySchema,
 } from "@agent-world/read-model";
 import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
@@ -25,6 +28,15 @@ type Row = QueryResultRow & {
   is_enabled: boolean;
   created_at: Date | string;
   updated_at: Date | string;
+};
+type ToolRow = QueryResultRow & {
+  id: string;
+  integration_id: string;
+  label: string;
+  tool_name: string;
+  fixed_arguments: unknown;
+  is_enabled: boolean;
+  created_at: Date | string;
 };
 
 function iso(value: Date | string) {
@@ -64,12 +76,92 @@ export class PostgresIntegrationStore {
                 ssh_username, credential_ref, health, is_enabled, created_at, updated_at
            FROM agent_world.integration_endpoints ORDER BY id LIMIT 201`,
       );
+      const tools = await client.query<ToolRow>(
+        `SELECT id, integration_id, label, tool_name, fixed_arguments, is_enabled, created_at
+           FROM agent_world.integration_tool_allowlist ORDER BY created_at, id LIMIT 501`,
+      );
       if (result.rows.length > 200) throw new Error("Integration registry exceeds bounded limit");
+      if (tools.rows.length > 500)
+        throw new Error("Integration tool allowlist exceeds bounded limit");
       return IntegrationRegistrySchema.parse({
         schemaVersion: 1,
         generatedAt: this.now().toISOString(),
         integrations: result.rows.map(summary),
+        toolAllowlist: tools.rows.map((row) =>
+          IntegrationToolAllowlistSummarySchema.parse({
+            id: row.id,
+            integrationId: row.integration_id,
+            label: row.label,
+            toolName: row.tool_name,
+            fixedArguments: row.fixed_arguments,
+            isEnabled: row.is_enabled,
+            createdAt: iso(row.created_at),
+          }),
+        ),
       });
+    } finally {
+      client.release();
+    }
+  }
+
+  async createToolAllowlist(inputValue: IntegrationToolAllowlistCreate) {
+    const input = IntegrationToolAllowlistCreateSchema.parse(inputValue);
+    const requestHash = hash(input);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        input.commandId,
+      ]);
+      const existing = await client.query<{
+        request_sha256: string;
+        tool_allowlist_id: string;
+      }>(
+        `SELECT request_sha256, tool_allowlist_id
+           FROM agent_world.integration_tool_allowlist_receipts WHERE command_id = $1`,
+        [input.commandId],
+      );
+      if (existing.rows[0]) {
+        if (
+          existing.rows.length !== 1 ||
+          existing.rows[0].request_sha256 !== requestHash ||
+          existing.rows[0].tool_allowlist_id !== input.id
+        ) {
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        }
+        await client.query("COMMIT");
+        return { outcome: "REPLAY" as const, toolAllowlistId: input.id };
+      }
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO agent_world.integration_tool_allowlist
+           (id, integration_id, label, tool_name, fixed_arguments, created_at)
+         SELECT $1, endpoint.id, $3, $4, $5::jsonb, $6
+           FROM agent_world.integration_endpoints endpoint
+          WHERE endpoint.id = $2 AND endpoint.kind = 'MCP'
+            AND endpoint.transport = 'HTTPS' AND endpoint.is_enabled = true
+            AND endpoint.health = 'READY' AND endpoint.credential_ref IS NOT NULL
+         RETURNING id`,
+        [
+          input.id,
+          input.integrationId,
+          input.label,
+          input.toolName,
+          JSON.stringify(input.fixedArguments),
+          input.createdAt,
+        ],
+      );
+      if (inserted.rows.length !== 1) throw new Error("INTEGRATION_TOOL_UNAVAILABLE");
+      await client.query(
+        `INSERT INTO agent_world.integration_tool_allowlist_receipts
+           (command_id, request_sha256, tool_allowlist_id, created_at)
+         VALUES ($1, $2, $3, $4)`,
+        [input.commandId, requestHash, input.id, input.createdAt],
+      );
+      await client.query("COMMIT");
+      return { outcome: "CREATED" as const, toolAllowlistId: input.id };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }

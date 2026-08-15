@@ -25,6 +25,7 @@ describe("IntegrationPanel", () => {
         items: [],
         executedAt: "2026-08-15T12:00:00.000Z",
       }),
+      registerTool: vi.fn(),
       requestMutation: vi.fn(),
       decideMutation: vi.fn(),
     };
@@ -75,6 +76,7 @@ describe("IntegrationPanel", () => {
       lifecycle: vi.fn(),
       probe,
       action: vi.fn(),
+      registerTool: vi.fn(),
       requestMutation: vi.fn(),
       decideMutation: vi.fn(),
     };
@@ -118,6 +120,7 @@ describe("IntegrationPanel", () => {
       lifecycle: vi.fn(),
       probe: vi.fn(),
       action,
+      registerTool: vi.fn(),
       requestMutation: vi.fn(),
       decideMutation: vi.fn(),
     };
@@ -177,6 +180,7 @@ describe("IntegrationPanel", () => {
       lifecycle: vi.fn(),
       probe: vi.fn(),
       action: vi.fn(),
+      registerTool: vi.fn(),
       requestMutation,
       decideMutation,
     };

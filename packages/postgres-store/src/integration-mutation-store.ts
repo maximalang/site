@@ -63,6 +63,20 @@ type TargetRow = QueryResultRow & {
   health: string;
   is_enabled: boolean;
 };
+type ToolRow = QueryResultRow & {
+  integration_id: string;
+  tool_name: string;
+  fixed_arguments: Record<string, unknown>;
+  is_enabled: boolean;
+};
+
+export type ExecutableIntegrationMutation =
+  | Exclude<IntegrationMutation, { kind: "MCP_CALL_REGISTERED_TOOL" }>
+  | {
+      kind: "MCP_CALL_REGISTERED_TOOL";
+      toolName: string;
+      fixedArguments: Record<string, unknown>;
+    };
 
 const iso = (value: Date | string) =>
   (value instanceof Date ? value : new Date(value)).toISOString();
@@ -95,7 +109,7 @@ export class PostgresIntegrationMutationStore {
   async request(inputValue: z.input<typeof RequestSchema>) {
     const input = RequestSchema.parse(inputValue);
     const requestHash = hash(input);
-    const expectedKind = "GITHUB";
+    const expectedKind = input.mutation.kind === "MCP_CALL_REGISTERED_TOOL" ? "MCP" : "GITHUB";
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -125,6 +139,20 @@ export class PostgresIntegrationMutationStore {
         [input.integrationId],
       );
       const integration = target.rows[0];
+      if (input.mutation.kind === "MCP_CALL_REGISTERED_TOOL") {
+        const tool = await client.query<ToolRow>(
+          `SELECT integration_id, tool_name, fixed_arguments, is_enabled
+             FROM agent_world.integration_tool_allowlist WHERE id = $1 FOR SHARE`,
+          [input.mutation.toolAllowlistId],
+        );
+        if (
+          tool.rows.length !== 1 ||
+          tool.rows[0]?.integration_id !== input.integrationId ||
+          tool.rows[0]?.is_enabled !== true
+        ) {
+          throw new Error("INTEGRATION_TOOL_UNAVAILABLE");
+        }
+      }
       if (
         !integration ||
         integration.kind !== expectedKind ||
@@ -225,6 +253,30 @@ export class PostgresIntegrationMutationStore {
       ) {
         throw new Error("INTEGRATION_MUTATION_UNAVAILABLE");
       }
+      const mutation = IntegrationMutationSchema.parse(row.mutation) as IntegrationMutation;
+      let executableMutation: ExecutableIntegrationMutation = mutation as Exclude<
+        IntegrationMutation,
+        { kind: "MCP_CALL_REGISTERED_TOOL" }
+      >;
+      if (mutation.kind === "MCP_CALL_REGISTERED_TOOL") {
+        const tool = await client.query<ToolRow>(
+          `SELECT integration_id, tool_name, fixed_arguments, is_enabled
+             FROM agent_world.integration_tool_allowlist WHERE id = $1`,
+          [mutation.toolAllowlistId],
+        );
+        if (
+          tool.rows.length !== 1 ||
+          tool.rows[0]?.integration_id !== row.integration_id ||
+          tool.rows[0]?.is_enabled !== true
+        ) {
+          throw new Error("INTEGRATION_TOOL_UNAVAILABLE");
+        }
+        executableMutation = {
+          kind: "MCP_CALL_REGISTERED_TOOL",
+          toolName: tool.rows[0].tool_name,
+          fixedArguments: tool.rows[0].fixed_arguments,
+        };
+      }
       await client.query("COMMIT");
       return {
         receipt: receipt(row, "RECORDED"),
@@ -232,7 +284,7 @@ export class PostgresIntegrationMutationStore {
           integrationId: IntegrationIdSchema.parse(integration.id),
           endpointUrl: integration.endpoint_url,
           credentialRef: integration.credential_ref,
-          mutation: IntegrationMutationSchema.parse(row.mutation) as IntegrationMutation,
+          mutation: executableMutation,
         },
       };
     } catch (error) {

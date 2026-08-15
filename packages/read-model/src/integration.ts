@@ -14,7 +14,18 @@ export const IntegrationActionSchema = z.enum([
 export const IntegrationMutationRequestIdSchema = z
   .string()
   .regex(/^integration_mutation_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+export const IntegrationToolAllowlistIdSchema = z
+  .string()
+  .regex(/^integration_tool_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+const FixedToolArgumentsSchema = z
+  .record(z.string().trim().min(1).max(120), z.json())
+  .refine((value) => Object.keys(value).length <= 50, "Too many fixed tool arguments")
+  .refine((value) => JSON.stringify(value).length <= 8_192, "Fixed tool arguments are too large");
 export const IntegrationMutationSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("MCP_CALL_REGISTERED_TOOL"),
+    toolAllowlistId: IntegrationToolAllowlistIdSchema,
+  }),
   z.strictObject({
     kind: z.literal("GITHUB_DISPATCH_WORKFLOW"),
     owner: z
@@ -43,6 +54,24 @@ export const IntegrationMutationSchema = z.discriminatedUnion("kind", [
       .regex(/^[A-Za-z0-9._/-]+$/),
   }),
 ]);
+export const IntegrationToolAllowlistCreateSchema = z.strictObject({
+  id: IntegrationToolAllowlistIdSchema,
+  integrationId: IntegrationIdSchema,
+  commandId: z.string().trim().min(1).max(512),
+  label: z.string().trim().min(1).max(120),
+  toolName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .regex(/^[A-Za-z0-9._:-]+$/),
+  fixedArguments: FixedToolArgumentsSchema,
+  createdAt: TimestampSchema,
+});
+export const IntegrationToolAllowlistSummarySchema = IntegrationToolAllowlistCreateSchema.omit({
+  commandId: true,
+  createdAt: true,
+}).extend({ isEnabled: z.boolean(), createdAt: TimestampSchema });
 export const IntegrationMutationStateSchema = z.enum([
   "PENDING",
   "DENIED",
@@ -145,6 +174,7 @@ export const IntegrationRegistrySchema = z.strictObject({
   schemaVersion: z.literal(1),
   generatedAt: TimestampSchema,
   integrations: z.array(IntegrationSummarySchema).max(200),
+  toolAllowlist: z.array(IntegrationToolAllowlistSummarySchema).max(500).optional(),
 });
 export type IntegrationCreate = z.infer<typeof IntegrationCreateSchema>;
 export type IntegrationRegistry = z.infer<typeof IntegrationRegistrySchema>;
@@ -152,3 +182,4 @@ export type IntegrationAction = z.infer<typeof IntegrationActionSchema>;
 export type IntegrationActionResult = z.infer<typeof IntegrationActionResultSchema>;
 export type IntegrationMutation = z.infer<typeof IntegrationMutationSchema>;
 export type IntegrationMutationReceipt = z.infer<typeof IntegrationMutationReceiptSchema>;
+export type IntegrationToolAllowlistCreate = z.infer<typeof IntegrationToolAllowlistCreateSchema>;

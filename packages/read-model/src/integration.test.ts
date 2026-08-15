@@ -4,10 +4,24 @@ import {
   IntegrationMutationReceiptSchema,
   IntegrationMutationSchema,
   IntegrationRegistrySchema,
+  IntegrationToolAllowlistCreateSchema,
 } from "./integration.js";
 
 describe("Integration contracts", () => {
   it("accepts only predefined bounded integration mutations", () => {
+    expect(
+      IntegrationMutationSchema.parse({
+        kind: "MCP_CALL_REGISTERED_TOOL",
+        toolAllowlistId: "integration_tool_11111111-1111-1111-1111-111111111111",
+      }).kind,
+    ).toBe("MCP_CALL_REGISTERED_TOOL");
+    expect(() =>
+      IntegrationMutationSchema.parse({
+        kind: "MCP_CALL_REGISTERED_TOOL",
+        toolName: "dangerous_tool",
+        arguments: { command: "rm -rf /" },
+      }),
+    ).toThrow();
     expect(() =>
       IntegrationMutationSchema.parse({
         kind: "N8N_TRIGGER_WEBHOOK",
@@ -26,6 +40,20 @@ describe("Integration contracts", () => {
         ref: "main; shutdown",
       }),
     ).toThrow();
+  });
+
+  it("registers immutable bounded MCP arguments instead of caller-owned invocation input", () => {
+    expect(
+      IntegrationToolAllowlistCreateSchema.parse({
+        id: "integration_tool_11111111-1111-1111-1111-111111111111",
+        integrationId: "integration_11111111-1111-1111-1111-111111111111",
+        commandId: "integration:tool:create:1",
+        label: "Publish approved artifact",
+        toolName: "artifact.publish",
+        fixedArguments: { channel: "review" },
+        createdAt: "2026-08-15T12:00:00.000Z",
+      }).fixedArguments,
+    ).toEqual({ channel: "review" });
   });
 
   it("keeps an outcome-unknown mutation distinct from a retryable failure", () => {

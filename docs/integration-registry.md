@@ -28,9 +28,22 @@ PostgreSQL lifecycle is `PENDING -> DENIED` or
 starts only after approval. A connection failure after sending is terminal
 `OUTCOME_UNKNOWN` and is never retried automatically. The executor accepts only
 the canonical GitHub dispatch path and pinned, allowlisted HTTPS connection.
-MCP writes and SSH service/deployment operations remain unavailable until a
-separate allowlisted tool/service registry exists; arbitrary remote commands
-are intentionally not exposed.
+
+MCP writes use a second, narrower registry. The owner first selects an exact
+tool returned by a fresh `tools/list` discovery and stores immutable, bounded
+JSON arguments in `integration_tool_allowlist`. A Run or UI caller can request
+only the resulting allowlist ID; it cannot supply a tool name or arguments at
+invocation time. The same separate approval lifecycle applies, and the
+executor resolves the tool and fixed arguments inside the approval transaction
+before calling `tools/call`. JSON-RPC rejection is a definite failure; an
+invalid response or transport/server interruption after dispatch is
+`OUTCOME_UNKNOWN` and is not retried. Docker MCP Gateway remains the preferred
+reused isolation/profile/secrets layer; AI World owns only its canonical
+allowlist, approval and event evidence.
+
+SSH service/deployment operations remain unavailable until a separate
+allowlisted service registry exists; arbitrary remote commands are
+intentionally not exposed.
 
 Remote access is deny-by-default. Add exact hostnames to
 `AGENT_WORLD_INTEGRATION_ALLOWED_HOSTS`. If any allowlisted hostname resolves to
@@ -43,6 +56,7 @@ Protocol references:
 
 - [MCP Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)
 - [MCP lifecycle](https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle)
+- [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
 - [n8n monitoring endpoints](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/monitor-n8n/)
 - [GitHub REST authentication](https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api)
 - [GitHub authenticated user endpoint](https://docs.github.com/en/rest/users/users#get-the-authenticated-user)

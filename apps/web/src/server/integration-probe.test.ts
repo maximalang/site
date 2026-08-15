@@ -150,6 +150,49 @@ describe("approved integration mutations", () => {
     });
   });
 
+  it("calls an approved MCP tool with only its registry-owned fixed arguments", async () => {
+    const https = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 200,
+        body: JSON.stringify({ jsonrpc: "2.0", id: "initialize", result: {} }),
+        contentType: "application/json",
+        sessionId: "session-1",
+      })
+      .mockResolvedValueOnce({ status: 202, body: "", contentType: "" })
+      .mockResolvedValueOnce({
+        status: 200,
+        body: JSON.stringify({ jsonrpc: "2.0", id: "tool-call", result: { content: [] } }),
+        contentType: "application/json",
+      });
+    const result = await createNodeIntegrationMutationExecutor(
+      { allowedHosts: ["mcp.example"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "203.0.113.10", family: 4 }),
+        https,
+      },
+    )({
+      endpointUrl: "https://mcp.example/mcp",
+      credential: "token",
+      mutation: {
+        kind: "MCP_CALL_REGISTERED_TOOL",
+        toolName: "artifact.publish",
+        fixedArguments: { channel: "review" },
+      },
+    });
+    expect(result).toEqual({ state: "SUCCEEDED" });
+    expect(https).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(https.mock.calls[2]?.[5])).toEqual({
+      jsonrpc: "2.0",
+      id: "tool-call",
+      method: "tools/call",
+      params: { name: "artifact.publish", arguments: { channel: "review" } },
+    });
+    expect(https.mock.calls[2]?.[4]).toEqual(
+      expect.objectContaining({ "mcp-session-id": "session-1" }),
+    );
+  });
+
   it("does not retry a transport failure with an unknown remote outcome", async () => {
     const https = vi.fn().mockRejectedValue(new Error("socket reset"));
     const result = await createNodeIntegrationMutationExecutor(

@@ -1,7 +1,8 @@
 import { promises as dns } from "node:dns";
 import { request as httpsRequest } from "node:https";
 import { BlockList, connect, isIP } from "node:net";
-import type { IntegrationAction, IntegrationMutation } from "@agent-world/read-model";
+import type { ExecutableIntegrationMutation } from "@agent-world/postgres-store";
+import type { IntegrationAction } from "@agent-world/read-model";
 
 const MAX_REMOTE_RESPONSE_BYTES = 32_768;
 
@@ -341,7 +342,7 @@ export function createNodeIntegrationMutationExecutor(
   return async (input: {
     endpointUrl: string;
     credential: string;
-    mutation: IntegrationMutation;
+    mutation: ExecutableIntegrationMutation;
   }): Promise<
     { state: "SUCCEEDED" } | { state: "FAILED" | "OUTCOME_UNKNOWN"; failureCode: string }
   > => {
@@ -361,10 +362,81 @@ export function createNodeIntegrationMutationExecutor(
         failureCode: error instanceof Error ? error.message.slice(0, 64) : "ROUTE_UNAVAILABLE",
       };
     }
+    const mcpUrl = new URL(base);
+    if (input.mutation.kind === "MCP_CALL_REGISTERED_TOOL") {
+      const headers: Record<string, string> = {
+        accept: "application/json, text/event-stream",
+        authorization: `Bearer ${input.credential}`,
+        "content-type": "application/json",
+        "user-agent": "agent-world-integration-mutation/1",
+      };
+      try {
+        const initialize = await callHttps(
+          mcpUrl,
+          resolved.address,
+          resolved.family,
+          "POST",
+          headers,
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: "initialize",
+            method: "initialize",
+            params: {
+              protocolVersion: "2025-06-18",
+              capabilities: {},
+              clientInfo: { name: "agent-world", version: "1" },
+            },
+          }),
+        );
+        if (initialize.status < 200 || initialize.status >= 300)
+          return initialize.status >= 500
+            ? { state: "OUTCOME_UNKNOWN", failureCode: "REMOTE_OUTCOME_UNKNOWN" }
+            : { state: "FAILED", failureCode: "REMOTE_REJECTED" };
+        if (initialize.sessionId) headers["mcp-session-id"] = initialize.sessionId;
+        const initialized = await callHttps(
+          mcpUrl,
+          resolved.address,
+          resolved.family,
+          "POST",
+          headers,
+          JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+        );
+        if (initialized.status < 200 || initialized.status >= 300)
+          return initialized.status >= 500
+            ? { state: "OUTCOME_UNKNOWN", failureCode: "REMOTE_OUTCOME_UNKNOWN" }
+            : { state: "FAILED", failureCode: "REMOTE_REJECTED" };
+        const response = await callHttps(
+          mcpUrl,
+          resolved.address,
+          resolved.family,
+          "POST",
+          headers,
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: "tool-call",
+            method: "tools/call",
+            params: { name: input.mutation.toolName, arguments: input.mutation.fixedArguments },
+          }),
+        );
+        if (response.status < 200 || response.status >= 300)
+          return response.status >= 500
+            ? { state: "OUTCOME_UNKNOWN", failureCode: "REMOTE_OUTCOME_UNKNOWN" }
+            : { state: "FAILED", failureCode: "REMOTE_REJECTED" };
+        const payload = jsonPayload(response);
+        if (payload.error !== undefined)
+          return { state: "FAILED", failureCode: "MCP_TOOL_REJECTED" };
+        if (!payload.result || typeof payload.result !== "object")
+          return { state: "OUTCOME_UNKNOWN", failureCode: "MCP_RESULT_INVALID" };
+        return { state: "SUCCEEDED" };
+      } catch {
+        return { state: "OUTCOME_UNKNOWN", failureCode: "INTERRUPTED_OUTCOME_UNKNOWN" };
+      }
+    }
+    const githubMutation = input.mutation;
     const url = new URL(base.origin);
     url.pathname = `/repos/${encodeURIComponent(input.mutation.owner)}/${encodeURIComponent(
-      input.mutation.repository,
-    )}/actions/workflows/${encodeURIComponent(input.mutation.workflowId)}/dispatches`;
+      githubMutation.repository,
+    )}/actions/workflows/${encodeURIComponent(githubMutation.workflowId)}/dispatches`;
     const headers = {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${input.credential}`,
@@ -380,7 +452,7 @@ export function createNodeIntegrationMutationExecutor(
         resolved.family,
         "POST",
         headers,
-        JSON.stringify({ ref: input.mutation.ref, return_run_details: true }),
+        JSON.stringify({ ref: githubMutation.ref, return_run_details: true }),
       );
     } catch {
       return { state: "OUTCOME_UNKNOWN", failureCode: "INTERRUPTED_OUTCOME_UNKNOWN" };

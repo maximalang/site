@@ -42,6 +42,7 @@ function runtime() {
     setIntegrationEnabled: vi.fn(),
     probeIntegration: vi.fn(),
     executeIntegrationAction: vi.fn(),
+    createIntegrationToolAllowlist: vi.fn(),
     requestIntegrationMutation: vi.fn(),
     decideIntegrationMutation: vi.fn(),
     readWorld: vi.fn(),

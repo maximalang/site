@@ -54,6 +54,7 @@ describe("PostgresIntegrationStore", () => {
           updated_at: input.createdAt,
         },
       ],
+      [],
     ]);
     const registry = await new PostgresIntegrationStore(
       fake.value,
