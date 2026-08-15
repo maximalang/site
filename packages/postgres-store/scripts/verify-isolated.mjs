@@ -2762,6 +2762,18 @@ try {
   ) {
     throw new Error("Mission decomposition did not create transport-neutral dependent Tasks");
   }
+  try {
+    await approvalStore.decide({
+      taskId: decomposition.tasks[1].taskId,
+      approvalId: `approval_${decomposition.tasks[1].taskId.slice("task_".length)}`,
+      decision: "APPROVE",
+      commandId: `approval-decision:approve:${decomposition.tasks[1].taskId.slice("task_".length)}`,
+      decidedAt: "2026-08-13T09:25:00.000Z",
+    });
+    throw new Error("Mission dependency guard accepted an incomplete downstream Task");
+  } catch (error) {
+    if (error?.code !== "DEPENDENCIES_INCOMPLETE") throw error;
+  }
 
   const scheduleTaskIds = ["task_b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1"];
   const scheduleFiringIds = ["schedule_firing_b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2"];
@@ -2827,7 +2839,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 17, scheduleScenarios: 5, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: IMAGE, migrations: migrations.length, tables: names.length, hubScenarios: 15, missionScenarios: 18, scheduleScenarios: 5, executionPreferenceScenarios: 6, resourceBrokerScenarios: 7, nativeChatLauncherScenarios: 5, secretStoreScenarios: 2, modelRouteScenarios: 2, conversationStoreScenarios: 11, conversationReaderScenarios: 2, ownerAuthScenarios: 6, worldReplayScenarios: 4, runtimeMessageScenarios: 3, taskAssignmentScenarios: 5, sharedContextScenarios: 14, memoryCurationScenarios: 12, memoryProjectionScenarios: 10, codexExecutionScenarios: 23, nativeChatControlScenarios: 9, nativeChatPullScenarios: 7 })}\n`,
   );
 } finally {
   await pool?.end().catch(() => undefined);

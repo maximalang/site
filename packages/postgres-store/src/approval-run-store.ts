@@ -63,6 +63,7 @@ type ApprovalTaskRow = QueryResultRow & {
   conversation_id: string;
   project_id: string;
   agent_id: string;
+  dependencies_ready: boolean;
 };
 
 type ActiveSessionRow = QueryResultRow & {
@@ -109,7 +110,8 @@ export type ApprovalRunStoreErrorCode =
   | "DECISION_CONFLICT"
   | "NO_ELIGIBLE_ROUTE"
   | "NO_ACTIVE_SESSION"
-  | "RUN_ACTIVE";
+  | "RUN_ACTIVE"
+  | "DEPENDENCIES_INCOMPLETE";
 
 const ERROR_CODES = new Set<ApprovalRunStoreErrorCode>([
   "APPROVAL_NOT_FOUND",
@@ -118,6 +120,7 @@ const ERROR_CODES = new Set<ApprovalRunStoreErrorCode>([
   "NO_ELIGIBLE_ROUTE",
   "NO_ACTIVE_SESSION",
   "RUN_ACTIVE",
+  "DEPENDENCIES_INCOMPLETE",
 ]);
 
 export class ApprovalRunStoreError extends Error {
@@ -259,7 +262,18 @@ export class PostgresApprovalRunStore {
       const found = await client.query<ApprovalTaskRow>(
         `SELECT a.id, a.task_id, a.state, a.requested_at, a.expires_at,
                 a.decided_at, a.reason, a.decision_command_id,
-                t.conversation_id, t.project_id, t.assignee_agent_id AS agent_id
+                t.conversation_id, t.project_id, t.assignee_agent_id AS agent_id,
+                NOT EXISTS (
+                  SELECT 1
+                    FROM agent_world.mission_task_dependencies dependency
+                   WHERE dependency.task_id = t.id
+                     AND NOT EXISTS (
+                       SELECT 1
+                         FROM agent_world.runs dependency_run
+                        WHERE dependency_run.task_id = dependency.depends_on_task_id
+                          AND dependency_run.status = 'COMPLETED'
+                     )
+                ) AS dependencies_ready
            FROM agent_world.approvals a
            JOIN agent_world.tasks t ON t.id = a.task_id
           WHERE a.task_id = $1 OR a.decision_command_id = $2
@@ -314,6 +328,9 @@ export class PostgresApprovalRunStore {
 
       if (decision.decision === "APPROVE") {
         if (row.state !== "PENDING") throw new ApprovalRunStoreError("DECISION_CONFLICT");
+        if (!row.dependencies_ready) {
+          throw new ApprovalRunStoreError("DEPENDENCIES_INCOMPLETE");
+        }
         const brokerDecision = await this.selectRoute(client, {
           taskId: row.task_id,
           projectId: row.project_id,

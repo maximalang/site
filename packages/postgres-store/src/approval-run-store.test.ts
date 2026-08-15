@@ -35,6 +35,7 @@ const pendingApproval = {
   conversation_id: "conversation_33333333-3333-3333-3333-333333333333",
   project_id: "project_33333333-3333-3333-3333-333333333333",
   agent_id: agentId,
+  dependencies_ready: true,
 };
 
 describe("PostgresApprovalRunStore", () => {
@@ -45,6 +46,25 @@ describe("PostgresApprovalRunStore", () => {
     expect(
       isApprovalRunStoreError({ name: "ApprovalRunStoreError", code: "DATABASE_SECRET" }),
     ).toBe(false);
+  });
+
+  it("refuses to approve a Mission Task before every dependency has a completed Run", async () => {
+    const fake = pool([[], [], [{ ...pendingApproval, dependencies_ready: false }], []]);
+    await expect(
+      new PostgresApprovalRunStore(fake.value, {
+        eventId: () => "event_88888888-8888-4888-8888-888888888888",
+      }).decide({
+        taskId,
+        approvalId,
+        decision: "APPROVE",
+        commandId: "approval-decision:approve:11111111-1111-1111-1111-111111111111",
+        decidedAt: "2026-08-13T10:05:00.000Z",
+      }),
+    ).rejects.toMatchObject({ code: "DEPENDENCIES_INCOMPLETE" });
+    expect(
+      fake.query.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO agent_world.runs")),
+    ).toBe(false);
+    expect(fake.query).toHaveBeenLastCalledWith("ROLLBACK");
   });
 
   it("atomically approves and creates one provenance-complete dispatch-pending Run", async () => {
