@@ -26,7 +26,7 @@ proven. `OPEN` means the required product surface is absent.
 | 17 | Configure an Agent schedule | PASS | Strict Agent schedule contracts, timezone/DST-aware recurrence, PostgreSQL schedules/firings, atomic Task + approval + World-event materialization, restart-safe polling and the owner-only Hub Simple/Advanced UI are proven by 5 real isolated-PostgreSQL schedule scenarios, standalone restart verification, unit tests and five-viewport Playwright/axe tests. Account and transport are intentionally absent from schedule intent. |
 | 18 | Manage MCP/n8n/servers/SSH from the site | PARTIAL | The owner-only Hub registry creates, lists, enables, disables and explicitly tests MCP, n8n, GitHub and SSH endpoints. A `READY` integration now exposes a predefined read-only action: MCP `tools/list`, n8n workflow list, GitHub repository list or SSH host inspection. Exact-host allowlisting, reserved-address blocking, private-network acknowledgement, pinned DNS, no redirects, bounded normalized output, encrypted/write-only credentials and durable PostgreSQL action replay are enforced. Isolated production HTTP proves the action receipt and restart-safe replay. Approval-gated write/workflow-trigger/shell/deploy actions remain the gap; arbitrary remote execution is intentionally not exposed. |
 | 19 | See tokens/limits/cost/context pressure | PARTIAL | The native Operations Observatory now shows persisted Codex input/cached/output tokens, aggregate Context Pack pressure and fresh/stale Broker quality, remaining-limit, speed, load and cost-efficiency signals. Actual monetary spend is deliberately shown as unavailable because no authoritative spend source is integrated yet; that missing source is the remaining gap. |
-| 20 | Automatically choose the rational Route | PASS | Resource Broker scores fresh quality, limits, cost, latency and load evidence and appends its exact decision event. |
+| 20 | Automatically choose the rational Route | PARTIAL | Resource Broker scores fresh quality, limits, cost, latency and load evidence and appends its exact decision event. Production dispatch currently resolves only READY OpenClaw and Codex adapters; an `API_MODEL` or `LOCAL_MODEL` decision has no registered Task execution adapter, so rational selection is proven but end-to-end execution/fallback for those routes is not. |
 | 21 | Survive restart without Task/Run/context loss | PASS | Isolated PostgreSQL, standalone restart, LangGraph checkpoint and Compose backup/restore verifiers cover the durable boundaries. |
 | 22 | Spend no LLM tokens on animation/chatter | PASS | World cues are deterministic projections; structured meetings prohibit transcript/chatter fields. |
 | 23 | Do not send every Agent the full history | PASS | Lazy MCP pulls and ContextCompiler category/token limits exclude full transcripts by default. |
@@ -56,7 +56,8 @@ substitute for the two account-bound live gates below.
 
 1. Add policy- and approval-gated predefined integration actions for n8n,
    GitHub and SSH/VDS; do not expose arbitrary remote commands.
-2. Integrate an authoritative monetary-spend source where a configured provider
-   exposes one; preserve `unknown` instead of estimating unsupported spend.
+2. Register a durable LiteLLM `API_MODEL`/`LOCAL_MODEL` Task adapter and persist
+   its structured result, token usage and authoritative upstream cost when
+   supplied; preserve `unknown` instead of estimating unsupported spend.
 3. Run the two account-bound live gates and repeat the full browser/runtime
    suite against the final head.
