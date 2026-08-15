@@ -16,6 +16,7 @@ function runtime() {
     assignTask: vi.fn(),
     advanceMissionWorkflow: vi.fn(),
     createMissionDecomposition: vi.fn(),
+    createMission: vi.fn(),
     recordMissionMeeting: vi.fn(),
     createSchedule: vi.fn(),
     readSchedules: vi.fn(),

@@ -41,6 +41,12 @@ export const applicationMissionWorkflowDependencies = {
     runtime().advanceMissionWorkflow(missionId),
 };
 
+export const applicationMissionDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  create: (input: Parameters<ReturnType<typeof runtime>["createMission"]>[0]) =>
+    runtime().createMission(input),
+};
+
 export const applicationMissionCollaborationDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   createDecomposition: (

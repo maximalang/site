@@ -4,6 +4,7 @@ import type {
   AgentId,
   AgentSchedule,
   MemoryCurationDecision,
+  Mission,
   MissionDecomposition,
   MissionId,
   ModelRouteId,
@@ -47,6 +48,7 @@ export type ApplicationRuntime = {
   sendConversation(input: SendMessageIntent): Promise<ConversationSendResult>;
   assignTask(input: AssignTaskInput): Promise<unknown>;
   advanceMissionWorkflow(missionId: MissionId): Promise<ProductionMissionWorkflowResult>;
+  createMission(input: Mission): Promise<unknown>;
   createMissionDecomposition(input: MissionDecomposition, materializedAt: string): Promise<unknown>;
   recordMissionMeeting(input: StructuredMeeting): Promise<unknown>;
   createSchedule(input: ScheduleCreateInput, createdAt: string): Promise<unknown>;

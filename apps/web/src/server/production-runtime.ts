@@ -493,6 +493,7 @@ export async function createProductionRuntime(
         );
         return { proposal: proposal.outcome, materialization };
       },
+      createMission: (input) => missionStore.createMission(input),
       recordMissionMeeting: (input) => missionStore.recordMeeting(input),
       createSchedule: (input, createdAt) => {
         const nextFireAt = input.isEnabled
