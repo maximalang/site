@@ -1,0 +1,128 @@
+import { createHash } from "node:crypto";
+import {
+  type IntegrationCreate,
+  IntegrationCreateSchema,
+  type IntegrationRegistry,
+  IntegrationRegistrySchema,
+} from "@agent-world/read-model";
+import type { QueryResultRow } from "pg";
+import type { TransactionPool } from "./conversation-store.js";
+
+type Row = QueryResultRow & {
+  id: string;
+  kind: string;
+  label: string;
+  transport: string;
+  endpoint_url: string | null;
+  ssh_host: string | null;
+  ssh_port: number | null;
+  ssh_username: string | null;
+  credential_ref: string | null;
+  health: string;
+  is_enabled: boolean;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+function iso(value: Date | string) {
+  return (value instanceof Date ? value : new Date(value)).toISOString();
+}
+function hash(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
+}
+function summary(row: Row) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    label: row.label,
+    endpoint:
+      row.transport === "HTTPS"
+        ? { transport: "HTTPS", url: row.endpoint_url }
+        : { transport: "SSH", host: row.ssh_host, port: row.ssh_port, username: row.ssh_username },
+    health: row.health,
+    isEnabled: row.is_enabled,
+    hasCredential: row.credential_ref !== null,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+  };
+}
+
+export class PostgresIntegrationStore {
+  constructor(
+    private readonly pool: TransactionPool,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
+
+  async list(): Promise<IntegrationRegistry> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<Row>(
+        `SELECT id, kind, label, transport, endpoint_url, ssh_host, ssh_port,
+                ssh_username, credential_ref, health, is_enabled, created_at, updated_at
+           FROM agent_world.integration_endpoints ORDER BY id LIMIT 201`,
+      );
+      if (result.rows.length > 200) throw new Error("Integration registry exceeds bounded limit");
+      return IntegrationRegistrySchema.parse({
+        schemaVersion: 1,
+        generatedAt: this.now().toISOString(),
+        integrations: result.rows.map(summary),
+      });
+    } finally {
+      client.release();
+    }
+  }
+
+  async create(input: IntegrationCreate) {
+    const value = IntegrationCreateSchema.parse(input);
+    const requestHash = hash(value);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        value.commandId,
+      ]);
+      const receipt = await client.query<{ request_sha256: string; integration_id: string }>(
+        "SELECT request_sha256, integration_id FROM agent_world.integration_command_receipts WHERE command_id = $1",
+        [value.commandId],
+      );
+      if (receipt.rows[0]) {
+        if (
+          receipt.rows[0].request_sha256 !== requestHash ||
+          receipt.rows[0].integration_id !== value.id
+        )
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        await client.query("COMMIT");
+        return { outcome: "REPLAY" as const, integrationId: value.id };
+      }
+      await client.query(
+        `INSERT INTO agent_world.integration_endpoints
+           (id, kind, label, transport, endpoint_url, ssh_host, ssh_port,
+            ssh_username, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`,
+        [
+          value.id,
+          value.kind,
+          value.label,
+          value.endpoint.transport,
+          value.endpoint.transport === "HTTPS" ? value.endpoint.url : null,
+          value.endpoint.transport === "SSH" ? value.endpoint.host : null,
+          value.endpoint.transport === "SSH" ? value.endpoint.port : null,
+          value.endpoint.transport === "SSH" ? value.endpoint.username : null,
+          value.createdAt,
+        ],
+      );
+      await client.query(
+        `INSERT INTO agent_world.integration_command_receipts
+           (command_id, request_sha256, integration_id, created_at) VALUES ($1, $2, $3, $4)`,
+        [value.commandId, requestHash, value.id, value.createdAt],
+      );
+      await client.query("COMMIT");
+      return { outcome: "CREATED" as const, integrationId: value.id };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}

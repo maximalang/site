@@ -10,6 +10,7 @@ export * from "./encrypted-secret-store.js";
 export * from "./execution-preference-store.js";
 export * from "./hub-command-store.js";
 export * from "./hub-reader.js";
+export * from "./integration-store.js";
 export * from "./memory-center-reader.js";
 export * from "./memory-curation-store.js";
 export * from "./memory-projection-store.js";

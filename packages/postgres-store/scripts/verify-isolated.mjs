@@ -28,6 +28,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresIntegrationStore,
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
   PostgresMemoryProjectionStore,
@@ -225,7 +226,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 34
+    ledger.rows.at(-1)?.version !== 35
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -284,6 +285,8 @@ try {
     "codex_execution_policies",
     "codex_worker_readiness",
     "hub_command_receipts",
+    "integration_command_receipts",
+    "integration_endpoints",
     "execution_preference_overrides",
     "encrypted_secrets",
     "approvals",
@@ -3005,6 +3008,40 @@ try {
     throw new Error(
       "Operations read model did not project graph and truthful observability evidence",
     );
+  }
+  const integrationStore = new PostgresIntegrationStore(
+    pool,
+    () => new Date("2026-08-15T12:00:00.000Z"),
+  );
+  const mcpIntegration = {
+    id: "integration_e1e1e1e1-e1e1-41e1-81e1-e1e1e1e1e1e1",
+    commandId: "integration:create:mcp-isolated",
+    kind: "MCP",
+    label: "AI World MCP",
+    endpoint: { transport: "HTTPS", url: "https://world.example/api/mcp" },
+    createdAt: "2026-08-15T11:00:00.000Z",
+  };
+  const sshIntegration = {
+    id: "integration_e2e2e2e2-e2e2-42e2-82e2-e2e2e2e2e2e2",
+    commandId: "integration:create:ssh-isolated",
+    kind: "SSH",
+    label: "Timeweb VDS",
+    endpoint: { transport: "SSH", host: "vds.example", port: 22, username: "agent-world" },
+    createdAt: "2026-08-15T11:01:00.000Z",
+  };
+  if (
+    (await integrationStore.create(mcpIntegration)).outcome !== "CREATED" ||
+    (await integrationStore.create(mcpIntegration)).outcome !== "REPLAY" ||
+    (await integrationStore.create(sshIntegration)).outcome !== "CREATED"
+  ) {
+    throw new Error("Integration registry command replay drifted");
+  }
+  const integrationRegistry = await integrationStore.list();
+  if (
+    integrationRegistry.integrations.length !== 2 ||
+    JSON.stringify(integrationRegistry).includes("secret-store:")
+  ) {
+    throw new Error("Integration registry did not preserve safe MCP and SSH boundaries");
   }
 
   process.stdout.write(

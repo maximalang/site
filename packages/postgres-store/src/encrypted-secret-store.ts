@@ -4,7 +4,7 @@ import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
 
 const SECRET_REF = /^secret-store:[A-Za-z0-9][A-Za-z0-9._/-]{0,500}$/;
-const PURPOSES = ["PROVIDER_API_KEY"] as const;
+const PURPOSES = ["PROVIDER_API_KEY", "INTEGRATION_CREDENTIAL"] as const;
 export type SecretPurpose = (typeof PURPOSES)[number];
 
 export const SECRET_STORE_ERROR_CODES = [

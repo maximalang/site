@@ -3,6 +3,7 @@ export * from "./conversation.js";
 export * from "./execution-preferences.js";
 export * from "./hub.js";
 export * from "./hub-command.js";
+export * from "./integration.js";
 export * from "./model-route-check.js";
 export * from "./operations.js";
 export * from "./projection.js";
