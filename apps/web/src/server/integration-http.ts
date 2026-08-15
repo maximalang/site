@@ -18,6 +18,19 @@ const LifecycleSchema = z.strictObject({
   integrationId: IntegrationIdSchema,
   commandId: z.string().trim().min(1).max(512),
 });
+const ProbeSchema = z.strictObject({
+  operation: z.literal("TEST"),
+  integrationId: IntegrationIdSchema,
+  commandId: z.string().trim().min(1).max(512),
+});
+const ProbeResultSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  integrationId: IntegrationIdSchema,
+  outcome: z.enum(["RECORDED", "REPLAY"]),
+  health: z.enum(["READY", "ERROR"]),
+  code: z.string().min(1).max(120),
+  checkedAt: z.iso.datetime({ offset: true }),
+});
 
 export type IntegrationHttpDependencies = {
   authorize(request: Request): Promise<boolean>;
@@ -25,6 +38,7 @@ export type IntegrationHttpDependencies = {
   create(input: z.infer<typeof IntegrationCreateSchema>): Promise<unknown>;
   credential(input: z.infer<typeof CredentialSchema>, writtenAt: string): Promise<unknown>;
   lifecycle(input: z.infer<typeof LifecycleSchema>, updatedAt: string): Promise<unknown>;
+  probe(input: z.infer<typeof ProbeSchema>, checkedAt: string): Promise<unknown>;
   now?: () => Date;
 };
 const headers = { "Cache-Control": "no-store, max-age=0", "X-Content-Type-Options": "nosniff" };
@@ -66,7 +80,9 @@ export function createIntegrationRouteHandlers(dependencies: IntegrationHttpDepe
             ? await dependencies.credential(CredentialSchema.parse(raw), now)
             : raw.operation === "ENABLE" || raw.operation === "DISABLE"
               ? await dependencies.lifecycle(LifecycleSchema.parse(raw), now)
-              : await dependencies.create(IntegrationCreateSchema.parse(raw));
+              : raw.operation === "TEST"
+                ? ProbeResultSchema.parse(await dependencies.probe(ProbeSchema.parse(raw), now))
+                : await dependencies.create(IntegrationCreateSchema.parse(raw));
         return Response.json({ schemaVersion: 1, result }, { headers, status: 201 });
       } catch {
         return error("INTEGRATION_COMMAND_REJECTED", 409);

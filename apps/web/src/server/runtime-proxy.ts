@@ -145,6 +145,10 @@ export const applicationIntegrationDependencies = {
     input: Omit<Parameters<ReturnType<typeof runtime>["setIntegrationEnabled"]>[0], "updatedAt">,
     updatedAt: string,
   ) => runtime().setIntegrationEnabled({ ...input, updatedAt }),
+  probe: (
+    input: Omit<Parameters<ReturnType<typeof runtime>["probeIntegration"]>[0], "checkedAt">,
+    checkedAt: string,
+  ) => runtime().probeIntegration({ ...input, checkedAt }),
 };
 
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {

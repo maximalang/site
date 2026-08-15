@@ -226,7 +226,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 35
+    ledger.rows.at(-1)?.version !== 36
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -287,6 +287,7 @@ try {
     "hub_command_receipts",
     "integration_command_receipts",
     "integration_endpoints",
+    "integration_probe_observations",
     "execution_preference_overrides",
     "encrypted_secrets",
     "approvals",
@@ -3090,15 +3091,37 @@ try {
   ) {
     throw new Error("Integration lifecycle replay drifted");
   }
+  await integrationStore.setEnabled({
+    operation: "ENABLE",
+    integrationId: mcpIntegration.id,
+    commandId: "integration:enable:mcp-isolated",
+    updatedAt: "2026-08-15T11:04:00.000Z",
+  });
+  const probeCommand = {
+    integrationId: mcpIntegration.id,
+    commandId: "integration:test:mcp-isolated",
+  };
+  if ((await integrationStore.prepareProbe(probeCommand)).outcome !== "READY") {
+    throw new Error("Integration probe was not prepared from canonical configuration");
+  }
+  const committedProbe = await integrationStore.commitProbe(
+    probeCommand,
+    { health: "ERROR", code: "HOST_NOT_ALLOWLISTED" },
+    "2026-08-15T11:05:00.000Z",
+  );
+  const replayedProbe = await integrationStore.prepareProbe(probeCommand);
+  if (committedProbe.outcome !== "RECORDED" || replayedProbe.outcome !== "REPLAY") {
+    throw new Error("Integration probe observation replay drifted");
+  }
   const integrationRegistry = await integrationStore.list();
   if (
     integrationRegistry.integrations.length !== 2 ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.hasCredential !==
       true ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.isEnabled !==
-      false ||
+      true ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.health !==
-      "UNCONFIGURED" ||
+      "ERROR" ||
     (await secretStore.read(integrationSecretRef, "INTEGRATION_CREDENTIAL")) !==
       "isolated-mcp-token" ||
     JSON.stringify(integrationRegistry).includes("secret-store:")

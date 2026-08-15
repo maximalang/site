@@ -93,6 +93,11 @@ export type ApplicationRuntime = {
     commandId: string;
     updatedAt: string;
   }): Promise<unknown>;
+  probeIntegration(input: {
+    integrationId: string;
+    commandId: string;
+    checkedAt: string;
+  }): Promise<unknown>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;
 };

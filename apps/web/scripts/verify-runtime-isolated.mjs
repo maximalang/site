@@ -413,16 +413,51 @@ try {
       commandId: "integration:disable:runtime",
     }),
   });
+  const enableIntegration = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      operation: "ENABLE",
+      integrationId,
+      commandId: "integration:enable:runtime",
+    }),
+  });
+  const testIntegration = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      operation: "TEST",
+      integrationId,
+      commandId: "integration:test:runtime",
+    }),
+  });
+  const testIntegrationBody = await testIntegration.json();
+  const replayIntegrationTest = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      operation: "TEST",
+      integrationId,
+      commandId: "integration:test:runtime",
+    }),
+  });
+  const replayIntegrationTestBody = await replayIntegrationTest.json();
   const integrations = await fetch(`${baseUrl}/api/integrations`, { headers: { cookie } });
   const integrationBody = await integrations.json();
   if (
     createIntegration.status !== 201 ||
     writeIntegrationCredential.status !== 201 ||
     disableIntegration.status !== 201 ||
+    enableIntegration.status !== 201 ||
+    testIntegration.status !== 201 ||
+    testIntegrationBody.result?.health !== "ERROR" ||
+    testIntegrationBody.result?.code !== "HOST_NOT_ALLOWLISTED" ||
+    replayIntegrationTest.status !== 201 ||
+    replayIntegrationTestBody.result?.outcome !== "REPLAY" ||
     integrations.status !== 200 ||
     integrationBody.integrations?.[0]?.hasCredential !== true ||
-    integrationBody.integrations?.[0]?.isEnabled !== false ||
-    integrationBody.integrations?.[0]?.health !== "UNCONFIGURED" ||
+    integrationBody.integrations?.[0]?.isEnabled !== true ||
+    integrationBody.integrations?.[0]?.health !== "ERROR" ||
     JSON.stringify(integrationBody).includes("runtime-integration-secret")
   ) {
     throw new Error(
@@ -688,7 +723,7 @@ try {
     [missionId],
   );
   if (
-    evidence.rows[0]?.migrations !== 35 ||
+    evidence.rows[0]?.migrations !== 36 ||
     evidence.rows[0]?.revoked_sessions !== 1 ||
     evidence.rows[0]?.mission_checkpoints < 1
   ) {
@@ -696,7 +731,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 35, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 36, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

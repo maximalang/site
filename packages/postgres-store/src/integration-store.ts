@@ -4,6 +4,7 @@ import {
   IntegrationCreateSchema,
   type IntegrationRegistry,
   IntegrationRegistrySchema,
+  IntegrationSummarySchema,
 } from "@agent-world/read-model";
 import type { QueryResultRow } from "pg";
 import type { TransactionPool } from "./conversation-store.js";
@@ -31,7 +32,7 @@ function hash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
 }
 function summary(row: Row) {
-  return {
+  return IntegrationSummarySchema.parse({
     id: row.id,
     kind: row.kind,
     label: row.label,
@@ -44,7 +45,7 @@ function summary(row: Row) {
     hasCredential: row.credential_ref !== null,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
-  };
+  });
 }
 
 export class PostgresIntegrationStore {
@@ -186,6 +187,123 @@ export class PostgresIntegrationStore {
       );
       await client.query("COMMIT");
       return { outcome: "UPDATED" as const, integrationId: input.integrationId };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async loadProbeTarget(integrationId: string) {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<Row>(
+        `SELECT id, kind, label, transport, endpoint_url, ssh_host, ssh_port,
+                ssh_username, credential_ref, health, is_enabled, created_at, updated_at
+           FROM agent_world.integration_endpoints WHERE id = $1`,
+        [integrationId],
+      );
+      const row = result.rows[0];
+      if (!row) throw new Error("INTEGRATION_NOT_FOUND");
+      return {
+        ...summary(row),
+        credentialRef: row.credential_ref,
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  async prepareProbe(input: { integrationId: string; commandId: string }) {
+    const client = await this.pool.connect();
+    try {
+      const requestHash = hash(input);
+      const receipt = await client.query<{
+        request_sha256: string;
+        health: "READY" | "ERROR";
+        code: string;
+        checked_at: Date | string;
+      }>(
+        `SELECT request_sha256, health, code, checked_at
+           FROM agent_world.integration_probe_observations WHERE command_id = $1`,
+        [input.commandId],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].request_sha256 !== requestHash)
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        return {
+          outcome: "REPLAY" as const,
+          result: {
+            health: receipt.rows[0].health,
+            code: receipt.rows[0].code,
+            checkedAt: iso(receipt.rows[0].checked_at),
+          },
+        };
+      }
+      const target = await client.query<Row>(
+        `SELECT id, kind, label, transport, endpoint_url, ssh_host, ssh_port,
+                ssh_username, credential_ref, health, is_enabled, created_at, updated_at
+           FROM agent_world.integration_endpoints WHERE id = $1`,
+        [input.integrationId],
+      );
+      const row = target.rows[0];
+      if (!row) throw new Error("INTEGRATION_NOT_FOUND");
+      return {
+        outcome: "READY" as const,
+        target: { ...summary(row), credentialRef: row.credential_ref },
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  async commitProbe(
+    input: { integrationId: string; commandId: string },
+    result: { health: "READY" | "ERROR"; code: string },
+    checkedAt: string,
+  ) {
+    const requestHash = hash(input);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        input.commandId,
+      ]);
+      const receipt = await client.query<{
+        request_sha256: string;
+        health: "READY" | "ERROR";
+        code: string;
+        checked_at: Date | string;
+      }>(
+        `SELECT request_sha256, health, code, checked_at FROM agent_world.integration_probe_observations WHERE command_id = $1`,
+        [input.commandId],
+      );
+      if (receipt.rows[0]) {
+        if (receipt.rows[0].request_sha256 !== requestHash)
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        await client.query("COMMIT");
+        return {
+          outcome: "REPLAY" as const,
+          health: receipt.rows[0].health,
+          code: receipt.rows[0].code,
+          checkedAt: iso(receipt.rows[0].checked_at),
+        };
+      }
+      const updated = await client.query<{ id: string }>(
+        `UPDATE agent_world.integration_endpoints SET health = $2, updated_at = $3
+          WHERE id = $1 AND is_enabled = true AND updated_at <= $3 RETURNING id`,
+        [input.integrationId, result.health, checkedAt],
+      );
+      if (updated.rows.length !== 1) throw new Error("INTEGRATION_NOT_PROBEABLE");
+      await client.query(
+        `INSERT INTO agent_world.integration_probe_observations
+           (command_id, request_sha256, integration_id, health, code, checked_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [input.commandId, requestHash, input.integrationId, result.health, result.code, checkedAt],
+      );
+      await client.query("COMMIT");
+      return { outcome: "RECORDED" as const, ...result, checkedAt };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

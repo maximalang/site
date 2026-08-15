@@ -8,6 +8,7 @@ export type IntegrationClient = {
   create(input: IntegrationCreate, csrf: string): Promise<void>;
   credential(id: string, plaintext: string, csrf: string): Promise<void>;
   lifecycle(id: string, operation: "ENABLE" | "DISABLE", csrf: string): Promise<void>;
+  probe(id: string, csrf: string): Promise<void>;
 };
 export function IntegrationPanel({
   csrfToken,
@@ -72,6 +73,18 @@ export function IntegrationPanel({
     setError(false);
     try {
       await client.lifecycle(id, operation, csrfToken);
+      await refresh();
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const probe = async (id: string) => {
+    setBusy(true);
+    setError(false);
+    try {
+      await client.probe(id, csrfToken);
       await refresh();
     } catch {
       setError(true);
@@ -150,6 +163,13 @@ export function IntegrationPanel({
               onClick={() => void lifecycle(item.id, item.isEnabled ? "DISABLE" : "ENABLE")}
             >
               {item.isEnabled ? "Отключить" : "Включить"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !item.isEnabled}
+              onClick={() => void probe(item.id)}
+            >
+              Проверить
             </button>
           </li>
         ))}

@@ -45,4 +45,17 @@ export const integrationClient = {
     });
     if (!response.ok) throw new Error("Integration lifecycle rejected");
   },
+  async probe(integrationId: string, csrfToken: string) {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({
+        operation: "TEST",
+        integrationId,
+        commandId: `integration:test:${crypto.randomUUID()}`,
+      }),
+    });
+    if (!response.ok) throw new Error("Integration probe rejected");
+  },
 };

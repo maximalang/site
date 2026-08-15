@@ -30,6 +30,7 @@ describe("integration HTTP boundary", () => {
       create: vi.fn().mockResolvedValue({ outcome: "CREATED" }),
       credential: vi.fn(),
       lifecycle: vi.fn(),
+      probe: vi.fn(),
     };
     const handlers = createIntegrationRouteHandlers(dependencies);
     expect((await handlers.GET(new Request("https://world.test/api/integrations"))).status).toBe(
@@ -47,6 +48,7 @@ describe("integration HTTP boundary", () => {
       create: vi.fn(),
       credential,
       lifecycle: vi.fn(),
+      probe: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const body = {
@@ -79,6 +81,7 @@ describe("integration HTTP boundary", () => {
       create: vi.fn(),
       credential: vi.fn(),
       lifecycle,
+      probe: vi.fn(),
     });
     const response = await handlers.POST(
       request({
@@ -91,6 +94,35 @@ describe("integration HTTP boundary", () => {
     expect(lifecycle).toHaveBeenCalledWith(
       expect.objectContaining({ operation: "DISABLE", integrationId: create.id }),
       expect.any(String),
+    );
+  });
+
+  it("returns only a bounded protocol probe result", async () => {
+    const probe = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      integrationId: create.id,
+      health: "READY",
+      code: "MCP_PROBE_OK",
+      checkedAt: registry.generatedAt,
+      outcome: "RECORDED",
+    });
+    const handlers = createIntegrationRouteHandlers({
+      authorize: async () => true,
+      list: vi.fn(),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe,
+      now: () => new Date(registry.generatedAt),
+    });
+    const response = await handlers.POST(
+      request({ operation: "TEST", integrationId: create.id, commandId: "integration:test:1" }),
+    );
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        result: expect.objectContaining({ health: "READY", code: "MCP_PROBE_OK" }),
+      }),
     );
   });
 });
