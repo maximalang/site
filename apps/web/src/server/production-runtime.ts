@@ -32,6 +32,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresIntegrationMutationStore,
   PostgresIntegrationStore,
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
@@ -59,7 +60,11 @@ import { ModelRouteCheckResponseSchema } from "@agent-world/read-model";
 import { nextOccurrence } from "@agent-world/scheduler";
 import { Pool, type PoolConfig } from "pg";
 import type { ApplicationRuntime } from "./application-runtime";
-import { createNodeIntegrationAction, createNodeIntegrationProbe } from "./integration-probe";
+import {
+  createNodeIntegrationAction,
+  createNodeIntegrationMutationExecutor,
+  createNodeIntegrationProbe,
+} from "./integration-probe";
 import { MemoryProjectionSupervisor } from "./memory-projection-supervisor";
 import { MissionHandoffSupervisor } from "./mission-handoff-supervisor";
 import { NativeChatReconciliationSupervisor } from "./native-chat-reconciliation-supervisor";
@@ -248,6 +253,7 @@ export async function createProductionRuntime(
     const hubReader = new PostgresHubReader(pool);
     const operationsReader = new PostgresOperationsReader(pool);
     const integrationStore = new PostgresIntegrationStore(pool);
+    const integrationMutationStore = new PostgresIntegrationMutationStore(pool);
     const integrationNetworkConfiguration = {
       allowedHosts: (environment.AGENT_WORLD_INTEGRATION_ALLOWED_HOSTS ?? "")
         .split(",")
@@ -258,6 +264,9 @@ export async function createProductionRuntime(
     };
     const integrationProbe = createNodeIntegrationProbe(integrationNetworkConfiguration);
     const integrationAction = createNodeIntegrationAction(integrationNetworkConfiguration);
+    const integrationMutationExecutor = createNodeIntegrationMutationExecutor(
+      integrationNetworkConfiguration,
+    );
     const hubCommandStore = new PostgresHubCommandStore(pool);
     const memoryReader = new PostgresMemoryCenterReader(pool);
     const memoryStore = new PostgresMemoryCurationStore(pool, {
@@ -668,6 +677,53 @@ export async function createProductionRuntime(
           : undefined;
         const result = await integrationAction(prepared.target, input.action, credential);
         return integrationStore.commitAction(command, result, input.executedAt);
+      },
+      requestIntegrationMutation: ({
+        requestId,
+        integrationId,
+        commandId,
+        mutation,
+        requestedAt,
+      }) =>
+        integrationMutationStore.request({
+          requestId,
+          integrationId,
+          commandId,
+          mutation,
+          requestedAt,
+        }),
+      decideIntegrationMutation: async (input) => {
+        const decision = await integrationMutationStore.decide({
+          requestId: input.requestId,
+          commandId: input.commandId,
+          decision: input.decision,
+          decidedAt: input.decidedAt,
+        });
+        if (!decision.execution) {
+          if (decision.receipt.state === "EXECUTING") {
+            return integrationMutationStore.complete({
+              requestId: input.requestId,
+              state: "OUTCOME_UNKNOWN",
+              failureCode: "INTERRUPTED_OUTCOME_UNKNOWN",
+              completedAt: input.decidedAt,
+            });
+          }
+          return decision.receipt;
+        }
+        const credential = await secretStore.read(
+          decision.execution.credentialRef,
+          "INTEGRATION_CREDENTIAL",
+        );
+        const outcome = await integrationMutationExecutor({
+          endpointUrl: decision.execution.endpointUrl,
+          credential,
+          mutation: decision.execution.mutation,
+        });
+        return integrationMutationStore.complete({
+          requestId: input.requestId,
+          ...outcome,
+          completedAt: new Date().toISOString(),
+        });
       },
       readWorld: () => worldStore.readWorld(configuration.agents),
       stop: async () => {

@@ -2,6 +2,8 @@ import {
   type IntegrationAction,
   IntegrationActionResultSchema,
   type IntegrationCreate,
+  type IntegrationMutation,
+  IntegrationMutationReceiptSchema,
   IntegrationRegistrySchema,
 } from "@agent-world/read-model";
 
@@ -78,5 +80,39 @@ export const integrationClient = {
     if (!response.ok) throw new Error("Integration action rejected");
     const body = (await response.json()) as { result?: unknown };
     return IntegrationActionResultSchema.parse(body.result);
+  },
+  async requestMutation(integrationId: string, mutation: IntegrationMutation, csrfToken: string) {
+    const uuid = crypto.randomUUID();
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({
+        operation: "REQUEST_MUTATION",
+        requestId: `integration_mutation_${uuid}`,
+        integrationId,
+        mutation,
+        commandId: `integration:mutation:request:${uuid}`,
+      }),
+    });
+    if (!response.ok) throw new Error("Integration mutation rejected");
+    const body = (await response.json()) as { result?: unknown };
+    return IntegrationMutationReceiptSchema.parse(body.result);
+  },
+  async decideMutation(requestId: string, decision: "APPROVE" | "DENY", csrfToken: string) {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({
+        operation: "DECIDE_MUTATION",
+        requestId,
+        decision,
+        commandId: `integration:mutation:${decision.toLowerCase()}:${crypto.randomUUID()}`,
+      }),
+    });
+    if (!response.ok) throw new Error("Integration mutation decision rejected");
+    const body = (await response.json()) as { result?: unknown };
+    return IntegrationMutationReceiptSchema.parse(body.result);
   },
 };

@@ -3,6 +3,9 @@ import {
   IntegrationActionSchema,
   IntegrationCreateSchema,
   IntegrationIdSchema,
+  IntegrationMutationReceiptSchema,
+  IntegrationMutationRequestIdSchema,
+  IntegrationMutationSchema,
   IntegrationRegistrySchema,
 } from "@agent-world/read-model";
 import * as z from "zod";
@@ -31,6 +34,19 @@ const ActionSchema = z.strictObject({
   commandId: z.string().trim().min(1).max(512),
   action: IntegrationActionSchema,
 });
+const MutationRequestSchema = z.strictObject({
+  operation: z.literal("REQUEST_MUTATION"),
+  requestId: IntegrationMutationRequestIdSchema,
+  integrationId: IntegrationIdSchema,
+  commandId: z.string().trim().min(1).max(512),
+  mutation: IntegrationMutationSchema,
+});
+const MutationDecisionSchema = z.strictObject({
+  operation: z.literal("DECIDE_MUTATION"),
+  requestId: IntegrationMutationRequestIdSchema,
+  commandId: z.string().trim().min(1).max(512),
+  decision: z.enum(["APPROVE", "DENY"]),
+});
 const ProbeResultSchema = z.strictObject({
   schemaVersion: z.literal(1),
   integrationId: IntegrationIdSchema,
@@ -48,6 +64,14 @@ export type IntegrationHttpDependencies = {
   lifecycle(input: z.infer<typeof LifecycleSchema>, updatedAt: string): Promise<unknown>;
   probe(input: z.infer<typeof ProbeSchema>, checkedAt: string): Promise<unknown>;
   action(input: z.infer<typeof ActionSchema>, executedAt: string): Promise<unknown>;
+  requestMutation(
+    input: z.infer<typeof MutationRequestSchema>,
+    requestedAt: string,
+  ): Promise<unknown>;
+  decideMutation(
+    input: z.infer<typeof MutationDecisionSchema>,
+    decidedAt: string,
+  ): Promise<unknown>;
   now?: () => Date;
 };
 const headers = { "Cache-Control": "no-store, max-age=0", "X-Content-Type-Options": "nosniff" };
@@ -95,7 +119,15 @@ export function createIntegrationRouteHandlers(dependencies: IntegrationHttpDepe
                   ? IntegrationActionResultSchema.parse(
                       await dependencies.action(ActionSchema.parse(raw), now),
                     )
-                  : await dependencies.create(IntegrationCreateSchema.parse(raw));
+                  : raw.operation === "REQUEST_MUTATION"
+                    ? IntegrationMutationReceiptSchema.parse(
+                        await dependencies.requestMutation(MutationRequestSchema.parse(raw), now),
+                      )
+                    : raw.operation === "DECIDE_MUTATION"
+                      ? IntegrationMutationReceiptSchema.parse(
+                          await dependencies.decideMutation(MutationDecisionSchema.parse(raw), now),
+                        )
+                      : await dependencies.create(IntegrationCreateSchema.parse(raw));
         return Response.json({ schemaVersion: 1, result }, { headers, status: 201 });
       } catch {
         return error("INTEGRATION_COMMAND_REJECTED", 409);

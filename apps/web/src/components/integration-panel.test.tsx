@@ -25,6 +25,8 @@ describe("IntegrationPanel", () => {
         items: [],
         executedAt: "2026-08-15T12:00:00.000Z",
       }),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     await screen.findByRole("heading", { name: "Интеграции" });
@@ -73,6 +75,8 @@ describe("IntegrationPanel", () => {
       lifecycle: vi.fn(),
       probe,
       action: vi.fn(),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     fireEvent.click(await screen.findByRole("button", { name: "Проверить" }));
@@ -114,6 +118,8 @@ describe("IntegrationPanel", () => {
       lifecycle: vi.fn(),
       probe: vi.fn(),
       action,
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     fireEvent.click(await screen.findByRole("button", { name: "Инструменты" }));
@@ -123,5 +129,65 @@ describe("IntegrationPanel", () => {
       "MCP_LIST_TOOLS",
       "csrf",
     );
+  });
+
+  it("requires a separate owner confirmation before GitHub workflow dispatch", async () => {
+    const pending = {
+      schemaVersion: 1 as const,
+      requestId: "integration_mutation_11111111-1111-1111-1111-111111111111",
+      integrationId: "integration_11111111-1111-4111-8111-111111111111",
+      mutation: {
+        kind: "GITHUB_DISPATCH_WORKFLOW" as const,
+        owner: "maximalang",
+        repository: "site",
+        workflowId: "deploy.yml",
+        ref: "main",
+      },
+      state: "PENDING" as const,
+      outcome: "RECORDED" as const,
+      requestedAt: "2026-08-15T12:00:00.000Z",
+    };
+    const requestMutation = vi.fn().mockResolvedValue(pending);
+    const decideMutation = vi.fn().mockResolvedValue({
+      ...pending,
+      state: "SUCCEEDED",
+      decidedAt: pending.requestedAt,
+      completedAt: pending.requestedAt,
+    });
+    const client = {
+      list: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        generatedAt: pending.requestedAt,
+        integrations: [
+          {
+            id: pending.integrationId,
+            kind: "GITHUB",
+            label: "GitHub",
+            endpoint: { transport: "HTTPS", url: "https://api.github.com" },
+            health: "READY",
+            isEnabled: true,
+            hasCredential: true,
+            createdAt: pending.requestedAt,
+            updatedAt: pending.requestedAt,
+          },
+        ],
+      }),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action: vi.fn(),
+      requestMutation,
+      decideMutation,
+    };
+    render(<IntegrationPanel client={client} csrfToken="csrf" />);
+    fireEvent.click(await screen.findByText("Advanced · workflow dispatch"));
+    fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "maximalang" } });
+    fireEvent.change(screen.getByLabelText("Repository"), { target: { value: "site" } });
+    fireEvent.click(screen.getByRole("button", { name: "Запросить запуск" }));
+    await screen.findByText("PENDING");
+    expect(decideMutation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Подтвердить запуск" }));
+    await vi.waitFor(() => expect(decideMutation).toHaveBeenCalledOnce());
   });
 });

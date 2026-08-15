@@ -32,6 +32,8 @@ describe("integration HTTP boundary", () => {
       lifecycle: vi.fn(),
       probe: vi.fn(),
       action: vi.fn(),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
     };
     const handlers = createIntegrationRouteHandlers(dependencies);
     expect((await handlers.GET(new Request("https://world.test/api/integrations"))).status).toBe(
@@ -51,6 +53,8 @@ describe("integration HTTP boundary", () => {
       lifecycle: vi.fn(),
       probe: vi.fn(),
       action: vi.fn(),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const body = {
@@ -85,6 +89,8 @@ describe("integration HTTP boundary", () => {
       lifecycle,
       probe: vi.fn(),
       action: vi.fn(),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
     });
     const response = await handlers.POST(
       request({
@@ -117,6 +123,8 @@ describe("integration HTTP boundary", () => {
       lifecycle: vi.fn(),
       probe,
       action: vi.fn(),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const response = await handlers.POST(
@@ -148,6 +156,8 @@ describe("integration HTTP boundary", () => {
       lifecycle: vi.fn(),
       probe: vi.fn(),
       action,
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
       now: () => new Date(registry.generatedAt),
     });
     const response = await handlers.POST(
@@ -166,5 +176,71 @@ describe("integration HTTP boundary", () => {
     expect(await response.json()).toEqual(
       expect.objectContaining({ result: expect.objectContaining({ status: "SUCCEEDED" }) }),
     );
+  });
+
+  it("keeps mutation request and explicit owner approval as separate commands", async () => {
+    const mutation = {
+      kind: "GITHUB_DISPATCH_WORKFLOW" as const,
+      owner: "maximalang",
+      repository: "site",
+      workflowId: "deploy.yml",
+      ref: "main",
+    };
+    const receipt = {
+      schemaVersion: 1 as const,
+      requestId: "integration_mutation_11111111-1111-1111-1111-111111111111",
+      integrationId: create.id,
+      mutation,
+      state: "PENDING" as const,
+      outcome: "RECORDED" as const,
+      requestedAt: registry.generatedAt,
+    };
+    const requestMutation = vi.fn().mockResolvedValue(receipt);
+    const decideMutation = vi.fn().mockResolvedValue({
+      ...receipt,
+      state: "SUCCEEDED",
+      decidedAt: registry.generatedAt,
+      completedAt: registry.generatedAt,
+    });
+    const handlers = createIntegrationRouteHandlers({
+      authorize: async () => true,
+      list: vi.fn(),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action: vi.fn(),
+      requestMutation,
+      decideMutation,
+      now: () => new Date(registry.generatedAt),
+    });
+    expect(
+      (
+        await handlers.POST(
+          request({
+            operation: "REQUEST_MUTATION",
+            requestId: receipt.requestId,
+            integrationId: create.id,
+            commandId: "integration:mutation:request:1",
+            mutation,
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    expect(decideMutation).not.toHaveBeenCalled();
+    expect(
+      (
+        await handlers.POST(
+          request({
+            operation: "DECIDE_MUTATION",
+            requestId: receipt.requestId,
+            commandId: "integration:mutation:approve:1",
+            decision: "APPROVE",
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    expect(requestMutation).toHaveBeenCalledOnce();
+    expect(decideMutation).toHaveBeenCalledOnce();
   });
 });

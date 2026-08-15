@@ -24,7 +24,7 @@ proven. `OPEN` means the required product surface is absent.
 | 15 | Manage the visual Memory network | PASS | Network, Timeline and Inbox plus Accept/Merge/Reject are product-native views. |
 | 16 | Open a Memory node and see exact evidence | PASS | Advanced Memory details preserve canonical Context/Event/Run provenance. |
 | 17 | Configure an Agent schedule | PASS | Strict Agent schedule contracts, timezone/DST-aware recurrence, PostgreSQL schedules/firings, atomic Task + approval + World-event materialization, restart-safe polling and the owner-only Hub Simple/Advanced UI are proven by 5 real isolated-PostgreSQL schedule scenarios, standalone restart verification, unit tests and five-viewport Playwright/axe tests. Account and transport are intentionally absent from schedule intent. |
-| 18 | Manage MCP/n8n/servers/SSH from the site | PARTIAL | The owner-only Hub registry creates, lists, enables, disables and explicitly tests MCP, n8n, GitHub and SSH endpoints. A `READY` integration now exposes a predefined read-only action: MCP `tools/list`, n8n workflow list, GitHub repository list or SSH host inspection. Exact-host allowlisting, reserved-address blocking, private-network acknowledgement, pinned DNS, no redirects, bounded normalized output, encrypted/write-only credentials and durable PostgreSQL action replay are enforced. Isolated production HTTP proves the action receipt and restart-safe replay. Approval-gated write/workflow-trigger/shell/deploy actions remain the gap; arbitrary remote execution is intentionally not exposed. |
+| 18 | Manage MCP/n8n/servers/SSH from the site | PARTIAL | The owner-only Hub registry creates, lists, enables, disables and explicitly tests MCP, n8n, GitHub and SSH endpoints. A `READY` integration exposes a predefined read-only action: MCP `tools/list`, n8n workflow list, GitHub repository list or SSH host inspection. GitHub now also provides an Advanced workflow-dispatch/deploy action through separate durable request and explicit owner-decision commands. PostgreSQL records `PENDING/DENIED/EXECUTING/terminal` state, network execution starts only after approval, and an unknown transport outcome is terminal and never retried. Exact-host allowlisting, DNS pinning and encrypted/write-only credentials remain enforced. Real PostgreSQL, production HTTP, component and executor tests prove the boundary. MCP writes and SSH service/deployment actions remain unavailable until an allowlisted tool/service registry exists; arbitrary remote execution is intentionally not exposed. |
 | 19 | See tokens/limits/cost/context pressure | PARTIAL | Operations aggregates persisted Codex plus API/Local input/cached/output tokens, Context Pack pressure and fresh/stale Broker signals. When LiteLLM supplies `x-litellm-response-cost`, the UI labels its aggregate explicitly as an estimate with source and job count; missing cost remains unknown. Reconciliation against provider-billed spend is still absent, so this is not claimed as actual invoiced cost. |
 | 20 | Automatically choose the rational Route | PASS | Resource Broker scores fresh quality, limits, cost, latency and load evidence and appends its exact decision event. Durable API_MODEL and LOCAL_MODEL Task adapters are registered in production. The Simple-first Hub provisions ExecutionRoute, Conversation, RuntimeBinding and active Session under one PostgreSQL transaction/receipt, with Auto selection and optional Advanced ModelRoute override. PostgreSQL proves paid-call idempotency, restart replay, result, usage, cost and memory projection. The disposable pinned LiteLLM verifier composes a canonical Broker decision with a live gateway completion and proves projection reconciliation plus a router-owned fallback bounded to one alternate deployment. AI World never retries an accepted or outcome-unknown paid call. |
 | 21 | Survive restart without Task/Run/context loss | PASS | Isolated PostgreSQL, standalone restart, LangGraph checkpoint and Compose backup/restore verifiers cover the durable boundaries. |
@@ -34,8 +34,8 @@ proven. `OPEN` means the required product surface is absent.
 
 ## Production preflight evidence
 
-The isolated production Compose verifier passed on the current head
-`49b63f07e7dcb760d912ad03d2de3f0a56c6ed9f`. It created a unique disposable
+The isolated production Compose verifier passed after migration 0041 and the
+approval-gated GitHub dispatch vertical slice. It created a unique disposable
 Compose project, exercised HTTPS, readiness degradation, a real PostgreSQL
 backup/mutation/restore cycle, non-root and read-only containers, private
 database/model-gateway/Codex-worker boundaries, separated Codex authentication,
@@ -54,7 +54,7 @@ substitute for the two account-bound live gates below.
 
 ## Next implementation order
 
-1. Add remaining approval-gated predefined integration mutations without
-   exposing arbitrary remote commands.
+1. Add allowlisted MCP write-tool and SSH service/deployment registries before
+   exposing their approval-gated mutations; never accept arbitrary commands.
 2. Run the two account-bound live gates and repeat the full browser/runtime
    suite against the final head.

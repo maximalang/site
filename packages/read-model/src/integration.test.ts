@@ -1,7 +1,56 @@
 import { describe, expect, it } from "vitest";
-import { IntegrationCreateSchema, IntegrationRegistrySchema } from "./integration.js";
+import {
+  IntegrationCreateSchema,
+  IntegrationMutationReceiptSchema,
+  IntegrationMutationSchema,
+  IntegrationRegistrySchema,
+} from "./integration.js";
 
 describe("Integration contracts", () => {
+  it("accepts only predefined bounded integration mutations", () => {
+    expect(() =>
+      IntegrationMutationSchema.parse({
+        kind: "N8N_TRIGGER_WEBHOOK",
+        webhookPath: "/webhook/daily_sync",
+      }),
+    ).toThrow();
+    expect(() =>
+      IntegrationMutationSchema.parse({ kind: "SSH_COMMAND", command: "rm -rf /" }),
+    ).toThrow();
+    expect(() =>
+      IntegrationMutationSchema.parse({
+        kind: "GITHUB_DISPATCH_WORKFLOW",
+        owner: "owner",
+        repository: "repo",
+        workflowId: "deploy.yml",
+        ref: "main; shutdown",
+      }),
+    ).toThrow();
+  });
+
+  it("keeps an outcome-unknown mutation distinct from a retryable failure", () => {
+    expect(
+      IntegrationMutationReceiptSchema.parse({
+        schemaVersion: 1,
+        requestId: "integration_mutation_11111111-1111-1111-1111-111111111111",
+        integrationId: "integration_11111111-1111-1111-1111-111111111111",
+        mutation: {
+          kind: "GITHUB_DISPATCH_WORKFLOW",
+          owner: "owner",
+          repository: "repo",
+          workflowId: "deploy.yml",
+          ref: "main",
+        },
+        state: "OUTCOME_UNKNOWN",
+        outcome: "REPLAY",
+        requestedAt: "2026-08-15T12:00:00.000Z",
+        decidedAt: "2026-08-15T12:01:00.000Z",
+        completedAt: "2026-08-15T12:02:00.000Z",
+        failureCode: "INTERRUPTED_OUTCOME_UNKNOWN",
+      }).state,
+    ).toBe("OUTCOME_UNKNOWN");
+  });
+
   it("separates HTTPS adapters from SSH locators and omits credentials", () => {
     const https = IntegrationCreateSchema.parse({
       id: "integration_11111111-1111-4111-8111-111111111111",

@@ -495,6 +495,75 @@ try {
   ) {
     throw new Error("Integration action was not durably recorded and replayed");
   }
+  const githubIntegrationId = "integration_15151515-1515-4515-8515-151515151515";
+  for (const body of [
+    {
+      id: githubIntegrationId,
+      commandId: "integration:create:github-runtime",
+      kind: "GITHUB",
+      label: "GitHub deploy surface",
+      endpoint: { transport: "HTTPS", url: "https://api.github.com" },
+      createdAt: "2026-08-15T00:01:00.000Z",
+    },
+    {
+      operation: "CREDENTIAL",
+      integrationId: githubIntegrationId,
+      commandId: "integration:credential:github-runtime",
+      plaintext: "runtime-github-secret",
+    },
+  ]) {
+    const response = await fetch(`${baseUrl}/api/integrations`, {
+      method: "POST",
+      headers: integrationHeaders,
+      body: JSON.stringify(body),
+    });
+    if (response.status !== 201) throw new Error("GitHub mutation fixture setup failed");
+  }
+  await database.query(
+    "UPDATE agent_world.integration_endpoints SET health = 'READY' WHERE id = $1",
+    [githubIntegrationId],
+  );
+  const mutationRequestId = "integration_mutation_15151515-1515-4515-8515-151515151515";
+  const mutationRequest = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      operation: "REQUEST_MUTATION",
+      requestId: mutationRequestId,
+      integrationId: githubIntegrationId,
+      commandId: "integration:mutation:request:runtime",
+      mutation: {
+        kind: "GITHUB_DISPATCH_WORKFLOW",
+        owner: "maximalang",
+        repository: "site",
+        workflowId: "deploy.yml",
+        ref: "main",
+      },
+    }),
+  });
+  const mutationRequestBody = await mutationRequest.json();
+  const mutationDecision = await fetch(`${baseUrl}/api/integrations`, {
+    method: "POST",
+    headers: integrationHeaders,
+    body: JSON.stringify({
+      operation: "DECIDE_MUTATION",
+      requestId: mutationRequestId,
+      commandId: "integration:mutation:deny:runtime",
+      decision: "DENY",
+    }),
+  });
+  const mutationDecisionBody = await mutationDecision.json();
+  if (
+    mutationRequest.status !== 201 ||
+    mutationRequestBody.result?.state !== "PENDING" ||
+    mutationDecision.status !== 201 ||
+    mutationDecisionBody.result?.state !== "DENIED" ||
+    JSON.stringify(mutationDecisionBody).includes("runtime-github-secret")
+  ) {
+    throw new Error(
+      `Integration mutation approval separation failed: request=${mutationRequest.status}/${mutationRequestBody.result?.state ?? mutationRequestBody.error?.code ?? "invalid"} decision=${mutationDecision.status}/${mutationDecisionBody.result?.state ?? mutationDecisionBody.error?.code ?? "invalid"}`,
+    );
+  }
   const projectId = "project_11111111-1111-1111-1111-111111111111";
   const memoryInbox = await fetch(
     `${baseUrl}/api/memory?projectId=${encodeURIComponent(projectId)}&view=INBOX`,
@@ -790,7 +859,7 @@ try {
     [missionId],
   );
   if (
-    evidence.rows[0]?.migrations !== 40 ||
+    evidence.rows[0]?.migrations !== 41 ||
     evidence.rows[0]?.revoked_sessions !== 1 ||
     evidence.rows[0]?.mission_checkpoints < 1
   ) {
@@ -798,7 +867,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 40, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, integrationActionReplay: true, chatGptAccountCreate: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 41, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, integrationActionReplay: true, chatGptAccountCreate: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

@@ -3,6 +3,8 @@ import type {
   IntegrationAction,
   IntegrationActionResult,
   IntegrationCreate,
+  IntegrationMutation,
+  IntegrationMutationReceipt,
   IntegrationRegistry,
 } from "@agent-world/read-model";
 import { useCallback, useEffect, useState } from "react";
@@ -15,6 +17,16 @@ export type IntegrationClient = {
   lifecycle(id: string, operation: "ENABLE" | "DISABLE", csrf: string): Promise<void>;
   probe(id: string, csrf: string): Promise<void>;
   action(id: string, action: IntegrationAction, csrf: string): Promise<IntegrationActionResult>;
+  requestMutation(
+    id: string,
+    mutation: IntegrationMutation,
+    csrf: string,
+  ): Promise<IntegrationMutationReceipt>;
+  decideMutation(
+    requestId: string,
+    decision: "APPROVE" | "DENY",
+    csrf: string,
+  ): Promise<IntegrationMutationReceipt>;
 };
 export function IntegrationPanel({
   csrfToken,
@@ -32,6 +44,11 @@ export function IntegrationPanel({
   const [credential, setCredential] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionResult, setActionResult] = useState<IntegrationActionResult>();
+  const [mutationReceipt, setMutationReceipt] = useState<IntegrationMutationReceipt>();
+  const [githubOwner, setGithubOwner] = useState("");
+  const [githubRepository, setGithubRepository] = useState("");
+  const [githubWorkflow, setGithubWorkflow] = useState("deploy.yml");
+  const [githubRef, setGithubRef] = useState("main");
   const refresh = useCallback(
     () =>
       client
@@ -110,6 +127,43 @@ export function IntegrationPanel({
       setBusy(false);
     }
   };
+  const requestGithubDispatch = async (id: string) => {
+    setBusy(true);
+    setError(false);
+    try {
+      setMutationReceipt(
+        await client.requestMutation(
+          id,
+          {
+            kind: "GITHUB_DISPATCH_WORKFLOW",
+            owner: githubOwner,
+            repository: githubRepository,
+            workflowId: githubWorkflow,
+            ref: githubRef,
+          },
+          csrfToken,
+        ),
+      );
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const decideMutation = async (decision: "APPROVE" | "DENY") => {
+    if (!mutationReceipt) return;
+    setBusy(true);
+    setError(false);
+    try {
+      setMutationReceipt(
+        await client.decideMutation(mutationReceipt.requestId, decision, csrfToken),
+      );
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <section aria-labelledby="integrations-title" className="integrations-panel">
       <div className="section-heading">
@@ -132,6 +186,22 @@ export function IntegrationPanel({
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {mutationReceipt ? (
+        <div className="integration-action-result" aria-live="polite">
+          <strong>GitHub workflow dispatch</strong>
+          <span>{mutationReceipt.state}</span>
+          {mutationReceipt.state === "PENDING" ? (
+            <div>
+              <button disabled={busy} onClick={() => void decideMutation("APPROVE")} type="button">
+                Подтвердить запуск
+              </button>
+              <button disabled={busy} onClick={() => void decideMutation("DENY")} type="button">
+                Отклонить
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div className="integration-form">
@@ -196,6 +266,50 @@ export function IntegrationPanel({
             >
               {item.isEnabled ? "Отключить" : "Включить"}
             </button>
+            {item.kind === "GITHUB" ? (
+              <details>
+                <summary>Advanced · workflow dispatch</summary>
+                <label>
+                  Owner
+                  <input
+                    value={githubOwner}
+                    onChange={(event) => setGithubOwner(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Repository
+                  <input
+                    value={githubRepository}
+                    onChange={(event) => setGithubRepository(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Workflow
+                  <input
+                    value={githubWorkflow}
+                    onChange={(event) => setGithubWorkflow(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Ref
+                  <input value={githubRef} onChange={(event) => setGithubRef(event.target.value)} />
+                </label>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    item.health !== "READY" ||
+                    !githubOwner ||
+                    !githubRepository ||
+                    !githubWorkflow ||
+                    !githubRef
+                  }
+                  onClick={() => void requestGithubDispatch(item.id)}
+                >
+                  Запросить запуск
+                </button>
+              </details>
+            ) : null}
             <button
               type="button"
               disabled={busy || !item.isEnabled}

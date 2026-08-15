@@ -156,6 +156,20 @@ export const applicationIntegrationDependencies = {
     >,
     executedAt: string,
   ) => runtime().executeIntegrationAction({ ...input, executedAt }),
+  requestMutation: (
+    input: Omit<
+      Parameters<ReturnType<typeof runtime>["requestIntegrationMutation"]>[0],
+      "requestedAt"
+    >,
+    requestedAt: string,
+  ) => runtime().requestIntegrationMutation({ ...input, requestedAt }),
+  decideMutation: (
+    input: Omit<
+      Parameters<ReturnType<typeof runtime>["decideIntegrationMutation"]>[0],
+      "decidedAt"
+    >,
+    decidedAt: string,
+  ) => runtime().decideIntegrationMutation({ ...input, decidedAt }),
 };
 
 export function authorizeApplicationRequest(request: Request): Promise<boolean> {

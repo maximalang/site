@@ -18,9 +18,19 @@ kind: MCP `tools/list`, n8n workflow listing, GitHub repository listing, or SSH
 host inspection. Actions accept no remote path, method, command or arbitrary
 parameters. Results are normalized to at most 100 bounded items and persisted
 in `integration_action_observations`; an exact `command_id` replay reads the
-stored result instead of repeating network access. Write, workflow-trigger,
-shell, git-push and deployment actions remain outside this catalog and require
-an explicit approval-aware policy before they can be added.
+stored result instead of repeating network access.
+
+GitHub additionally exposes one write action in Advanced mode: an existing
+`workflow_dispatch` workflow can be requested with bounded owner/repository,
+workflow and ref fields. Request and owner decision are separate commands. The
+PostgreSQL lifecycle is `PENDING -> DENIED` or
+`PENDING -> EXECUTING -> SUCCEEDED|FAILED|OUTCOME_UNKNOWN`; network execution
+starts only after approval. A connection failure after sending is terminal
+`OUTCOME_UNKNOWN` and is never retried automatically. The executor accepts only
+the canonical GitHub dispatch path and pinned, allowlisted HTTPS connection.
+MCP writes and SSH service/deployment operations remain unavailable until a
+separate allowlisted tool/service registry exists; arbitrary remote commands
+are intentionally not exposed.
 
 Remote access is deny-by-default. Add exact hostnames to
 `AGENT_WORLD_INTEGRATION_ALLOWED_HOSTS`. If any allowlisted hostname resolves to
@@ -36,3 +46,4 @@ Protocol references:
 - [n8n monitoring endpoints](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/monitor-n8n/)
 - [GitHub REST authentication](https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api)
 - [GitHub authenticated user endpoint](https://docs.github.com/en/rest/users/users#get-the-authenticated-user)
+- [GitHub workflow dispatch](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)

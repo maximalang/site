@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createNodeIntegrationAction,
+  createNodeIntegrationMutationExecutor,
   createNodeIntegrationProbe,
   type ProbeTarget,
 } from "./integration-probe";
@@ -118,5 +119,64 @@ describe("predefined integration actions", () => {
       },
     )(github, "GITHUB_LIST_REPOSITORIES", "token");
     expect(result.items).toEqual([{ id: "42", label: "owner/repo", detail: "private · active" }]);
+  });
+});
+
+describe("approved integration mutations", () => {
+  const mutation = {
+    kind: "GITHUB_DISPATCH_WORKFLOW" as const,
+    owner: "maximalang",
+    repository: "site",
+    workflowId: "deploy.yml",
+    ref: "main",
+  };
+
+  it("dispatches only the canonical GitHub workflow endpoint", async () => {
+    const https = vi.fn().mockResolvedValue({ status: 204, body: "", contentType: "" });
+    const result = await createNodeIntegrationMutationExecutor(
+      { allowedHosts: ["api.github.com"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "140.82.112.6", family: 4 }),
+        https,
+      },
+    )({ endpointUrl: "https://api.github.com/ignored", credential: "token", mutation });
+    expect(result).toEqual({ state: "SUCCEEDED" });
+    expect(https.mock.calls[0]?.[0].toString()).toBe(
+      "https://api.github.com/repos/maximalang/site/actions/workflows/deploy.yml/dispatches",
+    );
+    expect(JSON.parse(https.mock.calls[0]?.[5])).toEqual({
+      ref: "main",
+      return_run_details: true,
+    });
+  });
+
+  it("does not retry a transport failure with an unknown remote outcome", async () => {
+    const https = vi.fn().mockRejectedValue(new Error("socket reset"));
+    const result = await createNodeIntegrationMutationExecutor(
+      { allowedHosts: ["api.github.com"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "140.82.112.6", family: 4 }),
+        https,
+      },
+    )({ endpointUrl: "https://api.github.com", credential: "token", mutation });
+    expect(result).toEqual({
+      state: "OUTCOME_UNKNOWN",
+      failureCode: "INTERRUPTED_OUTCOME_UNKNOWN",
+    });
+    expect(https).toHaveBeenCalledOnce();
+  });
+
+  it("treats a server error as outcome-unknown instead of safe-to-retry", async () => {
+    const result = await createNodeIntegrationMutationExecutor(
+      { allowedHosts: ["api.github.com"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "140.82.112.6", family: 4 }),
+        https: vi.fn().mockResolvedValue({ status: 503, body: "", contentType: "" }),
+      },
+    )({ endpointUrl: "https://api.github.com", credential: "token", mutation });
+    expect(result).toEqual({
+      state: "OUTCOME_UNKNOWN",
+      failureCode: "REMOTE_OUTCOME_UNKNOWN",
+    });
   });
 });

@@ -34,6 +34,7 @@ import type {
   HubReadModel,
   IntegrationAction,
   IntegrationCreate,
+  IntegrationMutation,
   IntegrationRegistry,
   ModelRouteCheckResponse,
   OperationsReadModel,
@@ -104,6 +105,19 @@ export type ApplicationRuntime = {
     commandId: string;
     action: IntegrationAction;
     executedAt: string;
+  }): Promise<unknown>;
+  requestIntegrationMutation(input: {
+    requestId: string;
+    integrationId: string;
+    commandId: string;
+    mutation: IntegrationMutation;
+    requestedAt: string;
+  }): Promise<unknown>;
+  decideIntegrationMutation(input: {
+    requestId: string;
+    commandId: string;
+    decision: "APPROVE" | "DENY";
+    decidedAt: string;
   }): Promise<unknown>;
   readWorld(): Promise<WorldReadModel>;
   stop(): Promise<void>;

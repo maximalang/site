@@ -11,6 +11,61 @@ export const IntegrationActionSchema = z.enum([
   "GITHUB_LIST_REPOSITORIES",
   "SSH_INSPECT_HOST",
 ]);
+export const IntegrationMutationRequestIdSchema = z
+  .string()
+  .regex(/^integration_mutation_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+export const IntegrationMutationSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("GITHUB_DISPATCH_WORKFLOW"),
+    owner: z
+      .string()
+      .trim()
+      .min(1)
+      .max(39)
+      .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/),
+    repository: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .regex(/^[A-Za-z0-9._-]+$/),
+    workflowId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[A-Za-z0-9._-]+$/),
+    ref: z
+      .string()
+      .trim()
+      .min(1)
+      .max(255)
+      .regex(/^[A-Za-z0-9._/-]+$/),
+  }),
+]);
+export const IntegrationMutationStateSchema = z.enum([
+  "PENDING",
+  "DENIED",
+  "EXECUTING",
+  "SUCCEEDED",
+  "FAILED",
+  "OUTCOME_UNKNOWN",
+]);
+export const IntegrationMutationReceiptSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  requestId: IntegrationMutationRequestIdSchema,
+  integrationId: IntegrationIdSchema,
+  mutation: IntegrationMutationSchema,
+  state: IntegrationMutationStateSchema,
+  outcome: z.enum(["RECORDED", "REPLAY"]),
+  requestedAt: TimestampSchema,
+  decidedAt: TimestampSchema.optional(),
+  completedAt: TimestampSchema.optional(),
+  failureCode: z
+    .string()
+    .regex(/^[A-Z][A-Z0-9_]{0,63}$/)
+    .optional(),
+});
 export const IntegrationActionItemSchema = z.strictObject({
   id: z.string().trim().min(1).max(120),
   label: z.string().trim().min(1).max(240),
@@ -95,3 +150,5 @@ export type IntegrationCreate = z.infer<typeof IntegrationCreateSchema>;
 export type IntegrationRegistry = z.infer<typeof IntegrationRegistrySchema>;
 export type IntegrationAction = z.infer<typeof IntegrationActionSchema>;
 export type IntegrationActionResult = z.infer<typeof IntegrationActionResultSchema>;
+export type IntegrationMutation = z.infer<typeof IntegrationMutationSchema>;
+export type IntegrationMutationReceipt = z.infer<typeof IntegrationMutationReceiptSchema>;

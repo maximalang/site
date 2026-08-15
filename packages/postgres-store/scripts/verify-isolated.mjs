@@ -28,6 +28,7 @@ import {
   PostgresExecutionPreferenceStore,
   PostgresHubCommandStore,
   PostgresHubReader,
+  PostgresIntegrationMutationStore,
   PostgresIntegrationStore,
   PostgresMemoryCenterReader,
   PostgresMemoryCurationStore,
@@ -227,7 +228,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 40
+    ledger.rows.at(-1)?.version !== 41
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -3263,10 +3264,19 @@ try {
     endpoint: { transport: "SSH", host: "vds.example", port: 22, username: "agent-world" },
     createdAt: "2026-08-15T11:01:00.000Z",
   };
+  const githubIntegration = {
+    id: "integration_e3e3e3e3-e3e3-43e3-83e3-e3e3e3e3e3e3",
+    commandId: "integration:create:github-isolated",
+    kind: "GITHUB",
+    label: "GitHub deploy surface",
+    endpoint: { transport: "HTTPS", url: "https://api.github.com" },
+    createdAt: "2026-08-15T11:01:30.000Z",
+  };
   if (
     (await integrationStore.create(mcpIntegration)).outcome !== "CREATED" ||
     (await integrationStore.create(mcpIntegration)).outcome !== "REPLAY" ||
-    (await integrationStore.create(sshIntegration)).outcome !== "CREATED"
+    (await integrationStore.create(sshIntegration)).outcome !== "CREATED" ||
+    (await integrationStore.create(githubIntegration)).outcome !== "CREATED"
   ) {
     throw new Error("Integration registry command replay drifted");
   }
@@ -3317,9 +3327,95 @@ try {
   if (committedProbe.outcome !== "RECORDED" || replayedProbe.outcome !== "REPLAY") {
     throw new Error("Integration probe observation replay drifted");
   }
+  const githubSecretRef = `secret-store:integrations/${githubIntegration.id}/credential`;
+  await secretStore.write({
+    commandId: "integration:credential:github-isolated",
+    secretRef: githubSecretRef,
+    purpose: "INTEGRATION_CREDENTIAL",
+    plaintext: "isolated-github-token",
+    writtenAt: "2026-08-15T11:06:00.000Z",
+  });
+  await integrationStore.bindCredential(
+    githubIntegration.id,
+    githubSecretRef,
+    "2026-08-15T11:06:00.000Z",
+  );
+  await pool.query(
+    `UPDATE agent_world.integration_endpoints
+        SET health = 'READY', updated_at = '2026-08-15T11:07:00.000Z'
+      WHERE id = $1`,
+    [githubIntegration.id],
+  );
+  const mutationStore = new PostgresIntegrationMutationStore(pool);
+  const deniedMutation = {
+    requestId: "integration_mutation_e4e4e4e4-e4e4-44e4-84e4-e4e4e4e4e4e4",
+    integrationId: githubIntegration.id,
+    commandId: "integration:mutation:request:denied",
+    mutation: {
+      kind: "GITHUB_DISPATCH_WORKFLOW",
+      owner: "maximalang",
+      repository: "site",
+      workflowId: "deploy.yml",
+      ref: "main",
+    },
+    requestedAt: "2026-08-15T11:08:00.000Z",
+  };
+  if (
+    (await mutationStore.request(deniedMutation)).outcome !== "RECORDED" ||
+    (await mutationStore.request(deniedMutation)).outcome !== "REPLAY" ||
+    (
+      await mutationStore.decide({
+        requestId: deniedMutation.requestId,
+        commandId: "integration:mutation:deny:1",
+        decision: "DENY",
+        decidedAt: "2026-08-15T11:09:00.000Z",
+      })
+    ).receipt.state !== "DENIED"
+  ) {
+    throw new Error("Integration mutation denial lifecycle drifted");
+  }
+  const approvedMutation = {
+    requestId: "integration_mutation_e5e5e5e5-e5e5-45e5-85e5-e5e5e5e5e5e5",
+    integrationId: githubIntegration.id,
+    commandId: "integration:mutation:request:approved",
+    mutation: {
+      kind: "GITHUB_DISPATCH_WORKFLOW",
+      owner: "maximalang",
+      repository: "site",
+      workflowId: "deploy.yml",
+      ref: "main",
+    },
+    requestedAt: "2026-08-15T11:10:00.000Z",
+  };
+  await mutationStore.request(approvedMutation);
+  const approved = await mutationStore.decide({
+    requestId: approvedMutation.requestId,
+    commandId: "integration:mutation:approve:1",
+    decision: "APPROVE",
+    decidedAt: "2026-08-15T11:11:00.000Z",
+  });
+  if (
+    approved.receipt.state !== "EXECUTING" ||
+    approved.execution?.credentialRef !== githubSecretRef ||
+    approved.execution?.endpointUrl !== "https://api.github.com"
+  ) {
+    throw new Error("Integration mutation approval did not claim exact execution provenance");
+  }
+  const unknownMutation = {
+    requestId: approvedMutation.requestId,
+    state: "OUTCOME_UNKNOWN",
+    failureCode: "INTERRUPTED_OUTCOME_UNKNOWN",
+    completedAt: "2026-08-15T11:12:00.000Z",
+  };
+  if (
+    (await mutationStore.complete(unknownMutation)).outcome !== "RECORDED" ||
+    (await mutationStore.complete(unknownMutation)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Integration mutation outcome-unknown replay drifted");
+  }
   const integrationRegistry = await integrationStore.list();
   if (
-    integrationRegistry.integrations.length !== 2 ||
+    integrationRegistry.integrations.length !== 3 ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.hasCredential !==
       true ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.isEnabled !==

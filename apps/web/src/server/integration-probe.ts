@@ -1,7 +1,7 @@
 import { promises as dns } from "node:dns";
 import { request as httpsRequest } from "node:https";
 import { BlockList, connect, isIP } from "node:net";
-import type { IntegrationAction } from "@agent-world/read-model";
+import type { IntegrationAction, IntegrationMutation } from "@agent-world/read-model";
 
 const MAX_REMOTE_RESPONSE_BYTES = 32_768;
 
@@ -326,6 +326,71 @@ export function createNodeIntegrationAction(
       const code = error instanceof Error ? error.message.slice(0, 120) : "ACTION_FAILED";
       return { status: "FAILED", items: [{ id: "error", label: code }] };
     }
+  };
+}
+
+export function createNodeIntegrationMutationExecutor(
+  configuration: { allowedHosts: string[]; allowPrivateNetwork: boolean },
+  dependencies: { resolve?: typeof resolveHost; https?: typeof httpsCall } = {},
+) {
+  const resolveTarget = dependencies.resolve ?? resolveHost;
+  const callHttps = dependencies.https ?? httpsCall;
+  const allowedHosts = new Set(
+    configuration.allowedHosts.map((host) => host.trim().toLowerCase()).filter(Boolean),
+  );
+  return async (input: {
+    endpointUrl: string;
+    credential: string;
+    mutation: IntegrationMutation;
+  }): Promise<
+    { state: "SUCCEEDED" } | { state: "FAILED" | "OUTCOME_UNKNOWN"; failureCode: string }
+  > => {
+    if (!input.credential) return { state: "FAILED", failureCode: "CREDENTIAL_REQUIRED" };
+    const base = new URL(input.endpointUrl);
+    if (base.protocol !== "https:") return { state: "FAILED", failureCode: "HTTPS_REQUIRED" };
+    let resolved: Awaited<ReturnType<typeof resolveHost>>;
+    try {
+      resolved = await resolveTarget(
+        base.hostname,
+        allowedHosts,
+        configuration.allowPrivateNetwork,
+      );
+    } catch (error) {
+      return {
+        state: "FAILED",
+        failureCode: error instanceof Error ? error.message.slice(0, 64) : "ROUTE_UNAVAILABLE",
+      };
+    }
+    const url = new URL(base.origin);
+    url.pathname = `/repos/${encodeURIComponent(input.mutation.owner)}/${encodeURIComponent(
+      input.mutation.repository,
+    )}/actions/workflows/${encodeURIComponent(input.mutation.workflowId)}/dispatches`;
+    const headers = {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${input.credential}`,
+      "content-type": "application/json",
+      "user-agent": "agent-world-integration-mutation/1",
+      "x-github-api-version": "2026-03-10",
+    };
+    let response: Awaited<ReturnType<typeof httpsCall>>;
+    try {
+      response = await callHttps(
+        url,
+        resolved.address,
+        resolved.family,
+        "POST",
+        headers,
+        JSON.stringify({ ref: input.mutation.ref, return_run_details: true }),
+      );
+    } catch {
+      return { state: "OUTCOME_UNKNOWN", failureCode: "INTERRUPTED_OUTCOME_UNKNOWN" };
+    }
+    if (response.status !== 200 && response.status !== 204) {
+      return response.status >= 500
+        ? { state: "OUTCOME_UNKNOWN", failureCode: "REMOTE_OUTCOME_UNKNOWN" }
+        : { state: "FAILED", failureCode: "REMOTE_REJECTED" };
+    }
+    return { state: "SUCCEEDED" };
   };
 }
 
