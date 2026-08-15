@@ -551,6 +551,39 @@ try {
   if (replayProvider.status !== 200 || (await replayProvider.json()).outcome !== "REPLAY") {
     throw new Error("Authorized Hub command did not replay the committed Provider command");
   }
+  const consumerProviderId = "provider_16161616-1616-4616-8616-161616161616";
+  const chatAccountId = "account_16161616-1616-4616-8616-161616161616";
+  for (const command of [
+    {
+      schemaVersion: 1,
+      commandId: "hub_command_16161616-1616-4616-8616-161616161616",
+      kind: "PROVIDER_CREATE",
+      providerId: consumerProviderId,
+      slug: "chatgpt-consumer-runtime",
+      displayName: "ChatGPT consumer accounts",
+      providerKind: "OPENAI",
+      category: "CONSUMER_ACCOUNT",
+    },
+    {
+      schemaVersion: 1,
+      commandId: "hub_command_17171717-1717-4717-8717-171717171717",
+      kind: "ACCOUNT_CREATE",
+      accountId: chatAccountId,
+      providerId: consumerProviderId,
+      label: "Plus primary",
+      authMechanism: "CHATGPT_INTERACTIVE",
+      subscription: "Plus",
+      availableSurfaces: ["CHAT", "CODEX"],
+    },
+  ]) {
+    const response = await fetch(`${baseUrl}/api/hub/commands`, {
+      method: "POST",
+      headers: hubCommandHeaders,
+      body: JSON.stringify(command),
+    });
+    if (response.status !== 201)
+      throw new Error(`ChatGPT Account setup returned ${response.status}`);
+  }
   const provisionedAgentId = "agent_15151515-1515-4515-8515-151515151515";
   const provisionAgent = await fetch(`${baseUrl}/api/hub/commands`, {
     method: "POST",
@@ -594,7 +627,10 @@ try {
     updatedHub.status !== 200 ||
     updatedHubBody.providers?.filter(({ providerId }) => providerId === hubCommandBody.providerId)
       .length !== 1 ||
-    updatedHubBody.agents?.filter(({ agentId }) => agentId === provisionedAgentId).length !== 1
+    updatedHubBody.agents?.filter(({ agentId }) => agentId === provisionedAgentId).length !== 1 ||
+    updatedHubBody.accounts?.filter(
+      ({ accountId }) => accountId === chatAccountId && !String(accountId).startsWith("agent_"),
+    ).length !== 1
   ) {
     throw new Error("Hub read model did not expose exactly one command-created Provider");
   }
@@ -731,7 +767,7 @@ try {
   }
 
   process.stdout.write(
-    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 36, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
+    `${JSON.stringify({ status: "PASS", postgresImage: POSTGRES_IMAGE, migrations: 36, authLifecycle: true, worldAuth: true, hubAuth: true, operationsAuth: true, integrationsAuth: true, integrationLifecycle: true, integrationProbeReplay: true, chatGptAccountCreate: true, missionCreateAuth: true, agentProvisioningAuth: true, memoryAuth: true, nativeChatProfileAuth: true, hubCommandAuth: true, hubCommandReplay: true, executionPreferenceAuth: true, executionPreferenceWrite: true, conversationAuth: true, agentConversationAuth: true, taskAuth: true, approvalAuth: true, missionWorkflowCheckpoint: true, restartRevocation: true, optionalAdapterIsolation: true })}\n`,
   );
 } finally {
   if (runtimeServer) await stopRuntimeServer(runtimeServer);

@@ -5,6 +5,7 @@ import type { HubReadModel } from "@agent-world/read-model";
 import { useEffect, useState } from "react";
 import { loadHubReadModel } from "../client/hub-api";
 import { AgentProvisioningPanel } from "./agent-provisioning-panel";
+import { ChatGptAccountPanel } from "./chatgpt-account-panel";
 import {
   type ExecutionPreferenceClient,
   ExecutionPreferencesPanel,
@@ -96,6 +97,12 @@ export function HubPanel({
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <ChatGptAccountPanel
+        accounts={model.accounts}
+        csrfToken={csrfToken}
+        onCreated={() => setAttempt((value) => value + 1)}
+        providers={model.providers}
+      />
       <MissionPanel csrfToken={csrfToken} projects={model.projects} />
       <AgentProvisioningPanel
         csrfToken={csrfToken}
