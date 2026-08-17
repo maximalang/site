@@ -55,7 +55,7 @@ export function IntegrationPanel({
 }) {
   const [registry, setRegistry] = useState<IntegrationRegistry>();
   const [error, setError] = useState(false);
-  const [kind, setKind] = useState<"MCP" | "N8N" | "GITHUB" | "SSH">("MCP");
+  const [kind, setKind] = useState<"MCP" | "N8N" | "GITHUB" | "SSH" | "STEEL">("MCP");
   const [label, setLabel] = useState("");
   const [locator, setLocator] = useState("");
   const [username, setUsername] = useState("");
@@ -286,7 +286,7 @@ export function IntegrationPanel({
     <section aria-labelledby="integrations-title" className="integrations-panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">MCP · Automation · Servers</p>
+          <p className="eyebrow">MCP · Automation · Servers · Browser</p>
           <h2 id="integrations-title">Интеграции</h2>
         </div>
         <span className="count-badge">{registry?.integrations.length ?? 0}</span>
@@ -330,6 +330,7 @@ export function IntegrationPanel({
             <option>N8N</option>
             <option>GITHUB</option>
             <option>SSH</option>
+            <option>STEEL</option>
           </select>
         </label>
         <label>
@@ -578,6 +579,7 @@ export function IntegrationPanel({
                       N8N: "N8N_LIST_WORKFLOWS",
                       GITHUB: "GITHUB_LIST_REPOSITORIES",
                       SSH: "SSH_INSPECT_HOST",
+                      STEEL: "STEEL_LIST_SESSIONS",
                     } as const
                   )[item.kind],
                 )
@@ -589,7 +591,9 @@ export function IntegrationPanel({
                   ? "Workflow"
                   : item.kind === "GITHUB"
                     ? "Репозитории"
-                    : "Host info"}
+                    : item.kind === "STEEL"
+                      ? "Сессии"
+                      : "Host info"}
             </button>
           </li>
         ))}
