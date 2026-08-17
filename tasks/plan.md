@@ -8,6 +8,12 @@ with an evidence-backed OSS reuse audit. Production implementation is gated on
 that audit so the product reuses mature components instead of recreating an
 agent framework, model gateway, memory stack, or control panels.
 
+This web surface is an owner control shell, not a customer billing product. It
+must not grow checkout, payment collection, invoices, subscription sales or a
+provider-billing ingestion/reconciliation subsystem. Cost signals may appear as
+bounded operational estimates when execution providers expose them, but they
+are never presented as a customer charge or invoiced truth.
+
 ## Non-negotiable architecture constraints
 
 - `AgentTemplate` is reusable behavior; an `Agent`/`AgentInstance` is a durable
@@ -102,7 +108,9 @@ Phase 0 reuse and license audit
 
 - [x] Integrate n8n, MCP Gateway, GitHub, SSH/VDS and permitted browser sessions.
 - [x] Integrate Langfuse telemetry behind the product Observatory.
-- [ ] Complete native Chat/Work adapter interfaces without unsupported scraping.
+- [x] Complete native Chat/Work adapter interfaces without unsupported scraping.
+      `CHAT` has its dispatch/Control API contract; `WORK` is explicitly
+      `UNSUPPORTED` and non-selectable until a supported transport is proven.
 - [ ] Verify security, backup/restore, restart/replay and all 24 product-level
       acceptance criteria.
 
