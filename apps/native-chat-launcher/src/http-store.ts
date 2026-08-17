@@ -65,9 +65,14 @@ export class HttpNativeChatLaunchStore {
       redirect: "error",
       signal: AbortSignal.timeout(this.timeoutMs),
     });
-    if (!response.ok) throw new Error(`Launcher control rejected request with status ${response.status}`);
+    if (!response.ok)
+      throw new Error(`Launcher control rejected request with status ${response.status}`);
     const declaredLength = response.headers.get("content-length");
-    if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > MAX_RESPONSE_BYTES) {
+    if (
+      declaredLength &&
+      /^\d+$/.test(declaredLength) &&
+      Number(declaredLength) > MAX_RESPONSE_BYTES
+    ) {
       throw new Error("Launcher control response is oversized");
     }
     const text = await response.text();

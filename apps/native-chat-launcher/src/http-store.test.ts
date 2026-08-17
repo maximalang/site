@@ -11,12 +11,12 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("HttpNativeChatLaunchStore", () => {
   it("accepts only the exact HTTPS control endpoint, with loopback HTTP for local development", () => {
-    expect(parseNativeChatLauncherControlUrl("https://world.example.com/api/native-chat-launcher")).toBe(
-      "https://world.example.com/api/native-chat-launcher",
-    );
-    expect(parseNativeChatLauncherControlUrl("http://127.0.0.1:3000/api/native-chat-launcher")).toBe(
-      "http://127.0.0.1:3000/api/native-chat-launcher",
-    );
+    expect(
+      parseNativeChatLauncherControlUrl("https://world.example.com/api/native-chat-launcher"),
+    ).toBe("https://world.example.com/api/native-chat-launcher");
+    expect(
+      parseNativeChatLauncherControlUrl("http://127.0.0.1:3000/api/native-chat-launcher"),
+    ).toBe("http://127.0.0.1:3000/api/native-chat-launcher");
     expect(() =>
       parseNativeChatLauncherControlUrl("http://world.example.com/api/native-chat-launcher"),
     ).toThrow();
@@ -27,9 +27,7 @@ describe("HttpNativeChatLaunchStore", () => {
     const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       expect(body).toEqual({ schemaVersion: 1, action: "CLAIM", leaseMs: 120_000 });
-      expect(init?.headers).toEqual(
-        expect.objectContaining({ Authorization: `Bearer ${token}` }),
-      );
+      expect(init?.headers).toEqual(expect.objectContaining({ Authorization: `Bearer ${token}` }));
       return Response.json({
         schemaVersion: 1,
         claim: {

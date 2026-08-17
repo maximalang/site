@@ -1,14 +1,22 @@
 import { createHash } from "node:crypto";
+import {
+  AccountIdSchema,
+  ChatDispatchIdSchema,
+  LauncherIdSchema,
+  RunIdSchema,
+} from "@agent-world/domain";
 import { describe, expect, it, vi } from "vitest";
 import {
   createNativeChatLauncherRouteHandler,
   parseNativeChatLauncherControlConfiguration,
 } from "./native-chat-launcher-http";
 
-const launcherId = "launcher_11111111-1111-4111-8111-111111111111";
-const dispatchId = "chat_dispatch_22222222-2222-4222-8222-222222222222";
-const accountId = "account_33333333-3333-4333-8333-333333333333";
-const runId = "run_44444444-4444-4444-8444-444444444444";
+const launcherId = LauncherIdSchema.parse("launcher_11111111-1111-4111-8111-111111111111");
+const dispatchId = ChatDispatchIdSchema.parse(
+  "chat_dispatch_22222222-2222-4222-8222-222222222222",
+);
+const accountId = AccountIdSchema.parse("account_33333333-3333-4333-8333-333333333333");
+const runId = RunIdSchema.parse("run_44444444-4444-4444-8444-444444444444");
 const token = "a".repeat(43);
 const tokenSha256 = createHash("sha256").update(token).digest("hex");
 
@@ -62,9 +70,9 @@ describe("Native Chat launcher HTTP control", () => {
     ).toThrow();
 
     const handler = createNativeChatLauncherRouteHandler(dependencies(), undefined);
-    expect((await handler(request({ schemaVersion: 1, action: "CLAIM", leaseMs: 120_000 }))).status).toBe(
-      503,
-    );
+    expect(
+      (await handler(request({ schemaVersion: 1, action: "CLAIM", leaseMs: 120_000 }))).status,
+    ).toBe(503);
   });
 
   it("rejects an invalid bearer without touching the queue", async () => {

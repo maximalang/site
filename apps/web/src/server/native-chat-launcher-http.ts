@@ -90,7 +90,10 @@ function error(code: string, status: number): Response {
   return Response.json({ error: { code } }, { status, headers: RESPONSE_HEADERS });
 }
 
-function authorized(request: Request, configuration: NativeChatLauncherControlConfiguration): boolean {
+function authorized(
+  request: Request,
+  configuration: NativeChatLauncherControlConfiguration,
+): boolean {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return false;
   const token = header.slice("Bearer ".length);
