@@ -200,9 +200,11 @@ test("World skin preference and Memory Network remain canonical in the browser",
   expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBe(
     "space-station-v1",
   );
-  await testInfo.attach("world-space-station", {
-    body: await page.screenshot({ animations: "disabled", caret: "hide", fullPage: true }),
-    contentType: "image/png",
+  await page.screenshot({
+    animations: "disabled",
+    caret: "hide",
+    fullPage: true,
+    path: testInfo.outputPath(`${testInfo.project.name}-world-space-station.png`),
   });
 
   await page.getByRole("button", { name: "Project / system default" }).click();
@@ -223,8 +225,9 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await expect(memoryDialog.locator("[data-memory-kind='reference']")).toHaveCount(1);
   const accessibility = await new AxeBuilder({ page }).include("dialog").analyze();
   expect(accessibility.violations).toEqual([]);
-  await testInfo.attach("memory-network", {
-    body: await memoryDialog.screenshot({ animations: "disabled", caret: "hide" }),
-    contentType: "image/png",
+  await memoryDialog.screenshot({
+    animations: "disabled",
+    caret: "hide",
+    path: testInfo.outputPath(`${testInfo.project.name}-memory-network.png`),
   });
 });
