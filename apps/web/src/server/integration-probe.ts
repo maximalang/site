@@ -399,6 +399,26 @@ export function createNodeIntegrationAction(
           }),
         };
       }
+      if (action === "STEEL_LIST_SESSIONS" && target.kind === "STEEL") {
+        url.pathname = "/sessions";
+        url.search = "";
+        response = await callHttps(url, resolved.address, resolved.family, "GET", headers);
+        if (response.status < 200 || response.status >= 300) throw new Error("REMOTE_UNHEALTHY");
+        const sessions = jsonPayload(response).sessions;
+        if (!Array.isArray(sessions)) throw new Error("STEEL_SESSIONS_INVALID");
+        return {
+          status: "SUCCEEDED",
+          items: sessions.slice(0, 100).flatMap((session): ActionItem[] => {
+            if (!session || typeof session !== "object") return [];
+            const value = session as Record<string, unknown>;
+            const id = safeText(value.id, 120);
+            const status = safeText(value.status, 120);
+            if (!id || !status) return [];
+            const createdAt = safeText(value.createdAt, 120);
+            return [{ id, label: id, detail: createdAt ? `${status} · ${createdAt}` : status }];
+          }),
+        };
+      }
       throw new Error("INTEGRATION_ACTION_KIND_MISMATCH");
     } catch (error) {
       const code = error instanceof Error ? error.message.slice(0, 120) : "ACTION_FAILED";
@@ -588,10 +608,20 @@ export function createNodeIntegrationMutationExecutor(
   };
 }
 
-export function createNodeIntegrationProbe(configuration: {
-  allowedHosts: string[];
-  allowPrivateNetwork: boolean;
-}) {
+export function createNodeIntegrationProbe(
+  configuration: {
+    allowedHosts: string[];
+    allowPrivateNetwork: boolean;
+  },
+  dependencies: {
+    resolve?: typeof resolveHost;
+    https?: typeof httpsCall;
+    ssh?: typeof sshBanner;
+  } = {},
+) {
+  const resolveTarget = dependencies.resolve ?? resolveHost;
+  const callHttps = dependencies.https ?? httpsCall;
+  const inspectSsh = dependencies.ssh ?? sshBanner;
   const allowedHosts = new Set(
     configuration.allowedHosts.map((host) => host.trim().toLowerCase()).filter(Boolean),
   );
@@ -599,17 +629,17 @@ export function createNodeIntegrationProbe(configuration: {
     try {
       if (!target.isEnabled) throw new Error("INTEGRATION_DISABLED");
       if (target.endpoint.transport === "SSH") {
-        const resolved = await resolveHost(
+        const resolved = await resolveTarget(
           target.endpoint.host,
           allowedHosts,
           configuration.allowPrivateNetwork,
         );
-        await sshBanner(resolved.address, target.endpoint.port);
+        await inspectSsh(resolved.address, target.endpoint.port);
         return { health: "READY", code: "SSH_BANNER_OK" };
       }
       const url = new URL(target.endpoint.url);
       if (url.protocol !== "https:") throw new Error("HTTPS_REQUIRED");
-      const resolved = await resolveHost(
+      const resolved = await resolveTarget(
         url.hostname,
         allowedHosts,
         configuration.allowPrivateNetwork,
@@ -646,8 +676,11 @@ export function createNodeIntegrationProbe(configuration: {
         url.search = "";
         headers.accept = "application/vnd.github+json";
         headers["x-github-api-version"] = "2026-03-10";
+      } else if (target.kind === "STEEL") {
+        url.pathname = "/health";
+        url.search = "";
       }
-      const response = await httpsCall(
+      const response = await callHttps(
         url,
         resolved.address,
         resolved.family,
@@ -668,6 +701,9 @@ export function createNodeIntegrationProbe(configuration: {
         const parsed = JSON.parse(payload) as { jsonrpc?: unknown; result?: unknown };
         if (parsed.jsonrpc !== "2.0" || parsed.result === undefined)
           throw new Error("MCP_INITIALIZE_INVALID");
+      } else if (target.kind === "STEEL") {
+        const payload = jsonPayload(response);
+        if (payload.status !== "ok") throw new Error("STEEL_HEALTH_INVALID");
       }
       return { health: "READY", code: `${target.kind}_PROBE_OK` };
     } catch (error) {
