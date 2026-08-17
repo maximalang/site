@@ -115,10 +115,10 @@ export function MemoryNetworkGraph({
         <p className={styles.empty}>Network пуст.</p>
       ) : (
         <>
-          <div
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG requires the scrollable graph region to be keyboard-focusable. */}
+          <section
             aria-label="Прокручиваемая схема Memory Network"
             className={styles.canvas}
-            role="region"
             tabIndex={0}
           >
             <svg
@@ -191,7 +191,7 @@ export function MemoryNetworkGraph({
                 ))}
               </g>
             </svg>
-          </div>
+          </section>
           <section className={styles.legend} aria-label="Легенда Memory Network">
             <span>
               <i className={styles.memoryKey} aria-hidden="true" /> Canonical memory
