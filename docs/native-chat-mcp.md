@@ -64,6 +64,12 @@ structured results and canonical Control events.
   Project/content hash. Chunks support optional 1536-dimensional embeddings,
   a partial cosine HNSW index and bounded project-filtered retrieval with
   iterative scan enabled for filtered approximate search.
+- Project-shared RAG ingestion is production-wired end to end: the owner-only
+  `/api/rag` route validates a bounded request, deterministic ingestion chunks
+  it, LiteLLM generates embeddings through one canonical embedding ModelRoute,
+  and PostgreSQL commits document/chunk/context provenance atomically. The path
+  remains fail-closed until `AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID` names an
+  existing canonical embedding ModelRoute.
 
 The server does not read Chat output from the DOM and does not treat a visible
 Chat response as completion evidence.
@@ -188,10 +194,10 @@ cross-product database.
 - Deploy the implemented authorization server behind the production HTTPS
   endpoint and verify its public discovery/JWKS/DCR and Actions OpenAPI
   contracts.
-- Connect ingestion/chunking and an embedding adapter to the canonical RAG
-  write store. Every written chunk is already materialized as provenance-linked
-  shared context and ranked against the Task during ContextPack compilation,
-  but automated source ingestion and embedding generation are not yet activated.
+- If shared RAG is desired, select an eligible canonical embedding ModelRoute
+  and set `AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID`. Ingestion, chunking,
+  embedding generation, atomic PostgreSQL writes and retrieval are implemented;
+  absence of the route intentionally leaves `/api/rag` unavailable.
 - Run the host-local launcher against an owner-authenticated dedicated profile
   and record a real browser-submission receipt. The queue, driver and receipt
   path are implemented but still require this live E2E.
