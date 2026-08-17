@@ -1,15 +1,6 @@
 import { constants } from "node:fs";
-import {
-  chmod,
-  chown,
-  lstat,
-  mkdir,
-  open,
-  readFile,
-  rename,
-  rm,
-} from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { chmod, chown, lstat, mkdir, open, readFile, rename, rm } from "node:fs/promises";
+import { basename, join } from "node:path";
 import process from "node:process";
 
 const SOURCE_DIRECTORY = "/source-secrets";
@@ -61,8 +52,10 @@ async function replaceSecret(name) {
     await handle.close();
   }
 
-  await chown(temporary, RUNTIME_UID, RUNTIME_GID);
+  // Set the final mode while uid 0 still owns the file, then transfer ownership.
+  // The init container has CAP_CHOWN but deliberately does not retain CAP_FOWNER.
   await chmod(temporary, 0o400);
+  await chown(temporary, RUNTIME_UID, RUNTIME_GID);
   await rename(temporary, target);
 }
 
