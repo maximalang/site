@@ -205,6 +205,8 @@ router_settings:
       containerName,
       "--network",
       networkName,
+      "--add-host",
+      "host.docker.internal:host-gateway",
       "--user",
       "10001:10001",
       "--read-only",
