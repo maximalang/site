@@ -25,7 +25,7 @@ describe("selectResourceRoute", () => {
     expect(decision.selected).toBeUndefined();
   });
 
-  it("selects by explicit normalized policy and records every scored input", () => {
+  it("excludes experimental Native Chat until live evidence enables the transport", () => {
     const decision = selectResourceRoute({
       policy: {
         version: "resource-broker-v1",
@@ -64,9 +64,13 @@ describe("selectResourceRoute", () => {
       ],
     });
 
-    expect(decision.selected?.routeId).toBe(`route_${UUIDS.chat}`);
+    expect(decision.selected?.routeId).toBe(`route_${UUIDS.codex}`);
     expect(decision.evaluations).toHaveLength(2);
-    expect(decision.evaluations[0]?.score).toBe(0.85);
+    expect(decision.evaluations[0]).toMatchObject({
+      transportSupportStatus: "EXPERIMENTAL",
+      exclusion: "TRANSPORT_NOT_SELECTABLE",
+    });
+    expect(decision.evaluations[1]?.score).toBe(0.69);
   });
 
   it("fails closed on stale or unavailable evidence", () => {
@@ -79,9 +83,8 @@ describe("selectResourceRoute", () => {
       candidates: [
         {
           routeId: `route_${UUIDS.chat}`,
-          accountId: `account_${UUIDS.account}`,
           mode: "CHAT",
-          adapterKind: "NATIVE_CHATGPT",
+          adapterKind: "OPENCLAW",
           isAvailable: true,
           quality: 1,
           remainingLimits: 1,
@@ -118,8 +121,8 @@ describe("selectResourceRoute", () => {
   it("uses canonical route identity as a deterministic tie-break", () => {
     const common = {
       accountId: `account_${UUIDS.account}`,
-      mode: "CHAT" as const,
-      adapterKind: "NATIVE_CHATGPT" as const,
+      mode: "CODEX" as const,
+      adapterKind: "CODEX" as const,
       isAvailable: true,
       quality: 0.8,
       remainingLimits: 0.8,
@@ -142,5 +145,37 @@ describe("selectResourceRoute", () => {
     });
 
     expect(decision.selected?.routeId).toBe(`route_${UUIDS.chat}`);
+  });
+
+  it("records Native Work as unsupported instead of scoring it", () => {
+    const decision = selectResourceRoute({
+      policy: {
+        version: "resource-broker-v1",
+        weights: { quality: 0.2, remainingLimits: 0.2, cost: 0.2, speed: 0.2, load: 0.2 },
+      },
+      now: "2026-08-14T10:01:00.000Z",
+      candidates: [
+        {
+          routeId: `route_${UUIDS.chat}`,
+          accountId: `account_${UUIDS.account}`,
+          mode: "WORK",
+          adapterKind: "NATIVE_WORK",
+          isAvailable: true,
+          quality: 1,
+          remainingLimits: 1,
+          cost: 1,
+          speed: 1,
+          load: 1,
+          observedAt,
+          expiresAt,
+        },
+      ],
+    });
+
+    expect(decision.selected).toBeUndefined();
+    expect(decision.evaluations[0]).toMatchObject({
+      transportSupportStatus: "UNSUPPORTED",
+      exclusion: "TRANSPORT_NOT_SELECTABLE",
+    });
   });
 });

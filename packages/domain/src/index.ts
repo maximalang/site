@@ -8,4 +8,5 @@ export * from "./memory.js";
 export * from "./mission.js";
 export * from "./primitives.js";
 export * from "./schedule.js";
+export * from "./transport-support.js";
 export * from "./workflow.js";
