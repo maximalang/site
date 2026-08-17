@@ -91,6 +91,33 @@ describe("selectResourceRoute", () => {
     });
   });
 
+  it("promotes only the exact Native Chat route with canonical result evidence", () => {
+    const unverifiedRouteId = "route_44444444-4444-4444-4444-444444444444";
+    const decision = selectResourceRoute({
+      policy,
+      now: "2026-08-14T10:01:00.000Z",
+      candidates: [nativeChatCandidate, { ...nativeChatCandidate, routeId: unverifiedRouteId }],
+      verifiedCanonicalEvidenceRouteIds: [nativeChatCandidate.routeId],
+    });
+
+    expect(decision.selected?.routeId).toBe(nativeChatCandidate.routeId);
+    expect(decision.evaluations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          candidate: expect.objectContaining({ routeId: nativeChatCandidate.routeId }),
+          transportSupportStatus: "EXPERIMENTAL",
+          transportActivation: "VERIFIED_CANONICAL_EVIDENCE",
+          score: 0.85,
+        }),
+        expect.objectContaining({
+          candidate: expect.objectContaining({ routeId: unverifiedRouteId }),
+          transportSupportStatus: "EXPERIMENTAL",
+          exclusion: "TRANSPORT_NOT_SELECTABLE",
+        }),
+      ]),
+    );
+  });
+
   it("does not use the activation override for an unsupported Work transport", () => {
     const decision = selectResourceRoute({
       policy,
