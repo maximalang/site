@@ -54,6 +54,11 @@ substitute for the two account-bound live gates below.
   Account/Mode/thread/turn/model/sandbox/usage provenance. The deterministic
   official SDK/CLI verifier and login status are necessary but not sufficient
   for this gate.
+- A subsequent read-only official CLI bootstrap reached ChatGPT and created a
+  real thread, but the turn was rejected because that account's separate Codex
+  usage allowance was exhausted until 2026-08-20 13:13. No successful Run or
+  usage provenance is claimed from this attempt. This also confirms that CODEX
+  cannot substitute for the independently brokered Native Plus CHAT transport.
 
 The Timeweb MCP wrapper also completed an authenticated read after the reported
 refresh-token fix and returned the current server inventory. This proves that
