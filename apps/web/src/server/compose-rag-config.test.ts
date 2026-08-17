@@ -16,19 +16,19 @@ describe("production Compose optional runtime configuration", () => {
     const compose = readRepositoryFile("compose.yaml");
     const exampleEnvironment = readRepositoryFile(".env.example");
 
-    for (const [name, fallback] of [
-      ["AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID", ""],
-      ["AGENT_WORLD_LOCAL_MODEL_ORIGINS", ""],
-      ["AGENT_WORLD_LANGFUSE_BASE_URL", ""],
-      ["AGENT_WORLD_LANGFUSE_PUBLIC_KEY", ""],
-      ["AGENT_WORLD_LANGFUSE_SECRET_KEY", ""],
-      ["AGENT_WORLD_LANGFUSE_POLL_MS", "30000"],
-      ["AGENT_WORLD_LANGFUSE_TIMEOUT_MS", "5000"],
-      ["AGENT_WORLD_LANGFUSE_PLAINTEXT_ACK", ""],
-      ["AGENT_WORLD_SCHEDULE_POLL_MS", "30000"],
-      ["AGENT_WORLD_MISSION_HANDOFF_POLL_MS", "5000"],
-      ["AGENT_WORLD_NATIVE_CHAT_LAUNCHER_ID", ""],
-      ["AGENT_WORLD_NATIVE_CHAT_LAUNCHER_TOKEN_SHA256", ""],
+    for (const { name, fallback } of [
+      { name: "AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID", fallback: "" },
+      { name: "AGENT_WORLD_LOCAL_MODEL_ORIGINS", fallback: "" },
+      { name: "AGENT_WORLD_LANGFUSE_BASE_URL", fallback: "" },
+      { name: "AGENT_WORLD_LANGFUSE_PUBLIC_KEY", fallback: "" },
+      { name: "AGENT_WORLD_LANGFUSE_SECRET_KEY", fallback: "" },
+      { name: "AGENT_WORLD_LANGFUSE_POLL_MS", fallback: "30000" },
+      { name: "AGENT_WORLD_LANGFUSE_TIMEOUT_MS", fallback: "5000" },
+      { name: "AGENT_WORLD_LANGFUSE_PLAINTEXT_ACK", fallback: "" },
+      { name: "AGENT_WORLD_SCHEDULE_POLL_MS", fallback: "30000" },
+      { name: "AGENT_WORLD_MISSION_HANDOFF_POLL_MS", fallback: "5000" },
+      { name: "AGENT_WORLD_NATIVE_CHAT_LAUNCHER_ID", fallback: "" },
+      { name: "AGENT_WORLD_NATIVE_CHAT_LAUNCHER_TOKEN_SHA256", fallback: "" },
     ]) {
       expect(compose).toContain(composeExpansion(name, fallback));
     }
