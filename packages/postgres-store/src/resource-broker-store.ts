@@ -68,6 +68,8 @@ type ExistingDecisionRow = QueryResultRow & {
   decision: unknown;
 };
 
+type TaskActivationRow = QueryResultRow & { mode: string | null };
+
 export type ResourceBrokerStoreErrorCode =
   | "ROUTE_NOT_FOUND"
   | "OBSERVATION_CONFLICT"
@@ -134,6 +136,17 @@ export async function decideResourceRouteInTransaction(
       request.allowedAccountId ?? null,
     ],
   );
+  const explicitTaskMode = await client.query<TaskActivationRow>(
+    `SELECT mode
+       FROM agent_world.execution_preference_overrides
+      WHERE scope_kind = 'TASK' AND task_id = $1`,
+    [request.taskId],
+  );
+  const explicitNativeChatActivation =
+    request.allowedModes?.length === 1 &&
+    request.allowedModes[0] === "CHAT" &&
+    explicitTaskMode.rows.length === 1 &&
+    explicitTaskMode.rows[0]?.mode === "CHAT";
   const decision = selectResourceRoute({
     policy: request.policy,
     now: request.decidedAt,
@@ -158,6 +171,9 @@ export async function decideResourceRouteInTransaction(
         expiresAt: iso(row.expires_at),
       }),
     ),
+    ...(explicitNativeChatActivation
+      ? { experimentalActivationAdapterKinds: ["NATIVE_CHATGPT" as const] }
+      : {}),
   });
   const selectedEvaluation = decision.selected
     ? decision.evaluations.find(({ candidate }) => candidate.routeId === decision.selected?.routeId)
