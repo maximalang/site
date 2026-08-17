@@ -79,6 +79,6 @@ describe("MemoryCenter", () => {
       }),
       "csrf",
     );
-    expect(await screen.findByRole("status")).toHaveTextContent("Источник добавлен");
+    expect((await screen.findByRole("status")).textContent).toContain("Источник добавлен");
   });
 });
