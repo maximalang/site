@@ -4,6 +4,8 @@ import { buildContractFixture } from "../test-fixtures";
 import {
   createOfficePresentation,
   DEFAULT_OFFICE_SKIN,
+  OFFICE_SKINS,
+  resolveOfficeSkin,
   type OfficeSkin,
 } from "./openclaw-office-adapter";
 
@@ -90,11 +92,62 @@ describe("OpenClaw Office presentation adapter", () => {
     expect(DEFAULT_OFFICE_SKIN.zones).toHaveLength(4);
   });
 
-  it("allows a map skin change without changing canonical or semantic state", () => {
+  it("ships four interchangeable skins without changing canonical or semantic state", () => {
+    const world = projectWorldView(buildContractFixture());
+    const baseline = createOfficePresentation(world, DEFAULT_OFFICE_SKIN);
+    expect(OFFICE_SKINS.map((skin) => skin.label)).toEqual([
+      "OpenClaw Office",
+      "Space Station",
+      "Cyber / AI Lab",
+      "Minimal Grid",
+    ]);
+
+    for (const skin of OFFICE_SKINS) {
+      const view = createOfficePresentation(world, skin);
+      expect(
+        view.agents.map(({ agentId, visualStatus, actionCue, zone }) => ({
+          agentId,
+          visualStatus,
+          actionCue,
+          zone,
+        })),
+      ).toEqual(
+        baseline.agents.map(({ agentId, visualStatus, actionCue, zone }) => ({
+          agentId,
+          visualStatus,
+          actionCue,
+          zone,
+        })),
+      );
+      expect(view.agents.every((agent) => agent.x > 0 && agent.x < view.width)).toBe(true);
+      expect(view.agents.every((agent) => agent.y > 0 && agent.y < view.height)).toBe(true);
+    }
+  });
+
+  it("resolves skin preference user over project over system and fails safe to default", () => {
+    expect(
+      resolveOfficeSkin({
+        userPreferenceId: "minimal-grid-v1",
+        projectSkinId: "space-station-v1",
+        systemSkinId: "cyber-ai-lab-v1",
+      }).id,
+    ).toBe("minimal-grid-v1");
+    expect(
+      resolveOfficeSkin({
+        userPreferenceId: "unknown",
+        projectSkinId: "space-station-v1",
+        systemSkinId: "cyber-ai-lab-v1",
+      }).id,
+    ).toBe("space-station-v1");
+    expect(resolveOfficeSkin({ systemSkinId: "unknown" })).toBe(DEFAULT_OFFICE_SKIN);
+  });
+
+  it("allows custom map geometry without changing canonical or semantic state", () => {
     const world = projectWorldView(buildContractFixture());
     const roomySkin: OfficeSkin = {
       ...DEFAULT_OFFICE_SKIN,
       id: "roomy-test",
+      label: "Roomy test",
       width: 1_600,
       height: 900,
       zones: DEFAULT_OFFICE_SKIN.zones.map((zone) => ({

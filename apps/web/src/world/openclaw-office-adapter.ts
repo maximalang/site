@@ -17,6 +17,7 @@ export type OfficeVisualStatus =
   | "ERROR"
   | "OFFLINE";
 export type OfficeActionCue = "NONE" | "WORK" | "REVIEW";
+export type OfficeSkinTheme = "OPENCLAW_OFFICE" | "SPACE_STATION" | "CYBER_AI_LAB" | "MINIMAL_GRID";
 
 export type OfficeSkinZone = {
   id: OfficeZone;
@@ -27,15 +28,27 @@ export type OfficeSkinZone = {
   height: number;
 };
 
+export type OfficeSkinPalette = {
+  floor: string;
+  grid: string;
+  accent: string;
+  zones: Readonly<Record<OfficeZone, string>>;
+};
+
 export type OfficeSkin = {
   id: string;
+  label: string;
+  theme: OfficeSkinTheme;
   width: number;
   height: number;
   zones: readonly OfficeSkinZone[];
+  palette: OfficeSkinPalette;
 };
 
 export const DEFAULT_OFFICE_SKIN: OfficeSkin = {
   id: "openclaw-office-open-floor-v1",
+  label: "OpenClaw Office",
+  theme: "OPENCLAW_OFFICE",
   width: 1_200,
   height: 700,
   zones: [
@@ -44,7 +57,120 @@ export const DEFAULT_OFFICE_SKIN: OfficeSkin = {
     { id: "COLLABORATION", label: "Collaboration", x: 790, y: 70, width: 170, height: 560 },
     { id: "REVIEW_OPS", label: "Review / Ops", x: 990, y: 70, width: 150, height: 560 },
   ],
+  palette: {
+    floor: "#1c2a26",
+    grid: "#d9e5d8",
+    accent: "#75e6c6",
+    zones: {
+      COMMONS: "#2b3b35",
+      FOCUS: "#263934",
+      COLLABORATION: "#303a32",
+      REVIEW_OPS: "#3b332d",
+    },
+  },
 };
+
+export const SPACE_STATION_SKIN: OfficeSkin = {
+  id: "space-station-v1",
+  label: "Space Station",
+  theme: "SPACE_STATION",
+  width: 1_200,
+  height: 700,
+  zones: [
+    { id: "COMMONS", label: "Habitat", x: 60, y: 70, width: 240, height: 250 },
+    { id: "COLLABORATION", label: "Comms", x: 60, y: 350, width: 240, height: 280 },
+    { id: "FOCUS", label: "Flight Deck", x: 330, y: 70, width: 520, height: 560 },
+    { id: "REVIEW_OPS", label: "Mission Control", x: 880, y: 70, width: 260, height: 560 },
+  ],
+  palette: {
+    floor: "#101827",
+    grid: "#b9d8ff",
+    accent: "#7dd3fc",
+    zones: {
+      COMMONS: "#17233a",
+      FOCUS: "#142746",
+      COLLABORATION: "#1d2d4c",
+      REVIEW_OPS: "#2c2345",
+    },
+  },
+};
+
+export const CYBER_AI_LAB_SKIN: OfficeSkin = {
+  id: "cyber-ai-lab-v1",
+  label: "Cyber / AI Lab",
+  theme: "CYBER_AI_LAB",
+  width: 1_200,
+  height: 700,
+  zones: [
+    { id: "COMMONS", label: "Neural Lounge", x: 60, y: 70, width: 260, height: 560 },
+    { id: "FOCUS", label: "Compute Lab", x: 350, y: 70, width: 380, height: 560 },
+    { id: "COLLABORATION", label: "Link Room", x: 760, y: 70, width: 380, height: 270 },
+    { id: "REVIEW_OPS", label: "Control Core", x: 760, y: 370, width: 380, height: 260 },
+  ],
+  palette: {
+    floor: "#11131c",
+    grid: "#a7f3d0",
+    accent: "#34d399",
+    zones: {
+      COMMONS: "#18231f",
+      FOCUS: "#112b27",
+      COLLABORATION: "#1b2033",
+      REVIEW_OPS: "#2a1f31",
+    },
+  },
+};
+
+export const MINIMAL_GRID_SKIN: OfficeSkin = {
+  id: "minimal-grid-v1",
+  label: "Minimal Grid",
+  theme: "MINIMAL_GRID",
+  width: 1_200,
+  height: 700,
+  zones: [
+    { id: "COMMONS", label: "Idle", x: 60, y: 70, width: 240, height: 560 },
+    { id: "FOCUS", label: "Active", x: 340, y: 70, width: 240, height: 560 },
+    { id: "COLLABORATION", label: "Handoff", x: 620, y: 70, width: 240, height: 560 },
+    { id: "REVIEW_OPS", label: "Review", x: 900, y: 70, width: 240, height: 560 },
+  ],
+  palette: {
+    floor: "#151719",
+    grid: "#d1d5db",
+    accent: "#e5e7eb",
+    zones: {
+      COMMONS: "#202326",
+      FOCUS: "#24282b",
+      COLLABORATION: "#202326",
+      REVIEW_OPS: "#292629",
+    },
+  },
+};
+
+export const OFFICE_SKINS = [
+  DEFAULT_OFFICE_SKIN,
+  SPACE_STATION_SKIN,
+  CYBER_AI_LAB_SKIN,
+  MINIMAL_GRID_SKIN,
+] as const;
+
+const OFFICE_SKIN_BY_ID = new Map(OFFICE_SKINS.map((skin) => [skin.id, skin]));
+
+export function getOfficeSkin(skinId: string | undefined): OfficeSkin | undefined {
+  if (!skinId) return undefined;
+  return OFFICE_SKIN_BY_ID.get(skinId);
+}
+
+export function resolveOfficeSkin(input: {
+  userPreferenceId?: string | null;
+  projectSkinId?: string | null;
+  systemSkinId?: string | null;
+}): OfficeSkin {
+  return (
+    getOfficeSkin(input.userPreferenceId ?? undefined) ??
+    getOfficeSkin(input.projectSkinId ?? undefined) ??
+    getOfficeSkin(input.systemSkinId ?? undefined) ??
+    DEFAULT_OFFICE_SKIN
+  );
+}
 
 export type OfficePresentationAgent = {
   agentId: AgentProjectionCore["agentId"];
@@ -120,8 +246,8 @@ const STATUS_PRESENTATION: Record<
 };
 
 function validateSkin(skin: OfficeSkin): Map<OfficeZone, OfficeSkinZone> {
-  if (!skin.id.trim() || skin.width <= 0 || skin.height <= 0) {
-    throw new Error("Office skin requires a stable ID and positive dimensions");
+  if (!skin.id.trim() || !skin.label.trim() || skin.width <= 0 || skin.height <= 0) {
+    throw new Error("Office skin requires stable identity and positive dimensions");
   }
   const zones = new Map(skin.zones.map((zone) => [zone.id, zone]));
   if (zones.size !== 4 || skin.zones.length !== 4) {
