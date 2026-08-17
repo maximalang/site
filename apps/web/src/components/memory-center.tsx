@@ -5,13 +5,13 @@ import type {
   MemoryInbox,
   MemoryNetwork,
   MemoryTimeline,
-  type RagIngestionRequest,
+  RagIngestionRequest,
 } from "@agent-world/domain";
 import type { HubReadModel } from "@agent-world/read-model";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
-  loadMemoryView,
   ingestRagDocument,
+  loadMemoryView,
   type MemoryView,
   type MemoryViewModel,
   submitMemoryDecision,
@@ -316,9 +316,7 @@ export function MemoryCenter({
   const [ragTitle, setRagTitle] = useState("");
   const [ragRef, setRagRef] = useState("");
   const [ragContent, setRagContent] = useState("");
-  const [ragMimeType, setRagMimeType] = useState<"AUTO" | "text/plain" | "text/markdown">(
-    "AUTO",
-  );
+  const [ragMimeType, setRagMimeType] = useState<"AUTO" | "text/plain" | "text/markdown">("AUTO");
   const [ragPending, setRagPending] = useState(false);
   const [ragStatus, setRagStatus] = useState<"IDLE" | "SUCCEEDED" | "FAILED">("IDLE");
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -443,9 +441,7 @@ export function MemoryCenter({
             <label>
               MIME type
               <select
-                onChange={(event) =>
-                  setRagMimeType(event.target.value as typeof ragMimeType)
-                }
+                onChange={(event) => setRagMimeType(event.target.value as typeof ragMimeType)}
                 value={ragMimeType}
               >
                 <option value="AUTO">Auto</option>
