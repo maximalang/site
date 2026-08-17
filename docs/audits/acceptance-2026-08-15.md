@@ -48,9 +48,17 @@ substitute for the two account-bound live gates below.
 - A real AI World MCP/App connection from personal Plus must complete
   `run_id -> begin/pull -> commit_result`; until then `CHAT` remains
   non-selectable.
-- `codex login status` and one real ChatGPT-authenticated Codex Run must record
+- On 2026-08-17 the persisted `site_codex_state` volume returned
+  `Logged in using ChatGPT` from the pinned Codex worker image. One real
+  ChatGPT-authenticated Codex Run must still record
   Account/Mode/thread/turn/model/sandbox/usage provenance. The deterministic
-  official SDK/CLI verifier is necessary but not sufficient for this gate.
+  official SDK/CLI verifier and login status are necessary but not sufficient
+  for this gate.
+
+The Timeweb MCP wrapper also completed an authenticated read after the reported
+refresh-token fix and returned the current server inventory. This proves that
+wrapper's refreshed session path, but is not evidence for the separate AI World
+Plus MCP/App live gate.
 
 ## Next implementation order
 
