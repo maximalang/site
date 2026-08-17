@@ -329,7 +329,42 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
       view === "TIMELINE"
         ? { schemaVersion: 1, projectId, entries: [] }
         : view === "NETWORK"
-          ? { schemaVersion: 1, projectId, nodes: [], edges: [] }
+          ? {
+              schemaVersion: 1,
+              projectId,
+              nodes: [
+                {
+                  contextItemId: "context_item_58585858-5858-5858-5858-585858585858",
+                  sourceContextItemId: "context_item_57575757-5757-5757-5757-575757575757",
+                  content: "PostgreSQL remains canonical.",
+                  importance: 0.9,
+                  createdAt: "2026-08-13T06:03:00.000Z",
+                },
+                {
+                  contextItemId: "context_item_59595959-5959-5959-5959-595959595959",
+                  sourceContextItemId: "context_item_58585858-5858-5858-5858-585858585858",
+                  content: "Memory provenance is canonical.",
+                  importance: 0.8,
+                  createdAt: "2026-08-13T06:04:00.000Z",
+                },
+              ],
+              edges: [
+                {
+                  decisionId: "memory_decision_60606060-6060-6060-6060-606060606060",
+                  sourceContextItemId: "context_item_57575757-5757-5757-5757-575757575757",
+                  targetContextItemId: "context_item_58585858-5858-5858-5858-585858585858",
+                  relation: "ACCEPTED_FROM",
+                  createdAt: "2026-08-13T06:03:00.000Z",
+                },
+                {
+                  decisionId: "memory_decision_61616161-6161-6161-6161-616161616161",
+                  sourceContextItemId: "context_item_58585858-5858-5858-5858-585858585858",
+                  targetContextItemId: "context_item_59595959-5959-5959-5959-595959595959",
+                  relation: "MERGED_INTO",
+                  createdAt: "2026-08-13T06:04:00.000Z",
+                },
+              ],
+            }
           : {
               schemaVersion: 1,
               projectId,
@@ -491,6 +526,21 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.getByText("Research Lead → Reviewer", { exact: true })).toBeVisible();
   await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
 
+  const skinSelector = page.getByLabel("Map / skin");
+  await expect(skinSelector).toHaveValue("openclaw-office-open-floor-v1");
+  await skinSelector.selectOption("space-station-v1");
+  const spaceStation = page.locator('[data-skin="space-station-v1"]');
+  await expect(spaceStation).toBeVisible();
+  await expect(spaceStation.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("agent-world.office-skin.v1")),
+  ).toBe("space-station-v1");
+  await page.getByRole("button", { name: "Project / system default" }).click();
+  await expect(page.locator('[data-skin="openclaw-office-open-floor-v1"]')).toBeVisible();
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("agent-world.office-skin.v1")),
+  ).toBeNull();
+
   const skipLink = page.getByRole("link", { name: "К содержанию" });
   await page.keyboard.press("Tab");
   await expect(skipLink).toBeFocused();
@@ -605,6 +655,17 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     "aria-selected",
     "true",
   );
+  await page.keyboard.press("ArrowRight");
+  await expect(memoryDialog.getByRole("tab", { name: "Network" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(memoryDialog.getByTestId("memory-network-graph")).toBeVisible();
+  await expect(memoryDialog.locator("[data-relation='ACCEPTED_FROM']")).toHaveCount(1);
+  await expect(memoryDialog.locator("[data-relation='MERGED_INTO']")).toHaveCount(1);
+  await expect(
+    memoryDialog.getByText("Memory: PostgreSQL remains canonical.", { exact: true }),
+  ).toHaveCount(1);
   const memoryAccessibility = await new AxeBuilder({ page }).include("dialog").analyze();
   expect(memoryAccessibility.violations).toEqual([]);
   await page.keyboard.press("Escape");
