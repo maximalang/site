@@ -28,8 +28,14 @@ function referenceLabel(id: string): string {
   return `Context ref …${id.slice(-8)}`;
 }
 
+function edgeKey(edge: MemoryNetwork["edges"][number]): string {
+  return `${edge.decisionId}:${edge.relation}:${edge.sourceContextItemId}:${edge.targetContextItemId}:${edge.createdAt}`;
+}
+
 function buildVertices(network: MemoryNetwork): NetworkVertex[] {
-  const nodeById = new Map(network.nodes.map((node) => [node.contextItemId, node]));
+  const nodeById = new Map<string, MemoryNetwork["nodes"][number]>(
+    network.nodes.map((node) => [node.contextItemId, node]),
+  );
   const ids = new Set<string>(network.nodes.map((node) => node.contextItemId));
   for (const edge of network.edges) {
     ids.add(edge.sourceContextItemId);
@@ -133,8 +139,8 @@ export function MemoryNetworkGraph({
                   <path className={styles.arrow} d="M0 0L8 4L0 8Z" />
                 </marker>
               </defs>
-              <g aria-hidden="true">
-                {network.edges.map((edge, index) => {
+              <g>
+                {network.edges.map((edge) => {
                   const source = pointById.get(edge.sourceContextItemId);
                   const target = pointById.get(edge.targetContextItemId);
                   if (!source || !target) return null;
@@ -145,7 +151,7 @@ export function MemoryNetworkGraph({
                       }`}
                       data-memory-edge="true"
                       data-relation={edge.relation}
-                      key={`${edge.decisionId}-${index}`}
+                      key={edgeKey(edge)}
                       markerEnd={`url(#${markerId})`}
                       x1={source.x}
                       x2={target.x}
@@ -155,7 +161,7 @@ export function MemoryNetworkGraph({
                   );
                 })}
               </g>
-              <g aria-hidden="true">
+              <g>
                 {layout.points.map((point) => (
                   <g
                     data-memory-kind={point.kind.toLowerCase()}
@@ -181,7 +187,7 @@ export function MemoryNetworkGraph({
               </g>
             </svg>
           </div>
-          <div className={styles.legend} aria-label="Легенда Memory Network">
+          <div className={styles.legend} aria-label="Легенда Memory Network" role="group">
             <span>
               <i className={styles.memoryKey} aria-hidden="true" /> Canonical memory
             </span>
@@ -199,9 +205,10 @@ export function MemoryNetworkGraph({
             {network.nodes.map((node) => (
               <li key={node.contextItemId}>Memory: {node.content}</li>
             ))}
-            {network.edges.map((edge, index) => (
-              <li key={`${edge.decisionId}-accessible-${index}`}>
-                {relationCopy(edge.relation)}: {edge.sourceContextItemId} → {edge.targetContextItemId}
+            {network.edges.map((edge) => (
+              <li key={`${edgeKey(edge)}:accessible`}>
+                {relationCopy(edge.relation)}: {edge.sourceContextItemId} →{" "}
+                {edge.targetContextItemId}
               </li>
             ))}
           </ul>
@@ -222,8 +229,8 @@ export function MemoryNetworkGraph({
               <section aria-labelledby="memory-network-edge-details">
                 <h3 id="memory-network-edge-details">Provenance edges</h3>
                 <ul>
-                  {network.edges.map((edge, index) => (
-                    <li key={`${edge.decisionId}-advanced-${index}`}>
+                  {network.edges.map((edge) => (
+                    <li key={`${edgeKey(edge)}:advanced`}>
                       <strong>{relationCopy(edge.relation)}</strong>
                       <code>{edge.sourceContextItemId}</code>
                       <span aria-hidden="true">→</span>
