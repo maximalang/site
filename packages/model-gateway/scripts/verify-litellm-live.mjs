@@ -194,7 +194,7 @@ router_settings:
     - ${projectedAlias}:
         - ${fallbackAlias}
 `,
-    { encoding: "utf8", mode: 0o600 },
+    { encoding: "utf8", mode: 0o644 },
   );
   container = spawn(
     "docker",
