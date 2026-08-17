@@ -45,6 +45,11 @@ function run(args, options = {}) {
   return result.stdout;
 }
 
+function hasPublishedPort(inspect, containerPort) {
+  const bindings = inspect.HostConfig?.PortBindings?.[containerPort];
+  return Array.isArray(bindings) && bindings.some((binding) => Boolean(binding?.HostPort));
+}
+
 function runBash(args) {
   const result = spawnSync(bash, args, {
     cwd: workspaceRoot,
@@ -212,26 +217,34 @@ try {
     "-s",
     "/etc/ssl/certs/ca-certificates.crt",
   ]);
-  if (
-    webInspect.Config.User !== "10001:10001" ||
-    webInspect.HostConfig.ReadonlyRootfs !== true ||
-    !webInspect.HostConfig.CapDrop?.includes("ALL") ||
-    webInspect.NetworkSettings.Ports["3000/tcp"] !== null ||
-    postgresInspect.NetworkSettings.Ports["5432/tcp"] !== null ||
-    liteLlmInspect.Config.User !== "10001:10001" ||
-    liteLlmInspect.HostConfig.ReadonlyRootfs !== true ||
-    !liteLlmInspect.HostConfig.CapDrop?.includes("ALL") ||
-    liteLlmInspect.NetworkSettings.Ports["4000/tcp"] !== null ||
-    codexWorkerInspect.Config.User !== "10002:10002" ||
-    codexWorkerInspect.HostConfig.ReadonlyRootfs !== true ||
-    !codexWorkerInspect.HostConfig.CapDrop?.includes("ALL") ||
-    codexWorkerInspect.NetworkSettings.Ports["3100/tcp"] !== undefined ||
-    codexWorkerInspect.NetworkSettings.Networks[`${project}_edge`] !== undefined ||
-    codexWorkerHealth.status !== "available" ||
-    codexWorkerHealth.authentication !== "UNAVAILABLE" ||
-    codexVersion !== "codex-cli 0.147.0"
-  ) {
-    throw new Error("Container isolation contract is incomplete");
+  const isolationChecks = {
+    "web uses the expected non-root UID": webInspect.Config.User === "10001:10001",
+    "web root filesystem is read-only": webInspect.HostConfig.ReadonlyRootfs === true,
+    "web drops all capabilities": webInspect.HostConfig.CapDrop?.includes("ALL") === true,
+    "web port 3000 has no host binding": !hasPublishedPort(webInspect, "3000/tcp"),
+    "PostgreSQL port 5432 has no host binding": !hasPublishedPort(postgresInspect, "5432/tcp"),
+    "LiteLLM uses the expected non-root UID": liteLlmInspect.Config.User === "10001:10001",
+    "LiteLLM root filesystem is read-only": liteLlmInspect.HostConfig.ReadonlyRootfs === true,
+    "LiteLLM drops all capabilities": liteLlmInspect.HostConfig.CapDrop?.includes("ALL") === true,
+    "LiteLLM port 4000 has no host binding": !hasPublishedPort(liteLlmInspect, "4000/tcp"),
+    "Codex worker uses the expected non-root UID": codexWorkerInspect.Config.User === "10002:10002",
+    "Codex worker root filesystem is read-only": codexWorkerInspect.HostConfig.ReadonlyRootfs === true,
+    "Codex worker drops all capabilities": codexWorkerInspect.HostConfig.CapDrop?.includes("ALL") === true,
+    "Codex worker port 3100 has no host binding": !hasPublishedPort(codexWorkerInspect, "3100/tcp"),
+    "Codex worker is not attached to the edge network":
+      codexWorkerInspect.NetworkSettings.Networks[`${project}_edge`] === undefined,
+    "Codex worker process is available": codexWorkerHealth.status === "available",
+    "Codex authentication remains unavailable without owner login":
+      codexWorkerHealth.authentication === "UNAVAILABLE",
+    "Codex CLI version is pinned": codexVersion === "codex-cli 0.147.0",
+  };
+  const failedIsolationChecks = Object.entries(isolationChecks)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  if (failedIsolationChecks.length > 0) {
+    throw new Error(
+      `Container isolation contract is incomplete: ${failedIsolationChecks.join("; ")}`,
+    );
   }
 
   run([
