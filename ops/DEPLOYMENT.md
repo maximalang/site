@@ -32,6 +32,30 @@ OpenClaw remains an adapter target and is not duplicated in this Compose project
    curl --fail --silent https://your-host.example/api/health/ready
    ```
 
+For Native Plus Chat, first create a dedicated AI World secret directory outside
+the checkout and bootstrap the persistent OAuth files without displaying them:
+
+```sh
+install -d -m 700 /srv/agent-world/secrets
+npm run bootstrap:secrets --workspace @agent-world/native-chat-auth -- /srv/agent-world/secrets
+```
+
+Set the two generated absolute paths and the AI World-only resource and issuer
+in this deployment's `.env`, then validate and enable the optional service:
+
+```sh
+docker compose -p agent-world --profile native-chat config --quiet
+docker compose -p agent-world --profile native-chat up -d --build --wait --wait-timeout 120
+```
+
+When hosted under the same Timeweb account as another product, the common
+account or reverse proxy is the only permitted reuse. AI World needs its own
+hostname, deployment directory, Compose project, OAuth keys/audience/issuer,
+PostgreSQL database and volumes, backups, logs and release lifecycle. Never
+attach these containers to Recruiter Radar storage or accept its bearer or
+refresh tokens. The native Chat authorization service shares only AI World's
+canonical PostgreSQL database, preserving the single source-of-truth rule.
+
 PostgreSQL and the web port are never published. Only Caddy binds host ports.
 `/api/health/live` proves the web process can serve HTTP; `/api/health/ready`
 also probes PostgreSQL through the published production runtime. Neither route

@@ -141,6 +141,23 @@ The optional Compose service is enabled with `--profile native-chat`. Private
 signing and cookie-key files are mounted read-only and are never available to
 the web resource server.
 
+Generate those two files once in an existing, dedicated directory outside the
+repository. The command refuses relative paths, symlink directories and any
+existing destination file; it prints paths only, never key material:
+
+```powershell
+npm.cmd run bootstrap:secrets --workspace @agent-world/native-chat-auth -- C:\secure\agent-world-native-chat
+```
+
+```sh
+npm run bootstrap:secrets --workspace @agent-world/native-chat-auth -- /srv/agent-world/secrets
+```
+
+Point `AGENT_WORLD_MCP_OAUTH_JWKS_FILE` and
+`AGENT_WORLD_MCP_OAUTH_COOKIE_KEYS_FILE` at the resulting files. Back them up
+encrypted and do not copy them into Recruiter Radar, another MCP wrapper or the
+repository.
+
 ## Timeweb wrapper reuse boundary
 
 The repaired Timeweb wrapper implementation may be reused as source code and a
@@ -157,6 +174,14 @@ A common reverse proxy or Timeweb account is acceptable infrastructure. It
 must route to isolated applications and cannot collapse either product's trust
 boundary. The AI World MCP resource remains the exact
 `https://<ai-world-host>/api/mcp` audience.
+
+On a shared Timeweb host, use a distinct deployment directory, environment file
+and Compose project name, for example `docker compose -p agent-world`. Do not
+join an existing Recruiter Radar Compose project or reuse its database service,
+Docker volumes, OAuth environment, health checks or release lifecycle. Inside
+AI World, the authorization service intentionally writes grants and token audit
+events to AI World's canonical PostgreSQL source of truth; this is not a shared
+cross-product database.
 
 ## Remaining activation gates
 
