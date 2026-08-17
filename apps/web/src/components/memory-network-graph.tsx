@@ -187,7 +187,7 @@ export function MemoryNetworkGraph({
               </g>
             </svg>
           </div>
-          <div className={styles.legend} aria-label="Легенда Memory Network" role="group">
+          <section className={styles.legend} aria-label="Легенда Memory Network">
             <span>
               <i className={styles.memoryKey} aria-hidden="true" /> Canonical memory
             </span>
@@ -200,7 +200,7 @@ export function MemoryNetworkGraph({
             <span>
               <i className={styles.mergedKey} aria-hidden="true" /> Merged into
             </span>
-          </div>
+          </section>
           <ul className="visually-hidden">
             {network.nodes.map((node) => (
               <li key={node.contextItemId}>Memory: {node.content}</li>
