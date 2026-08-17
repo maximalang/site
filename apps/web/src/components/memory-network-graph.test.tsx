@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { MemoryNetwork } from "@agent-world/domain";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { MemoryNetworkGraph } from "./memory-network-graph";
 
@@ -70,8 +70,11 @@ describe("MemoryNetworkGraph", () => {
 
     rerender(<MemoryNetworkGraph advanced network={network} />);
     expect(screen.getByRole("heading", { name: "Canonical nodes" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Provenance edges" })).toBeTruthy();
+    const provenanceHeading = screen.getByRole("heading", { name: "Provenance edges" });
+    const provenanceSection = provenanceHeading.closest("section");
+    expect(provenanceSection).not.toBeNull();
+    if (!provenanceSection) return;
     expect(screen.getAllByText(firstId).length).toBeGreaterThan(0);
-    expect(screen.getByText("Merged into")).toBeTruthy();
+    expect(within(provenanceSection).getByText("Merged into")).toBeTruthy();
   });
 });
