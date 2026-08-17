@@ -69,6 +69,7 @@ type ExistingDecisionRow = QueryResultRow & {
 };
 
 type TaskActivationRow = QueryResultRow & { mode: string | null };
+type VerifiedRouteRow = QueryResultRow & { route_id: string };
 
 export type ResourceBrokerStoreErrorCode =
   | "ROUTE_NOT_FOUND"
@@ -147,6 +148,25 @@ export async function decideResourceRouteInTransaction(
     request.allowedModes[0] === "CHAT" &&
     explicitTaskMode.rows.length === 1 &&
     explicitTaskMode.rows[0]?.mode === "CHAT";
+  const verifiedNativeChatRoutes = await client.query<VerifiedRouteRow>(
+    `SELECT DISTINCT run.route_id
+       FROM agent_world.runs run
+       JOIN agent_world.native_chat_results result
+         ON result.run_id = run.id
+        AND result.account_id = run.account_id
+      WHERE run.adapter_kind = 'NATIVE_CHATGPT'
+        AND run.status = 'COMPLETED'
+        AND run.route_id IS NOT NULL
+        AND run.completed_at IS NOT NULL
+        AND run.completed_at <= $1
+        AND result.committed_at <= $1
+      ORDER BY run.route_id
+      LIMIT 1001`,
+    [request.decidedAt],
+  );
+  if (verifiedNativeChatRoutes.rows.length > 1_000) {
+    throw new Error("Verified Native Chat route evidence exceeds bounded limit");
+  }
   const decision = selectResourceRoute({
     policy: request.policy,
     now: request.decidedAt,
@@ -174,6 +194,13 @@ export async function decideResourceRouteInTransaction(
     ...(explicitNativeChatActivation
       ? { experimentalActivationAdapterKinds: ["NATIVE_CHATGPT" as const] }
       : {}),
+    ...(verifiedNativeChatRoutes.rows.length === 0
+      ? {}
+      : {
+          verifiedCanonicalEvidenceRouteIds: verifiedNativeChatRoutes.rows.map(({ route_id }) =>
+            RouteIdSchema.parse(route_id),
+          ),
+        }),
   });
   const selectedEvaluation = decision.selected
     ? decision.evaluations.find(({ candidate }) => candidate.routeId === decision.selected?.routeId)
