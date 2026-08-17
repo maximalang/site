@@ -3,7 +3,9 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+      - codex/phase-1-contracts
 
 permissions:
   contents: read
@@ -50,6 +52,20 @@ jobs:
         env:
           AGENT_WORLD_RUNTIME_TEST_ACK: isolated
 
+  orchestration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run test:orchestration
+        env:
+          AGENT_WORLD_LANGGRAPH_TEST_ACK: isolated
+
   openclaw:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -77,6 +93,20 @@ jobs:
       - run: npm run test:litellm-live
         env:
           AGENT_WORLD_LITELLM_LIVE_TEST_ACK: isolated
+
+  codex:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run test:codex-live
+        env:
+          AGENT_WORLD_CODEX_LIVE_TEST_ACK: isolated
 
   browser:
     runs-on: ubuntu-latest
