@@ -4,12 +4,13 @@ import * as z from "zod";
 export const IntegrationIdSchema = z
   .string()
   .regex(/^integration_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-export const IntegrationKindSchema = z.enum(["MCP", "N8N", "GITHUB", "SSH"]);
+export const IntegrationKindSchema = z.enum(["MCP", "N8N", "GITHUB", "SSH", "STEEL"]);
 export const IntegrationActionSchema = z.enum([
   "MCP_LIST_TOOLS",
   "N8N_LIST_WORKFLOWS",
   "GITHUB_LIST_REPOSITORIES",
   "SSH_INSPECT_HOST",
+  "STEEL_LIST_SESSIONS",
 ]);
 export const IntegrationMutationRequestIdSchema = z
   .string()
