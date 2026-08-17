@@ -1,6 +1,6 @@
 # Integration registry and health probes
 
-The owner-only Hub stores MCP, n8n, GitHub and SSH endpoint metadata in
+The owner-only Hub stores MCP, n8n, GitHub, SSH and Steel endpoint metadata in
 PostgreSQL and credentials in the encrypted secret store. Credentials are
 write-only and are never included in the registry read model.
 
@@ -11,14 +11,22 @@ in `integration_probe_observations`; only a successful probe can set health to
 - MCP: Streamable HTTP `initialize`, accepting JSON or SSE JSON-RPC responses;
 - n8n: `GET /healthz/readiness`;
 - GitHub: authenticated `GET /user` with the current versioned REST headers;
-- SSH: TCP handshake and SSH banner validation only, never a remote command.
+- SSH: TCP handshake and SSH banner validation only, never a remote command;
+- Steel: `GET /health`, requiring the canonical `{ "status": "ok" }` readiness response.
 
 After a successful probe, the Hub exposes one predefined read-only action per
-kind: MCP `tools/list`, n8n workflow listing, GitHub repository listing, or SSH
-host inspection. Actions accept no remote path, method, command or arbitrary
-parameters. Results are normalized to at most 100 bounded items and persisted
-in `integration_action_observations`; an exact `command_id` replay reads the
-stored result instead of repeating network access.
+kind: MCP `tools/list`, n8n workflow listing, GitHub repository listing, SSH
+host inspection, or Steel `GET /sessions`. Actions accept no remote path,
+method, command or arbitrary parameters. Results are normalized to at most 100
+bounded items and persisted in `integration_action_observations`; an exact
+`command_id` replay reads the stored result instead of repeating network access.
+
+The Steel surface is deliberately inventory-only. AI World does not expose
+Steel session creation, release, scrape, screenshot, PDF, debugger interaction,
+navigation, or arbitrary browser commands through the Integration registry.
+Browser-session output remains untrusted input. A future write-capable browser
+surface requires a separate policy and approval contract rather than extending
+`STEEL_LIST_SESSIONS`.
 
 GitHub additionally exposes one write action in Advanced mode: an existing
 `workflow_dispatch` workflow can be requested with bounded owner/repository,
