@@ -1,6 +1,6 @@
 import { LauncherIdSchema, type NativeChatLaunchClaim, TimestampSchema } from "@agent-world/domain";
-import type { HttpNativeChatLaunchStore } from "./http-store.js";
 import { type NativeChatBrowserDriver, NativeChatBrowserError } from "./driver.js";
+import type { HttpNativeChatLaunchStore } from "./http-store.js";
 
 type LaunchStore = Pick<HttpNativeChatLaunchStore, "claimNext" | "markSubmitted" | "recordFailure">;
 
