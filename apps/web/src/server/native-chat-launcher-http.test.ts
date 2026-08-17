@@ -12,9 +12,7 @@ import {
 } from "./native-chat-launcher-http";
 
 const launcherId = LauncherIdSchema.parse("launcher_11111111-1111-4111-8111-111111111111");
-const dispatchId = ChatDispatchIdSchema.parse(
-  "chat_dispatch_22222222-2222-4222-8222-222222222222",
-);
+const dispatchId = ChatDispatchIdSchema.parse("chat_dispatch_22222222-2222-4222-8222-222222222222");
 const accountId = AccountIdSchema.parse("account_33333333-3333-4333-8333-333333333333");
 const runId = RunIdSchema.parse("run_44444444-4444-4444-8444-444444444444");
 const token = "a".repeat(43);

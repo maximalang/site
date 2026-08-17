@@ -35,8 +35,10 @@ structured results and canonical Control events.
   exact selected route; Native Chat must not have one.
 - The launcher queue uses PostgreSQL `FOR UPDATE SKIP LOCKED` leases. Account IDs
   map to opaque browser-profile aliases; filesystem paths, cookies and login
-  identities never enter canonical dispatches. Successful submission records a
-  versioned SHA-256 receipt, while duplicate or expired claims fail closed.
+  identities never enter canonical dispatches. The host-local browser launcher
+  reaches that queue only through a scoped HTTPS control endpoint; PostgreSQL is
+  never published to the laptop. Successful submission records a versioned
+  SHA-256 receipt, while duplicate or expired claims fail closed.
 - Ordered, idempotent event append; `commit_result` stores the complete validated
   structured result before returning success.
 - Every dispatch persists a 30-minute attach deadline and, after `begin_run`, a
@@ -96,39 +98,85 @@ idempotency, project boundaries or the terminal commit requirement.
 ## Host-local browser launcher
 
 The on-demand launcher runs on the owner's laptop, outside Docker and Timeweb,
-because the authenticated ChatGPT browser profiles remain local. Build and run
-it with:
+because authenticated ChatGPT browser profiles remain local. It no longer
+connects to PostgreSQL. Instead it uses the exact public HTTPS endpoint
+`/api/native-chat-launcher` with a dedicated bearer token that has no access to
+owner sessions, MCP OAuth or other APIs.
+
+Generate the launcher token directly into an existing secure directory. The
+bootstrap command refuses relative paths, symlink parent directories and an
+existing destination; it writes the raw token only to the requested file and
+prints the token SHA-256, not the token itself:
+
+```powershell
+npm.cmd run bootstrap:token --workspace @agent-world/native-chat-launcher -- C:\secure\agent-world-native-chat-launcher.token
+```
+
+```sh
+npm run bootstrap:token --workspace @agent-world/native-chat-launcher -- /srv/agent-world/native-chat-launcher.token
+```
+
+Configure the production web service with the printed hash and one fixed opaque
+launcher ID:
+
+```dotenv
+AGENT_WORLD_NATIVE_CHAT_LAUNCHER_ID=launcher_00000000-0000-0000-0000-000000000000
+AGENT_WORLD_NATIVE_CHAT_LAUNCHER_TOKEN_SHA256=<64-lowercase-hex-from-bootstrap>
+```
+
+Configure the laptop process with the same launcher ID, the raw-token file and
+the HTTPS control URL:
+
+```dotenv
+AGENT_WORLD_NATIVE_CHAT_CONTROL_URL=https://agent-world.example.com/api/native-chat-launcher
+AGENT_WORLD_NATIVE_CHAT_LAUNCHER_TOKEN_FILE=C:/secure/agent-world-native-chat-launcher.token
+AGENT_WORLD_NATIVE_CHAT_LAUNCHER_ID=launcher_00000000-0000-0000-0000-000000000000
+AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT=C:/secure/agent-world-chat-profiles
+AGENT_WORLD_NATIVE_CHAT_LEASE_MS=120000
+AGENT_WORLD_NATIVE_CHAT_POLL_MS=2000
+AGENT_WORLD_NATIVE_CHAT_PAGE_RETENTION_MS=1800000
+AGENT_WORLD_NATIVE_CHAT_ONCE=false
+```
+
+Off-loopback HTTP is rejected by the launcher; production uses HTTPS through
+Caddy. The server stores only the SHA-256 token verifier. Client-provided
+launcher IDs and timestamps are not trusted: the endpoint binds all queue
+operations to its configured launcher ID and server clock. Claim, submission
+and failure bodies are bounded and schema-validated, and the token comparison
+is timing-safe. The browser launcher therefore needs neither `DATABASE_URL` nor
+owner credentials.
+
+Build and run it with:
 
 ```powershell
 npm.cmd run build --workspace @agent-world/native-chat-launcher
 npm.cmd start --workspace @agent-world/native-chat-launcher
 ```
 
-Configure the launcher with the variables documented in `.env.example`. On the
-first launch, Chrome opens a dedicated directory below
+On the first launch, Chrome opens a dedicated directory below
 `AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT`; the owner signs in manually. Use one
 opaque profile alias and directory per ChatGPT Account. AI World never asks for
 or exports passwords, two-factor codes, cookies or browser storage.
 
-The owner can configure each canonical ChatGPT Account in Hub → Native Plus
-Chat. Simple mode requires only the Account and AI World App URL and assigns an
-opaque profile alias automatically; Advanced mode permits changing that alias
-or disabling its launcher mapping. The owner-only API stores the mapping in
+The owner configures each canonical ChatGPT Account in Hub → Native Plus Chat.
+Simple mode requires only the Account and AI World App URL and assigns an opaque
+profile alias automatically; Advanced mode permits changing that alias or
+disabling its launcher mapping. The owner-only API stores the mapping in
 PostgreSQL. Browser filesystem paths remain host-local and never enter the API
 or canonical database.
 
-`AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL` must point to the AI World GPT/App connected
-to this MCP resource. Its instructions must call `begin_run(run_id)`, pull only
-needed context with `get_run_resources`, emit structured progress events, and
-finish with `commit_result` or `fail_run`. The launcher opens that surface,
-fills only the exact `run_id`, clicks Send and records a versioned submission
-receipt after the new Chat URL is observed. It neither inspects response nodes
-nor waits for the final response. The page remains open for a bounded retention
-window so the native Chat runtime can complete independently through MCP.
+The configured launch URL must point to the AI World GPT/App connected to this
+MCP resource. Its instructions must call `begin_run(run_id)`, pull only needed
+context with `get_run_resources`, emit structured progress events, and finish
+with `commit_result` or `fail_run`. The launcher opens that surface, fills only
+the exact `run_id`, clicks Send and records a versioned submission receipt after
+the new Chat URL is observed. It neither inspects response nodes nor waits for
+the final response. The page remains open for a bounded retention window so the
+native Chat runtime can complete independently through MCP.
 
 ## Fail-closed configuration
 
-All values are required before the routes become discoverable:
+All values are required before the MCP routes become discoverable:
 
 ```dotenv
 AGENT_WORLD_MCP_ENABLED=true
@@ -198,9 +246,9 @@ cross-product database.
   and set `AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID`. Ingestion, chunking,
   embedding generation, atomic PostgreSQL writes and retrieval are implemented;
   absence of the route intentionally leaves `/api/rag` unavailable.
-- Run the host-local launcher against an owner-authenticated dedicated profile
-  and record a real browser-submission receipt. The queue, driver and receipt
-  path are implemented but still require this live E2E.
+- Configure the server-side launcher ID/token hash and run the host-local
+  launcher against an owner-authenticated dedicated profile. Record a real
+  browser-submission receipt through the HTTPS control endpoint.
 - Complete a real personal Plus Chat run through `commit_result`; until then the
   product must continue to label CHAT unavailable/non-selectable.
 
