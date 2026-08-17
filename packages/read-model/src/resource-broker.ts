@@ -62,7 +62,9 @@ export const ResourceRouteCandidateSchema = z
     expiresAt: TimestampSchema,
   })
   .superRefine((candidate, context) => {
-    if (!(validTransportModes[candidate.adapterKind] as readonly string[]).includes(candidate.mode)) {
+    if (
+      !(validTransportModes[candidate.adapterKind] as readonly string[]).includes(candidate.mode)
+    ) {
       context.addIssue({ code: "custom", message: "Route mode does not match its adapter" });
     }
     if (Date.parse(candidate.expiresAt) <= Date.parse(candidate.observedAt)) {
@@ -157,7 +159,7 @@ export function selectResourceRoute(
   const selected = evaluations
     .filter(
       (evaluation): evaluation is typeof evaluation & { score: number } =>
-        evaluation.score !== undefined,
+        "score" in evaluation && evaluation.score !== undefined,
     )
     .sort(
       (left, right) =>
