@@ -5,8 +5,8 @@ import {
   createOfficePresentation,
   DEFAULT_OFFICE_SKIN,
   OFFICE_SKINS,
-  resolveOfficeSkin,
   type OfficeSkin,
+  resolveOfficeSkin,
 } from "./openclaw-office-adapter";
 
 describe("OpenClaw Office presentation adapter", () => {
