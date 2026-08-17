@@ -184,7 +184,9 @@ async function installReadRoutes(page: import("@playwright/test").Page) {
   });
 }
 
-test("World skin preference and Memory Network remain canonical in the browser", async ({ page }) => {
+test("World skin preference and Memory Network remain canonical in the browser", async ({
+  page,
+}) => {
   await installReadRoutes(page);
   await page.goto("/");
 
