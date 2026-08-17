@@ -105,6 +105,7 @@ export function MemoryNetworkGraph({
   const layout = layoutVertices(vertices);
   const pointById = new Map(layout.points.map((point) => [point.id, point]));
 
+  // biome-ignore-start lint/a11y/noNoninteractiveTabindex: WCAG requires the scrollable graph region to be keyboard-focusable.
   return (
     <section className={styles.root} aria-label="Сеть принятой памяти">
       <div className={styles.summary}>
@@ -115,7 +116,6 @@ export function MemoryNetworkGraph({
         <p className={styles.empty}>Network пуст.</p>
       ) : (
         <>
-          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG requires the scrollable graph region to be keyboard-focusable. */}
           <section
             aria-label="Прокручиваемая схема Memory Network"
             className={styles.canvas}
@@ -251,4 +251,5 @@ export function MemoryNetworkGraph({
       )}
     </section>
   );
+  // biome-ignore-end lint/a11y/noNoninteractiveTabindex: WCAG requires the scrollable graph region to be keyboard-focusable.
 }
