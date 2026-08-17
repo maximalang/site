@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const workspaceRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -47,4 +48,19 @@ if (web.depends_on?.["native-chat-auth"]) {
   throw new Error("web must not depend on native-chat-auth; that would create a startup cycle");
 }
 
-process.stdout.write(`${JSON.stringify({ status: "PASS", nativeChatMigrationOrdering: true })}\n`);
+const caddyfile = readFileSync(new URL("./Caddyfile", import.meta.url), "utf8");
+const oauthProxyBlocks = [...caddyfile.matchAll(/reverse_proxy native-chat-auth:3002 \{([^}]*)\}/g)];
+if (oauthProxyBlocks.length !== 2) {
+  throw new Error("Caddy must expose exactly two managed native-chat-auth proxy blocks");
+}
+for (const [, body] of oauthProxyBlocks) {
+  if (!/header_up\s+X-Forwarded-Proto\s+https/.test(body)) {
+    throw new Error(
+      "Every native-chat-auth proxy block must force the canonical public HTTPS scheme",
+    );
+  }
+}
+
+process.stdout.write(
+  `${JSON.stringify({ status: "PASS", nativeChatMigrationOrdering: true, oauthProxyScheme: "https" })}\n`,
+);
