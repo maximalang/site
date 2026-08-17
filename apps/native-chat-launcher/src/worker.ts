@@ -1,11 +1,8 @@
 import { LauncherIdSchema, type NativeChatLaunchClaim, TimestampSchema } from "@agent-world/domain";
-import type { PostgresNativeChatLaunchStore } from "@agent-world/postgres-store";
+import type { HttpNativeChatLaunchStore } from "./http-store.js";
 import { type NativeChatBrowserDriver, NativeChatBrowserError } from "./driver.js";
 
-type LaunchStore = Pick<
-  PostgresNativeChatLaunchStore,
-  "claimNext" | "markSubmitted" | "recordFailure"
->;
+type LaunchStore = Pick<HttpNativeChatLaunchStore, "claimNext" | "markSubmitted" | "recordFailure">;
 
 export type NativeChatLauncherOutcome = "IDLE" | "SUBMITTED" | "RETRY" | "FAILED";
 
