@@ -18,10 +18,36 @@ type NetworkPoint = NetworkVertex & {
 const CELL_WIDTH = 180;
 const CELL_HEIGHT = 124;
 const CANVAS_PADDING = 64;
+const LABEL_LINE_LENGTH = 20;
+const LABEL_MAX_LINES = 2;
 
-function compactLabel(value: string): string {
+function clipLabelLine(value: string): string {
+  return value.length <= LABEL_LINE_LENGTH
+    ? value
+    : `${value.slice(0, LABEL_LINE_LENGTH - 1).trimEnd()}…`;
+}
+
+function compactLabelLines(value: string): string[] {
   const normalized = value.trim().replace(/\s+/g, " ");
-  return normalized.length <= 26 ? normalized : `${normalized.slice(0, 25)}…`;
+  if (normalized.length <= LABEL_LINE_LENGTH) return [normalized];
+
+  const lines: string[] = [];
+  let current = "";
+  for (const word of normalized.split(" ")) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= LABEL_LINE_LENGTH) {
+      current = candidate;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = word;
+  }
+  if (current) lines.push(current);
+
+  if (lines.length <= LABEL_MAX_LINES) return lines.map(clipLabelLine);
+  const first = clipLabelLine(lines[0] ?? normalized);
+  const remainder = lines.slice(1).join(" ");
+  return [first, clipLabelLine(remainder)];
 }
 
 function referenceLabel(id: string): string {
@@ -167,28 +193,40 @@ export function MemoryNetworkGraph({
                 })}
               </g>
               <g>
-                {layout.points.map((point) => (
-                  <g
-                    data-memory-kind={point.kind.toLowerCase()}
-                    key={point.id}
-                    transform={`translate(${point.x} ${point.y})`}
-                  >
-                    <circle
-                      className={
-                        point.kind === "MEMORY" ? styles.memoryCircle : styles.referenceCircle
-                      }
-                      r={point.kind === "MEMORY" ? 28 : 12}
-                    />
-                    <text className={styles.nodeLabel} textAnchor="middle" y="44">
-                      {compactLabel(point.content)}
-                    </text>
-                    {point.importance !== null ? (
-                      <text className={styles.nodeMeta} textAnchor="middle" y="60">
-                        importance {point.importance.toFixed(2)}
+                {layout.points.map((point) => {
+                  const labelLines = compactLabelLines(point.content);
+                  return (
+                    <g
+                      data-memory-kind={point.kind.toLowerCase()}
+                      key={point.id}
+                      transform={`translate(${point.x} ${point.y})`}
+                    >
+                      <circle
+                        className={
+                          point.kind === "MEMORY" ? styles.memoryCircle : styles.referenceCircle
+                        }
+                        r={point.kind === "MEMORY" ? 28 : 12}
+                      />
+                      <text className={styles.nodeLabel} textAnchor="middle" y="44">
+                        <tspan x="0">{labelLines[0]}</tspan>
+                        {labelLines[1] ? (
+                          <tspan dy="14" x="0">
+                            {labelLines[1]}
+                          </tspan>
+                        ) : null}
                       </text>
-                    ) : null}
-                  </g>
-                ))}
+                      {point.importance !== null ? (
+                        <text
+                          className={styles.nodeMeta}
+                          textAnchor="middle"
+                          y={labelLines.length > 1 ? "76" : "60"}
+                        >
+                          importance {point.importance.toFixed(2)}
+                        </text>
+                      ) : null}
+                    </g>
+                  );
+                })}
               </g>
             </svg>
           </section>

@@ -64,6 +64,14 @@ describe("MemoryNetworkGraph", () => {
     expect(screen.getByText("Memory: PostgreSQL remains canonical.")).toBeTruthy();
   });
 
+  it("wraps long visual labels into bounded lines without truncating semantic memory", () => {
+    render(<MemoryNetworkGraph advanced={false} network={network} />);
+
+    expect(screen.getByText("PostgreSQL remains")).toBeTruthy();
+    expect(screen.getByText("canonical.")).toBeTruthy();
+    expect(screen.getByText("Memory: PostgreSQL remains canonical.")).toBeTruthy();
+  });
+
   it("shows full canonical and provenance identifiers only in Advanced details", () => {
     const { rerender } = render(<MemoryNetworkGraph advanced={false} network={network} />);
     expect(screen.queryByRole("heading", { name: "Canonical nodes" })).toBeNull();
