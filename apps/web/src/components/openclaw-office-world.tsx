@@ -60,7 +60,11 @@ export function OpenClawOfficeWorld({
   projectSkinId,
 }: OpenClawOfficeWorldProps) {
   const configuredSkin = useMemo(
-    () => resolveOfficeSkin({ projectSkinId, systemSkinId }),
+    () =>
+      resolveOfficeSkin({
+        ...(projectSkinId === undefined ? {} : { projectSkinId }),
+        systemSkinId,
+      }),
     [projectSkinId, systemSkinId],
   );
   const [skinId, setSkinId] = useState(configuredSkin.id);
@@ -70,7 +74,7 @@ export function OpenClawOfficeWorld({
     setSkinId(
       resolveOfficeSkin({
         userPreferenceId: stored,
-        projectSkinId,
+        ...(projectSkinId === undefined ? {} : { projectSkinId }),
         systemSkinId,
       }).id,
     );
