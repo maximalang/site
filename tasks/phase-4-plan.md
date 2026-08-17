@@ -55,7 +55,7 @@ tests while preserving the existing `TaskExecutionAdapter` surface.
 
 - [x] Adapter identity is exactly `CODEX` and no SDK type crosses its boundary.
 - [x] Agent, Account, Session and Codex thread identities remain distinct.
-- [ ] Timeout, cancellation, auth, sandbox, malformed event and SDK failures
+- [x] Timeout, cancellation, auth, sandbox, malformed event and SDK failures
       normalize without raw output or credential leakage.
 - [x] Duplicate dispatch uses canonical idempotency and never creates a second
       Codex turn.
@@ -94,9 +94,15 @@ reading them.
 
 - [x] Pinned SDK launches its pinned official CLI and emits real JSONL events.
 - [x] Deterministic live proof covers progress, final output, usage and failure.
-- [ ] `codex login status` proves the configured method without exposing tokens.
+- [x] `codex login status` proves the configured method without exposing tokens.
 - [ ] A real ChatGPT-authenticated Codex run records Account/Mode/thread/turn,
       sandbox, model and usage provenance in PostgreSQL.
+
+The persisted Codex worker state returned `Logged in using ChatGPT` on
+2026-08-17. A subsequent official CLI bootstrap reached ChatGPT and created a
+real thread, but the turn was rejected because that account's separate Codex
+usage allowance was exhausted until 2026-08-20 13:13. This proves auth readiness
+without satisfying the successful-Run gate above.
 
 ## Slice 5: Product flow and native-surface status
 
