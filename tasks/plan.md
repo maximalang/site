@@ -92,7 +92,7 @@ Phase 0 reuse and license audit
 - [x] Deliver Graphiti/FalkorDB memory with evidence and curation.
 - [x] Deliver Memory Center Network, Timeline and Inbox projections with
       provenance-aware Curator `Accept / Merge / Reject` decisions.
-- [ ] Deliver LangGraph workflows, deterministic routing, handoffs, review,
+- [x] Deliver LangGraph workflows, deterministic routing, handoffs, review,
       retry and approvals.
 - [x] Deliver Mission decomposition, reusable Agent Templates/Instances,
       Resource Broker scoring and structured position/synthesis/decision
