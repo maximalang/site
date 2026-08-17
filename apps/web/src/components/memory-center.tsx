@@ -16,6 +16,7 @@ import {
   type MemoryViewModel,
   submitMemoryDecision,
 } from "../client/memory-api";
+import { MemoryNetworkGraph } from "./memory-network-graph";
 
 export type MemoryCenterClient = {
   load(projectId: string, view: MemoryView): Promise<MemoryViewModel>;
@@ -282,20 +283,7 @@ function MemoryDrawer({
           ))}
         </ol>
       ) : null}
-      {!loading && graph ? (
-        <section className="memory-network" aria-label="Сеть принятой памяти">
-          <ul>
-            {graph.nodes.map((node) => (
-              <li key={node.contextItemId}>
-                <strong>{node.content}</strong>
-                <span>Importance {node.importance}</span>
-                {advanced ? <code>{node.contextItemId}</code> : null}
-              </li>
-            ))}
-          </ul>
-          <p>{graph.edges.length} provenance links</p>
-        </section>
-      ) : null}
+      {!loading && graph ? <MemoryNetworkGraph advanced={advanced} network={graph} /> : null}
     </dialog>
   );
 }
