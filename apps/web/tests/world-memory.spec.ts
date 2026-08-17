@@ -186,7 +186,7 @@ async function installReadRoutes(page: import("@playwright/test").Page) {
 
 test("World skin preference and Memory Network remain canonical in the browser", async ({
   page,
-}) => {
+}, testInfo) => {
   await installReadRoutes(page);
   await page.goto("/");
 
@@ -200,6 +200,10 @@ test("World skin preference and Memory Network remain canonical in the browser",
   expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBe(
     "space-station-v1",
   );
+  await testInfo.attach("world-space-station", {
+    body: await page.screenshot({ animations: "disabled", caret: "hide", fullPage: true }),
+    contentType: "image/png",
+  });
 
   await page.getByRole("button", { name: "Project / system default" }).click();
   await expect(page.locator('[data-skin="openclaw-office-open-floor-v1"]')).toBeVisible();
@@ -219,4 +223,8 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await expect(memoryDialog.locator("[data-memory-kind='reference']")).toHaveCount(1);
   const accessibility = await new AxeBuilder({ page }).include("dialog").analyze();
   expect(accessibility.violations).toEqual([]);
+  await testInfo.attach("memory-network", {
+    body: await memoryDialog.screenshot({ animations: "disabled", caret: "hide" }),
+    contentType: "image/png",
+  });
 });
