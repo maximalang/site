@@ -89,6 +89,7 @@ export const ResourceBrokerEvaluationSchema = z.strictObject({
   candidate: ResourceRouteCandidateSchema,
   score: UnitIntervalSchema.optional(),
   transportSupportStatus: TransportSupportStatusSchema.optional(),
+  transportActivation: z.literal("EXPLICIT_OWNER_TASK_MODE").optional(),
   exclusion: z.enum(["UNAVAILABLE", "STALE_OBSERVATION", "TRANSPORT_NOT_SELECTABLE"]).optional(),
 });
 
@@ -105,6 +106,7 @@ const SelectionInputSchema = z.strictObject({
   policy: ResourceBrokerPolicySchema,
   now: TimestampSchema,
   candidates: z.array(ResourceRouteCandidateSchema).max(1_000),
+  experimentalActivationAdapterKinds: z.array(ExecutionAdapterKindSchema).max(6).optional(),
 });
 
 function roundedScore(
@@ -134,7 +136,10 @@ export function selectResourceRoute(
       }
       routeIds.add(candidate.routeId);
       const transportCapability = getChatWorkTransportCapability(candidate.adapterKind);
-      if (transportCapability && !transportCapability.selectable) {
+      const explicitlyActivated =
+        transportCapability?.status === "EXPERIMENTAL" &&
+        parsed.experimentalActivationAdapterKinds?.includes(candidate.adapterKind) === true;
+      if (transportCapability && !transportCapability.selectable && !explicitlyActivated) {
         return {
           candidate,
           transportSupportStatus: transportCapability.status,
@@ -144,15 +149,29 @@ export function selectResourceRoute(
       const transportStatus = transportCapability
         ? { transportSupportStatus: transportCapability.status }
         : {};
+      const transportActivation = explicitlyActivated
+        ? { transportActivation: "EXPLICIT_OWNER_TASK_MODE" as const }
+        : {};
       if (!candidate.isAvailable) {
-        return { candidate, ...transportStatus, exclusion: "UNAVAILABLE" as const };
+        return {
+          candidate,
+          ...transportStatus,
+          ...transportActivation,
+          exclusion: "UNAVAILABLE" as const,
+        };
       }
       if (Date.parse(candidate.expiresAt) <= now) {
-        return { candidate, ...transportStatus, exclusion: "STALE_OBSERVATION" as const };
+        return {
+          candidate,
+          ...transportStatus,
+          ...transportActivation,
+          exclusion: "STALE_OBSERVATION" as const,
+        };
       }
       return {
         candidate,
         ...transportStatus,
+        ...transportActivation,
         score: roundedScore(candidate, parsed.policy.weights),
       };
     });
