@@ -2,8 +2,10 @@ import {
   AccountIdSchema,
   ExecutionAdapterKindSchema,
   ExecutionModeSchema,
+  getChatWorkTransportCapability,
   RouteIdSchema,
   TimestampSchema,
+  TransportSupportStatusSchema,
 } from "@agent-world/domain";
 import * as z from "zod";
 
@@ -60,9 +62,7 @@ export const ResourceRouteCandidateSchema = z
     expiresAt: TimestampSchema,
   })
   .superRefine((candidate, context) => {
-    if (
-      !(validTransportModes[candidate.adapterKind] as readonly string[]).includes(candidate.mode)
-    ) {
+    if (!(validTransportModes[candidate.adapterKind] as readonly string[]).includes(candidate.mode)) {
       context.addIssue({ code: "custom", message: "Route mode does not match its adapter" });
     }
     if (Date.parse(candidate.expiresAt) <= Date.parse(candidate.observedAt)) {
@@ -86,7 +86,8 @@ export type ResourceRouteCandidate = z.infer<typeof ResourceRouteCandidateSchema
 export const ResourceBrokerEvaluationSchema = z.strictObject({
   candidate: ResourceRouteCandidateSchema,
   score: UnitIntervalSchema.optional(),
-  exclusion: z.enum(["UNAVAILABLE", "STALE_OBSERVATION"]).optional(),
+  transportSupportStatus: TransportSupportStatusSchema.optional(),
+  exclusion: z.enum(["UNAVAILABLE", "STALE_OBSERVATION", "TRANSPORT_NOT_SELECTABLE"]).optional(),
 });
 
 export const ResourceBrokerDecisionSchema = z.strictObject({
@@ -126,14 +127,32 @@ export function selectResourceRoute(
   const evaluations = [...parsed.candidates]
     .sort((left, right) => left.routeId.localeCompare(right.routeId))
     .map((candidate) => {
-      if (routeIds.has(candidate.routeId))
+      if (routeIds.has(candidate.routeId)) {
         throw new Error("Resource Broker candidates must be unique");
-      routeIds.add(candidate.routeId);
-      if (!candidate.isAvailable) return { candidate, exclusion: "UNAVAILABLE" as const };
-      if (Date.parse(candidate.expiresAt) <= now) {
-        return { candidate, exclusion: "STALE_OBSERVATION" as const };
       }
-      return { candidate, score: roundedScore(candidate, parsed.policy.weights) };
+      routeIds.add(candidate.routeId);
+      const transportCapability = getChatWorkTransportCapability(candidate.adapterKind);
+      if (transportCapability && !transportCapability.selectable) {
+        return {
+          candidate,
+          transportSupportStatus: transportCapability.status,
+          exclusion: "TRANSPORT_NOT_SELECTABLE" as const,
+        };
+      }
+      const transportStatus = transportCapability
+        ? { transportSupportStatus: transportCapability.status }
+        : {};
+      if (!candidate.isAvailable) {
+        return { candidate, ...transportStatus, exclusion: "UNAVAILABLE" as const };
+      }
+      if (Date.parse(candidate.expiresAt) <= now) {
+        return { candidate, ...transportStatus, exclusion: "STALE_OBSERVATION" as const };
+      }
+      return {
+        candidate,
+        ...transportStatus,
+        score: roundedScore(candidate, parsed.policy.weights),
+      };
     });
   const selected = evaluations
     .filter(
