@@ -67,7 +67,9 @@ export function parseLangfuseTelemetryConfig(
     throw new Error("AGENT_WORLD_LANGFUSE_BASE_URL must be an absolute URL");
   }
   if (url.username || url.password || url.search || url.hash || url.pathname !== "/") {
-    throw new Error("AGENT_WORLD_LANGFUSE_BASE_URL must be an origin without credentials or query data");
+    throw new Error(
+      "AGENT_WORLD_LANGFUSE_BASE_URL must be an origin without credentials or query data",
+    );
   }
   if (url.protocol !== "https:") {
     const explicitlyPrivate =
@@ -75,7 +77,9 @@ export function parseLangfuseTelemetryConfig(
       (isLoopback(url.hostname) ||
         environment.AGENT_WORLD_LANGFUSE_PLAINTEXT_ACK === "private-network");
     if (!explicitlyPrivate) {
-      throw new Error("Langfuse telemetry requires HTTPS or an explicit private-network acknowledgement");
+      throw new Error(
+        "Langfuse telemetry requires HTTPS or an explicit private-network acknowledgement",
+      );
     }
   }
 
@@ -115,7 +119,9 @@ function doubleAttribute(key: string, value: number) {
 function buildSnapshotPayload(snapshot: OperationsReadModel, observedAt: Date): unknown {
   const observatory = snapshot.observatory;
   const routeSignalCount = observatory.routeSignals.length;
-  const availableRouteCount = observatory.routeSignals.filter((signal) => signal.isAvailable).length;
+  const availableRouteCount = observatory.routeSignals.filter(
+    (signal) => signal.isAvailable,
+  ).length;
   const freshRouteCount = observatory.routeSignals.filter((signal) => signal.isFresh).length;
   const attributes = [
     stringAttribute("agent_world.generated_at", snapshot.generatedAt),

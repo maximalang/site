@@ -3,6 +3,7 @@ import { startApplicationRuntime } from "./application-runtime";
 import {
   LangfuseObservatorySupervisor,
   LangfuseOtlpExporter,
+  type LangfuseTelemetryConfig,
   parseLangfuseTelemetryConfig,
 } from "./langfuse-observatory";
 import { createProductionRuntime } from "./production-runtime";
@@ -17,7 +18,7 @@ function recordLangfuseProjection(event: unknown): void {
 
 async function createInstrumentedProductionRuntime(): Promise<ApplicationRuntime> {
   const runtime = await createProductionRuntime();
-  let config;
+  let config: LangfuseTelemetryConfig | undefined;
   try {
     config = parseLangfuseTelemetryConfig(process.env);
   } catch {
