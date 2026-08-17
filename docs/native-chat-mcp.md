@@ -141,6 +141,23 @@ The optional Compose service is enabled with `--profile native-chat`. Private
 signing and cookie-key files are mounted read-only and are never available to
 the web resource server.
 
+## Timeweb wrapper reuse boundary
+
+The repaired Timeweb wrapper implementation may be reused as source code and a
+deployment pattern, including its durable refresh-token rotation. AI World must
+nevertheless be an entirely separate deployment everywhere:
+
+- a dedicated hostname and process/application;
+- a dedicated OAuth issuer, dynamic-client registry, audience and signing keys;
+- dedicated cookie keys, PostgreSQL database, backups, logs and lifecycle;
+- no Recruiter Radar routes, domain, accounts, credentials or storage;
+- no shared refresh-token family or bearer token accepted across products.
+
+A common reverse proxy or Timeweb account is acceptable infrastructure. It
+must route to isolated applications and cannot collapse either product's trust
+boundary. The AI World MCP resource remains the exact
+`https://<ai-world-host>/api/mcp` audience.
+
 ## Remaining activation gates
 
 - Deploy the implemented authorization server behind the production HTTPS

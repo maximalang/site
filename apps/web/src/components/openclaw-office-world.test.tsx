@@ -24,6 +24,18 @@ describe("OpenClaw Office World presentation", () => {
     for (const agent of world.agents) {
       expect(screen.getByRole("button", { name: new RegExp(agent.core.displayName) })).toBeTruthy();
     }
+    expect(container.querySelectorAll("[data-openclaw-primitive='desk']").length).toBeGreaterThan(
+      1,
+    );
+    expect(container.querySelector("[data-openclaw-primitive='meeting-table']")).toBeTruthy();
+    expect(container.querySelector("[data-openclaw-primitive='sofa']")).toBeTruthy();
+    expect(container.querySelector("[data-openclaw-primitive='plant']")).toBeTruthy();
+    expect(container.querySelectorAll("[data-openclaw-primitive='pawn']")).toHaveLength(
+      world.agents.length,
+    );
+    expect(container.querySelectorAll(".office-monitor-active")).toHaveLength(
+      world.agents.filter((agent) => agent.core.status === "RUNNING").length,
+    );
   });
 
   it("keeps selection and conversation actions on native agent controls", () => {

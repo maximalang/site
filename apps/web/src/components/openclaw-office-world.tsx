@@ -7,6 +7,13 @@ import {
   type OfficePresentationAgent,
   type OfficeVisualStatus,
 } from "../world/openclaw-office-adapter";
+import {
+  OfficeDesk,
+  OfficeMeetingTable,
+  OfficePawn,
+  OfficePlant,
+  OfficeSofa,
+} from "./openclaw-office-primitives";
 
 type AgentId = WorldView["agents"][number]["core"]["agentId"];
 type OpenClawOfficeWorldProps = {
@@ -26,30 +33,13 @@ const STATUS_GLYPH: Record<OfficeVisualStatus, string> = {
   OFFLINE: "○",
 };
 
-function avatarColors(seed: string) {
-  let hash = 0;
-  for (const character of seed) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  const palettes = [
-    ["#ffb86b", "#7c3aed"],
-    ["#75e6c6", "#245b78"],
-    ["#f5a3c7", "#713e63"],
-    ["#f2d56b", "#6a5420"],
-  ] as const;
-  return palettes[hash % palettes.length] ?? palettes[0];
-}
-
 function AgentPawn({ agent }: { agent: OfficePresentationAgent }) {
-  const [body, trim] = avatarColors(agent.avatarSeed);
   return (
-    <svg aria-hidden="true" className="office-pawn" viewBox="0 0 64 78">
-      <ellipse className="office-pawn-shadow" cx="32" cy="70" rx="22" ry="6" />
-      <path d="M13 62c0-16 8-25 19-25s19 9 19 25v7H13z" fill={body} stroke={trim} />
-      <circle cx="32" cy="25" r="16" fill="#f4cba8" stroke={trim} />
-      <path d="M17 24c1-13 8-19 16-19 10 0 16 7 16 18-5-5-10-7-16-7-7 0-11 3-16 8z" fill={trim} />
-      <circle cx="27" cy="26" r="1.6" fill="#17211f" />
-      <circle cx="38" cy="26" r="1.6" fill="#17211f" />
-      <path d="M28 32c3 2 6 2 9 0" fill="none" stroke="#8b4d49" strokeLinecap="round" />
-    </svg>
+    <OfficePawn
+      reviewing={agent.visualStatus === "REVIEWING"}
+      seed={agent.avatarSeed}
+      working={agent.visualStatus === "WORKING"}
+    />
   );
 }
 
@@ -60,6 +50,10 @@ export function OpenClawOfficeWorld({
   onOpenConversation,
 }: OpenClawOfficeWorldProps) {
   const office = createOfficePresentation(world, DEFAULT_OFFICE_SKIN);
+  const activeDeskCount = Math.min(
+    4,
+    office.agents.filter((agent) => agent.visualStatus === "WORKING").length,
+  );
   return (
     <div
       className="openclaw-office-world office-world"
@@ -96,13 +90,15 @@ export function OpenClawOfficeWorld({
           </g>
         ))}
         <g className="office-furniture">
-          <path d="M380 188h330v40H380zM380 365h330v40H380z" />
-          <circle cx="875" cy="350" r="58" />
-          <path d="M1015 180h98v56h-98zM1015 470h98v56h-98z" />
-          <path
-            className="office-plant"
-            d="M170 165c-44-26-55 35-12 45-19 43 48 48 48 5 46 2 48-57 5-54-2-39-50-37-41 4z"
-          />
+          <OfficeDesk active={activeDeskCount > 0} x={455} y={150} />
+          <OfficeDesk active={activeDeskCount > 1} x={645} y={150} />
+          <OfficeDesk active={activeDeskCount > 2} x={455} y={430} />
+          <OfficeDesk active={activeDeskCount > 3} x={645} y={430} />
+          <OfficeMeetingTable x={875} y={350} />
+          <OfficeSofa x={183} y={230} />
+          <OfficeSofa x={183} y={430} />
+          <OfficePlant x={95} y={145} />
+          <OfficePlant x={275} y={570} />
         </g>
         <g className="office-handoff-layer">
           {office.handoffs.map((handoff) => (

@@ -394,16 +394,7 @@ main {
 }
 
 .office-furniture {
-  fill: #897a63;
-  stroke: #ad9c7e;
-  stroke-width: 3;
-}
-.office-furniture circle {
-  fill: #756553;
-}
-.office-furniture .office-plant {
-  fill: #43866b;
-  stroke: #75b294;
+  filter: drop-shadow(0 3px 3px rgb(0 0 0 / 18%));
 }
 
 .office-agent {
@@ -438,8 +429,70 @@ main {
   margin: 0 auto;
   overflow: visible;
 }
-.office-pawn-shadow {
-  fill: rgb(0 0 0 / 28%);
+
+.office-pawn-idle {
+  animation: office-pawn-breathe 3.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.office-pawn-working .office-pawn-arms {
+  animation: office-pawn-type 0.32s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+
+.office-pawn-reviewing {
+  animation: office-pawn-review 1.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.office-pawn-eyes {
+  animation: office-pawn-blink 4.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.office-monitor-active {
+  animation: office-monitor-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes office-pawn-breathe {
+  50% {
+    transform: translateY(-1px) scaleY(1.015);
+  }
+}
+
+@keyframes office-pawn-type {
+  to {
+    transform: translateY(2px) rotate(2deg);
+  }
+}
+
+@keyframes office-pawn-review {
+  50% {
+    transform: rotate(-2deg);
+  }
+}
+
+@keyframes office-pawn-blink {
+  0%,
+  45%,
+  49%,
+  100% {
+    transform: scaleY(1);
+  }
+  47% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes office-monitor-glow {
+  50% {
+    fill: #67e8f9;
+    filter: drop-shadow(0 0 4px #22d3ee);
+  }
 }
 
 .office-agent-error .office-pawn,
@@ -840,7 +893,13 @@ dialog.memory-center-dialog::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .office-agent {
+  .office-agent,
+  .office-pawn-idle,
+  .office-pawn-working .office-pawn-arms,
+  .office-pawn-reviewing,
+  .office-pawn-eyes,
+  .office-monitor-active {
+    animation: none;
     transition: none;
   }
 }
