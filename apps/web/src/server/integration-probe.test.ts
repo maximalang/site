@@ -21,6 +21,14 @@ const target = {
   updatedAt: "2026-08-15T12:00:00.000Z",
 } as ProbeTarget;
 
+const steelTarget = {
+  ...target,
+  id: "integration_22222222-2222-4222-8222-222222222222",
+  kind: "STEEL",
+  label: "Steel browser sessions",
+  endpoint: { transport: "HTTPS", url: "https://steel.example/base" },
+} as ProbeTarget;
+
 describe("integration protocol probe", () => {
   it("fails closed before DNS or network access when a host is not allowlisted", async () => {
     const result = await createNodeIntegrationProbe({
@@ -44,6 +52,40 @@ describe("integration protocol probe", () => {
       allowPrivateNetwork: false,
     })({ ...target, endpoint: { transport: "HTTPS", url: "https://127.0.0.1/api/mcp" } });
     expect(result).toEqual({ health: "ERROR", code: "PRIVATE_NETWORK_NOT_ACKNOWLEDGED" });
+  });
+
+  it("probes only the bounded Steel health endpoint", async () => {
+    const https = vi.fn().mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({ status: "ok" }),
+      contentType: "application/json",
+    });
+    const result = await createNodeIntegrationProbe(
+      { allowedHosts: ["steel.example"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "203.0.113.30", family: 4 }),
+        https,
+      },
+    )(steelTarget);
+    expect(result).toEqual({ health: "READY", code: "STEEL_PROBE_OK" });
+    expect(https).toHaveBeenCalledOnce();
+    expect(https.mock.calls[0]?.[0].toString()).toBe("https://steel.example/health");
+    expect(https.mock.calls[0]?.[3]).toBe("GET");
+  });
+
+  it("rejects a Steel health response that does not prove service readiness", async () => {
+    const result = await createNodeIntegrationProbe(
+      { allowedHosts: ["steel.example"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "203.0.113.30", family: 4 }),
+        https: vi.fn().mockResolvedValue({
+          status: 200,
+          body: JSON.stringify({ status: "starting" }),
+          contentType: "application/json",
+        }),
+      },
+    )(steelTarget);
+    expect(result).toEqual({ health: "ERROR", code: "STEEL_HEALTH_INVALID" });
   });
 });
 
@@ -121,6 +163,43 @@ describe("predefined integration actions", () => {
       },
     )(github, "GITHUB_LIST_REPOSITORIES", "token");
     expect(result.items).toEqual([{ id: "42", label: "owner/repo", detail: "private · active" }]);
+  });
+
+  it("lists Steel sessions through one read-only bounded GET", async () => {
+    const https = vi.fn().mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({
+        sessions: [
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            status: "live",
+            createdAt: "2026-08-15T12:00:00.000Z",
+          },
+        ],
+      }),
+      contentType: "application/json",
+    });
+    const result = await createNodeIntegrationAction(
+      { allowedHosts: ["steel.example"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "203.0.113.30", family: 4 }),
+        https,
+      },
+    )({ ...steelTarget, health: "READY" }, "STEEL_LIST_SESSIONS");
+    expect(result).toEqual({
+      status: "SUCCEEDED",
+      items: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          label: "11111111-1111-4111-8111-111111111111",
+          detail: "live · 2026-08-15T12:00:00.000Z",
+        },
+      ],
+    });
+    expect(https).toHaveBeenCalledOnce();
+    expect(https.mock.calls[0]?.[0].toString()).toBe("https://steel.example/sessions");
+    expect(https.mock.calls[0]?.[3]).toBe("GET");
+    expect(https.mock.calls[0]?.[5]).toBeUndefined();
   });
 });
 
