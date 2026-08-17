@@ -115,7 +115,12 @@ export function MemoryNetworkGraph({
         <p className={styles.empty}>Network пуст.</p>
       ) : (
         <>
-          <div className={styles.canvas}>
+          <div
+            aria-label="Прокручиваемая схема Memory Network"
+            className={styles.canvas}
+            role="region"
+            tabIndex={0}
+          >
             <svg
               aria-label={`Memory Network: ${network.nodes.length} canonical memories, ${network.edges.length} provenance links`}
               className={styles.svg}
