@@ -4,7 +4,6 @@ import type {
   AgentId,
   AgentSchedule,
   MemoryCurationDecision,
-  RagIngestionRequest,
   Mission,
   MissionDecomposition,
   MissionId,
@@ -15,6 +14,7 @@ import type {
   NativeChatControlEventInput,
   NativeChatPullRequest,
   NativeChatPullResponse,
+  RagIngestionRequest,
   SendMessageIntent,
   StructuredMeeting,
 } from "@agent-world/domain";
