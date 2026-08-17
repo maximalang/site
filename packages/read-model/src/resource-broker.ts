@@ -89,7 +89,9 @@ export const ResourceBrokerEvaluationSchema = z.strictObject({
   candidate: ResourceRouteCandidateSchema,
   score: UnitIntervalSchema.optional(),
   transportSupportStatus: TransportSupportStatusSchema.optional(),
-  transportActivation: z.literal("EXPLICIT_OWNER_TASK_MODE").optional(),
+  transportActivation: z
+    .enum(["EXPLICIT_OWNER_TASK_MODE", "VERIFIED_CANONICAL_EVIDENCE"])
+    .optional(),
   exclusion: z.enum(["UNAVAILABLE", "STALE_OBSERVATION", "TRANSPORT_NOT_SELECTABLE"]).optional(),
 });
 
@@ -107,6 +109,7 @@ const SelectionInputSchema = z.strictObject({
   now: TimestampSchema,
   candidates: z.array(ResourceRouteCandidateSchema).max(1_000),
   experimentalActivationAdapterKinds: z.array(ExecutionAdapterKindSchema).max(6).optional(),
+  verifiedCanonicalEvidenceRouteIds: z.array(RouteIdSchema).max(1_000).optional(),
 });
 
 function roundedScore(
@@ -128,6 +131,7 @@ export function selectResourceRoute(
   const parsed = SelectionInputSchema.parse(input);
   const now = Date.parse(parsed.now);
   const routeIds = new Set<string>();
+  const verifiedCanonicalEvidenceRouteIds = new Set(parsed.verifiedCanonicalEvidenceRouteIds ?? []);
   const evaluations = [...parsed.candidates]
     .sort((left, right) => left.routeId.localeCompare(right.routeId))
     .map((candidate) => {
@@ -139,7 +143,15 @@ export function selectResourceRoute(
       const explicitlyActivated =
         transportCapability?.status === "EXPERIMENTAL" &&
         parsed.experimentalActivationAdapterKinds?.includes(candidate.adapterKind) === true;
-      if (transportCapability && !transportCapability.selectable && !explicitlyActivated) {
+      const canonicallyVerified =
+        transportCapability?.status === "EXPERIMENTAL" &&
+        verifiedCanonicalEvidenceRouteIds.has(candidate.routeId);
+      if (
+        transportCapability &&
+        !transportCapability.selectable &&
+        !explicitlyActivated &&
+        !canonicallyVerified
+      ) {
         return {
           candidate,
           transportSupportStatus: transportCapability.status,
@@ -151,7 +163,9 @@ export function selectResourceRoute(
         : {};
       const transportActivation = explicitlyActivated
         ? { transportActivation: "EXPLICIT_OWNER_TASK_MODE" as const }
-        : {};
+        : canonicallyVerified
+          ? { transportActivation: "VERIFIED_CANONICAL_EVIDENCE" as const }
+          : {};
       if (!candidate.isAvailable) {
         return {
           candidate,
