@@ -120,6 +120,14 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm exec --workspace @agent-world/web -- playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Upload browser visual evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-visual-evidence-${{ github.sha }}
+          path: apps/web/test-results/**/*.png
+          if-no-files-found: error
+          retention-days: 14
 
   container:
     runs-on: ubuntu-latest
