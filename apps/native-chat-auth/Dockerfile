@@ -9,7 +9,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/native-chat-auth/package.json ./apps/native-chat-auth/package.json
 RUN npm ci --omit=dev --ignore-scripts --workspace @agent-world/native-chat-auth \
-    && npm cache clean --force
+    && npm cache clean --force \
+    && test "$(id -u node)" = "1000" \
+    && test "$(id -g node)" = "1000"
 COPY apps/native-chat-auth/src ./apps/native-chat-auth/src
 WORKDIR /app/apps/native-chat-auth
 USER node
