@@ -96,6 +96,32 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  native-chat-secrets:
+    profiles: ["native-chat"]
+    build:
+      context: .
+      dockerfile: apps/native-chat-auth/Dockerfile
+    image: agent-world-native-chat-auth:${AGENT_WORLD_IMAGE_TAG:-local}
+    user: "0:0"
+    command: ["node", "src/prepare-runtime-secrets.js"]
+    restart: "no"
+    volumes:
+      - ${AGENT_WORLD_MCP_OAUTH_JWKS_FILE:-./ops/secrets/disabled-oauth-jwks.json}:/source-secrets/oauth-jwks.json:ro
+      - ${AGENT_WORLD_MCP_OAUTH_COOKIE_KEYS_FILE:-./ops/secrets/disabled-oauth-cookie-keys.json}:/source-secrets/oauth-cookie-keys.json:ro
+      - native_chat_oauth_secrets:/runtime-secrets
+    read_only: true
+    network_mode: none
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 32
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_READ_SEARCH
+    security_opt:
+      - no-new-privileges:true
+
   native-chat-auth:
     profiles: ["native-chat"]
     build:
@@ -108,6 +134,8 @@ services:
         condition: service_healthy
       web:
         condition: service_healthy
+      native-chat-secrets:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://agent_world:${AGENT_WORLD_POSTGRES_PASSWORD}@postgres:5432/agent_world
       AGENT_WORLD_MCP_AUTH_PROVIDER: local_oidc
@@ -117,8 +145,7 @@ services:
       AGENT_WORLD_MCP_OAUTH_JWKS_FILE: /run/secrets/oauth-jwks.json
       AGENT_WORLD_MCP_OAUTH_COOKIE_KEYS_FILE: /run/secrets/oauth-cookie-keys.json
     volumes:
-      - ${AGENT_WORLD_MCP_OAUTH_JWKS_FILE:-./ops/secrets/disabled-oauth-jwks.json}:/run/secrets/oauth-jwks.json:ro
-      - ${AGENT_WORLD_MCP_OAUTH_COOKIE_KEYS_FILE:-./ops/secrets/disabled-oauth-cookie-keys.json}:/run/secrets/oauth-cookie-keys.json:ro
+      - native_chat_oauth_secrets:/run/secrets:ro
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777,noexec,nosuid,nodev
@@ -336,3 +363,4 @@ volumes:
   caddy_data:
   caddy_config:
   falkordb_data:
+  native_chat_oauth_secrets:
