@@ -99,7 +99,11 @@ export function OpenClawOfficeWorld({
     <section aria-label="Игровая карта AI World">
       <div className="memory-launch-controls">
         <label htmlFor="world-skin">Map / skin</label>
-        <select id="world-skin" onChange={(event) => selectSkin(event.target.value)} value={skin.id}>
+        <select
+          id="world-skin"
+          onChange={(event) => selectSkin(event.target.value)}
+          value={skin.id}
+        >
           {OFFICE_SKINS.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
