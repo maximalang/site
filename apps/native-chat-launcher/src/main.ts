@@ -1,92 +1,57 @@
+import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import {
-  AccountIdSchema,
-  BrowserProfileRefSchema,
-  LauncherIdSchema,
-  NativeChatLaunchUrlSchema,
-} from "@agent-world/domain";
-import { PostgresNativeChatLaunchStore } from "@agent-world/postgres-store";
-import pg from "pg";
+import { LauncherIdSchema } from "@agent-world/domain";
 import * as z from "zod";
 import { PlaywrightNativeChatBrowserDriver } from "./driver.js";
+import { HttpNativeChatLaunchStore, parseNativeChatLauncherControlUrl } from "./http-store.js";
 import { NativeChatLauncherWorker } from "./worker.js";
 
-const { Pool } = pg;
+const EnvironmentSchema = z.object({
+  AGENT_WORLD_NATIVE_CHAT_CONTROL_URL: z.string().url().max(2_048),
+  AGENT_WORLD_NATIVE_CHAT_LAUNCHER_TOKEN_FILE: z.string().trim().min(1).max(4_096),
+  AGENT_WORLD_NATIVE_CHAT_LAUNCHER_ID: LauncherIdSchema,
+  AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT: z.string().trim().min(1).max(4_096),
+  AGENT_WORLD_NATIVE_CHAT_LEASE_MS: z.coerce
+    .number()
+    .int()
+    .min(10_000)
+    .max(300_000)
+    .default(120_000),
+  AGENT_WORLD_NATIVE_CHAT_POLL_MS: z.coerce.number().int().min(250).max(60_000).default(2_000),
+  AGENT_WORLD_NATIVE_CHAT_PAGE_RETENTION_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(24 * 60 * 60_000)
+    .default(30 * 60_000),
+  AGENT_WORLD_NATIVE_CHAT_ONCE: z.enum(["true", "false"]).default("false"),
+});
 
-const EnvironmentSchema = z
-  .object({
-    DATABASE_URL: z.string().url().startsWith("postgresql://").max(2_048),
-    AGENT_WORLD_DATABASE_TLS: z.enum(["require", "disable"]).default("require"),
-    AGENT_WORLD_DATABASE_PLAINTEXT_ACK: z.literal("private-network").optional(),
-    AGENT_WORLD_NATIVE_CHAT_LAUNCHER_ID: LauncherIdSchema,
-    AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT: z.string().trim().min(1).max(4_096),
-    AGENT_WORLD_NATIVE_CHAT_LEASE_MS: z.coerce
-      .number()
-      .int()
-      .min(10_000)
-      .max(300_000)
-      .default(120_000),
-    AGENT_WORLD_NATIVE_CHAT_POLL_MS: z.coerce.number().int().min(250).max(60_000).default(2_000),
-    AGENT_WORLD_NATIVE_CHAT_PAGE_RETENTION_MS: z.coerce
-      .number()
-      .int()
-      .min(60_000)
-      .max(24 * 60 * 60_000)
-      .default(30 * 60_000),
-    AGENT_WORLD_NATIVE_CHAT_ONCE: z.enum(["true", "false"]).default("false"),
-    AGENT_WORLD_NATIVE_CHAT_ACCOUNT_ID: AccountIdSchema.optional(),
-    AGENT_WORLD_NATIVE_CHAT_PROFILE_REF: BrowserProfileRefSchema.optional(),
-    AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL: NativeChatLaunchUrlSchema.optional(),
-  })
-  .superRefine((environment, context) => {
-    if (!isAbsolute(environment.AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT)) {
-      context.addIssue({ code: "custom", message: "Native Chat profile root must be absolute" });
-    }
-    if (
-      environment.AGENT_WORLD_DATABASE_TLS === "disable" &&
-      environment.AGENT_WORLD_DATABASE_PLAINTEXT_ACK !== "private-network"
-    ) {
-      context.addIssue({ code: "custom", message: "Plaintext database requires acknowledgement" });
-    }
-    const profileValues = [
-      environment.AGENT_WORLD_NATIVE_CHAT_ACCOUNT_ID,
-      environment.AGENT_WORLD_NATIVE_CHAT_PROFILE_REF,
-      environment.AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL,
-    ];
-    if (profileValues.some(Boolean) && !profileValues.every(Boolean)) {
-      context.addIssue({
-        code: "custom",
-        message: "Account, profile ref and launch URL must be configured together",
-      });
-    }
-  });
+function readLauncherToken(path: string): string {
+  if (!isAbsolute(path)) throw new Error("Native Chat launcher token file must be absolute");
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 43 || stat.size > 256) {
+    throw new Error("Native Chat launcher token file violates the local secret contract");
+  }
+  const token = readFileSync(path, "utf8").trim();
+  if (!/^[A-Za-z0-9_-]{43,128}$/.test(token)) {
+    throw new Error("Native Chat launcher token must be canonical base64url");
+  }
+  return token;
+}
 
 function boundedLog(event: string, outcome: string, identifiers: Record<string, string> = {}) {
   process.stdout.write(`${JSON.stringify({ event, outcome, ...identifiers })}\n`);
 }
 
 const environment = EnvironmentSchema.parse(process.env);
-const pool = new Pool({
-  connectionString: environment.DATABASE_URL,
-  max: 2,
-  idleTimeoutMillis: 10_000,
-  connectionTimeoutMillis: 3_000,
-  ssl: environment.AGENT_WORLD_DATABASE_TLS === "require" ? { rejectUnauthorized: true } : false,
-});
-const store = new PostgresNativeChatLaunchStore(pool);
-if (
-  environment.AGENT_WORLD_NATIVE_CHAT_ACCOUNT_ID &&
-  environment.AGENT_WORLD_NATIVE_CHAT_PROFILE_REF &&
-  environment.AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL
-) {
-  await store.configureProfile({
-    accountId: environment.AGENT_WORLD_NATIVE_CHAT_ACCOUNT_ID,
-    profileRef: environment.AGENT_WORLD_NATIVE_CHAT_PROFILE_REF,
-    launchUrl: environment.AGENT_WORLD_NATIVE_CHAT_LAUNCH_URL,
-    isEnabled: true,
-    updatedAt: new Date().toISOString(),
-  });
+if (!isAbsolute(environment.AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT)) {
+  throw new Error("Native Chat profile root must be absolute");
 }
+const store = new HttpNativeChatLaunchStore({
+  controlUrl: parseNativeChatLauncherControlUrl(environment.AGENT_WORLD_NATIVE_CHAT_CONTROL_URL),
+  token: readLauncherToken(environment.AGENT_WORLD_NATIVE_CHAT_LAUNCHER_TOKEN_FILE),
+});
 const browser = new PlaywrightNativeChatBrowserDriver(
   environment.AGENT_WORLD_NATIVE_CHAT_PROFILE_ROOT,
   { retentionMs: environment.AGENT_WORLD_NATIVE_CHAT_PAGE_RETENTION_MS },
@@ -126,4 +91,3 @@ do {
 } while (!stopping && environment.AGENT_WORLD_NATIVE_CHAT_ONCE !== "true");
 
 await browser.close();
-await pool.end();
