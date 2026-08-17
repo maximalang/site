@@ -137,6 +137,56 @@ describe("IntegrationPanel", () => {
     );
   });
 
+  it("exposes Steel inventory without a Steel write surface", async () => {
+    const integrationId = "integration_22222222-2222-4222-8222-222222222222";
+    const action = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      integrationId,
+      action: "STEEL_LIST_SESSIONS",
+      outcome: "RECORDED",
+      status: "SUCCEEDED",
+      items: [{ id: "session-1", label: "session-1", detail: "live" }],
+      executedAt: "2026-08-15T12:00:00.000Z",
+    });
+    const client = {
+      list: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        generatedAt: "2026-08-15T12:00:00.000Z",
+        integrations: [
+          {
+            id: integrationId,
+            kind: "STEEL",
+            label: "Steel browser sessions",
+            endpoint: { transport: "HTTPS", url: "https://steel.example" },
+            health: "READY",
+            isEnabled: true,
+            hasCredential: false,
+            createdAt: "2026-08-15T12:00:00.000Z",
+            updatedAt: "2026-08-15T12:00:00.000Z",
+          },
+        ],
+      }),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action,
+      registerTool: vi.fn(),
+      registerSshOperation: vi.fn(),
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
+    };
+    render(<IntegrationPanel client={client} csrfToken="csrf" />);
+    expect(await screen.findByRole("option", { name: "STEEL" })).toBeTruthy();
+    expect(screen.queryByText(/workflow dispatch/)).toBeNull();
+    expect(screen.queryByText(/write-инструменты/)).toBeNull();
+    expect(screen.queryByText(/server\/deploy операции/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Сессии" }));
+    expect(await screen.findByText(/session-1 · live/)).toBeTruthy();
+    expect(action).toHaveBeenCalledWith(integrationId, "STEEL_LIST_SESSIONS", "csrf");
+    expect(client.requestMutation).not.toHaveBeenCalled();
+  });
+
   it("requires a separate owner confirmation before GitHub workflow dispatch", async () => {
     const pending = {
       schemaVersion: 1 as const,
