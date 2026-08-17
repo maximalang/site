@@ -1,3 +1,5 @@
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { Server, utils } from "ssh2";
 import { describe, expect, it, vi } from "vitest";
 import {
   createNodeIntegrationAction,
@@ -192,6 +194,123 @@ describe("approved integration mutations", () => {
       expect.objectContaining({ "mcp-session-id": "session-1" }),
     );
   });
+
+  it("derives a registered SSH service command and pins the trusted host key", async () => {
+    const ssh = vi.fn().mockResolvedValue({ code: 0 });
+    const result = await createNodeIntegrationMutationExecutor(
+      { allowedHosts: ["vds.example"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "203.0.113.20", family: 4 }),
+        ssh,
+      },
+    )({
+      endpoint: { transport: "SSH", host: "vds.example", port: 22, username: "deploy" },
+      credential: "private-key",
+      mutation: {
+        kind: "SSH_RUN_REGISTERED_OPERATION",
+        operation: { kind: "SYSTEMD_RESTART", systemdUnit: "agent-world.service" },
+        hostKeySha256: `SHA256:${"A".repeat(43)}`,
+      },
+    });
+    expect(result).toEqual({ state: "SUCCEEDED" });
+    expect(ssh).toHaveBeenCalledWith({
+      address: "203.0.113.20",
+      port: 22,
+      username: "deploy",
+      privateKey: "private-key",
+      hostKeySha256: `SHA256:${"A".repeat(43)}`,
+      command: "sudo -n systemctl restart -- agent-world.service",
+    });
+  });
+
+  it("derives a bounded Compose deploy and never accepts a caller command", async () => {
+    const ssh = vi.fn().mockResolvedValue({ code: 0 });
+    await createNodeIntegrationMutationExecutor(
+      { allowedHosts: ["vds.example"], allowPrivateNetwork: false },
+      {
+        resolve: vi.fn().mockResolvedValue({ address: "203.0.113.20", family: 4 }),
+        ssh,
+      },
+    )({
+      endpoint: { transport: "SSH", host: "vds.example", port: 22, username: "deploy" },
+      credential: "private-key",
+      mutation: {
+        kind: "SSH_RUN_REGISTERED_OPERATION",
+        operation: {
+          kind: "DOCKER_COMPOSE_DEPLOY",
+          composeProject: "agent-world",
+          workingDirectory: "/srv/agent-world",
+        },
+        hostKeySha256: `SHA256:${"B".repeat(43)}`,
+      },
+    });
+    expect(ssh.mock.calls[0]?.[0].command).toBe(
+      "cd -- /srv/agent-world && docker compose --project-name agent-world pull && docker compose --project-name agent-world up -d --remove-orphans",
+    );
+  });
+
+  it("executes the derived command through a real SSH handshake with host-key pinning", async () => {
+    const serverPrivateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({
+      format: "pem",
+      type: "pkcs1",
+    });
+    const clientPrivateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({
+      format: "pem",
+      type: "pkcs1",
+    });
+    const parsed = utils.parseKey(serverPrivateKey);
+    if (parsed instanceof Error) throw parsed;
+    const hostKeySha256 = `SHA256:${createHash("sha256")
+      .update(parsed.getPublicSSH())
+      .digest("base64")
+      .replace(/=+$/, "")}`;
+    let receivedCommand = "";
+    const server = new Server({ hostKeys: [serverPrivateKey] }, (client) => {
+      client.on("authentication", (context) => context.accept());
+      client.on("ready", () => {
+        client.on("session", (accept) => {
+          const session = accept();
+          session.on("exec", (acceptExec, _reject, info) => {
+            receivedCommand = info.command;
+            const stream = acceptExec();
+            stream.exit(0);
+            stream.end();
+          });
+        });
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("SSH test server unavailable");
+    try {
+      const result = await createNodeIntegrationMutationExecutor(
+        { allowedHosts: ["vds.example"], allowPrivateNetwork: true },
+        { resolve: vi.fn().mockResolvedValue({ address: "127.0.0.1", family: 4 }) },
+      )({
+        endpoint: {
+          transport: "SSH",
+          host: "vds.example",
+          port: address.port,
+          username: "deploy",
+        },
+        credential: clientPrivateKey.toString(),
+        mutation: {
+          kind: "SSH_RUN_REGISTERED_OPERATION",
+          operation: { kind: "SYSTEMD_RESTART", systemdUnit: "agent-world.service" },
+          hostKeySha256,
+        },
+      });
+      expect(result).toEqual({ state: "SUCCEEDED" });
+      expect(receivedCommand).toBe("sudo -n systemctl restart -- agent-world.service");
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  }, 15_000);
 
   it("does not retry a transport failure with an unknown remote outcome", async () => {
     const https = vi.fn().mockRejectedValue(new Error("socket reset"));

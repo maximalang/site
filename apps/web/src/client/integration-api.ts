@@ -5,8 +5,11 @@ import {
   type IntegrationMutation,
   IntegrationMutationReceiptSchema,
   IntegrationRegistrySchema,
+  type IntegrationSshOperationCreate,
   type IntegrationToolAllowlistCreate,
 } from "@agent-world/read-model";
+
+type WithoutCreatedAt<T> = T extends unknown ? Omit<T, "createdAt"> : never;
 
 export const integrationClient = {
   async list() {
@@ -90,6 +93,18 @@ export const integrationClient = {
       body: JSON.stringify({ operation: "REGISTER_TOOL", ...input }),
     });
     if (!response.ok) throw new Error("Integration tool registration rejected");
+  },
+  async registerSshOperation(
+    input: WithoutCreatedAt<IntegrationSshOperationCreate>,
+    csrfToken: string,
+  ) {
+    const response = await fetch("/api/integrations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+      body: JSON.stringify({ operation: "REGISTER_SSH_OPERATION", ...input }),
+    });
+    if (!response.ok) throw new Error("SSH operation registration rejected");
   },
   async requestMutation(integrationId: string, mutation: IntegrationMutation, csrfToken: string) {
     const uuid = crypto.randomUUID();

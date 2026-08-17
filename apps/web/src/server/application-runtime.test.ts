@@ -43,6 +43,7 @@ function runtime() {
     probeIntegration: vi.fn(),
     executeIntegrationAction: vi.fn(),
     createIntegrationToolAllowlist: vi.fn(),
+    createIntegrationSshOperation: vi.fn(),
     requestIntegrationMutation: vi.fn(),
     decideIntegrationMutation: vi.fn(),
     readWorld: vi.fn(),

@@ -7,12 +7,14 @@ import {
   IntegrationMutationRequestIdSchema,
   IntegrationMutationSchema,
   IntegrationRegistrySchema,
+  IntegrationSshOperationCreateSchema,
   IntegrationToolAllowlistCreateSchema,
 } from "@agent-world/read-model";
 import * as z from "zod";
 import { hasSameOriginHost } from "./request-security";
 
 const MAX_BYTES = 32_768;
+type WithoutOperation<T> = T extends unknown ? Omit<T, "operation"> : never;
 const CredentialSchema = z.strictObject({
   operation: z.literal("CREDENTIAL"),
   integrationId: IntegrationIdSchema,
@@ -55,6 +57,18 @@ const RegisterToolResultSchema = z.strictObject({
   outcome: z.enum(["CREATED", "REPLAY"]),
   toolAllowlistId: IntegrationToolAllowlistCreateSchema.shape.id,
 });
+const RegisterSshOperationSchema = z.discriminatedUnion("operationKind", [
+  IntegrationSshOperationCreateSchema.options[0]
+    .omit({ createdAt: true })
+    .extend({ operation: z.literal("REGISTER_SSH_OPERATION") }),
+  IntegrationSshOperationCreateSchema.options[1]
+    .omit({ createdAt: true })
+    .extend({ operation: z.literal("REGISTER_SSH_OPERATION") }),
+]);
+const RegisterSshOperationResultSchema = z.strictObject({
+  outcome: z.enum(["CREATED", "REPLAY"]),
+  sshOperationId: IntegrationSshOperationCreateSchema.options[0].shape.id,
+});
 const ProbeResultSchema = z.strictObject({
   schemaVersion: z.literal(1),
   integrationId: IntegrationIdSchema,
@@ -74,6 +88,10 @@ export type IntegrationHttpDependencies = {
   action(input: z.infer<typeof ActionSchema>, executedAt: string): Promise<unknown>;
   registerTool?(
     input: Omit<z.infer<typeof RegisterToolSchema>, "operation">,
+    createdAt: string,
+  ): Promise<unknown>;
+  registerSshOperation?(
+    input: WithoutOperation<z.infer<typeof RegisterSshOperationSchema>>,
     createdAt: string,
   ): Promise<unknown>;
   requestMutation(
@@ -140,18 +158,31 @@ export function createIntegrationRouteHandlers(dependencies: IntegrationHttpDepe
                           now,
                         ),
                       )
-                    : raw.operation === "REQUEST_MUTATION"
-                      ? IntegrationMutationReceiptSchema.parse(
-                          await dependencies.requestMutation(MutationRequestSchema.parse(raw), now),
+                    : raw.operation === "REGISTER_SSH_OPERATION" &&
+                        dependencies.registerSshOperation
+                      ? RegisterSshOperationResultSchema.parse(
+                          await dependencies.registerSshOperation(
+                            (({ operation: _operation, ...command }) => command)(
+                              RegisterSshOperationSchema.parse(raw),
+                            ),
+                            now,
+                          ),
                         )
-                      : raw.operation === "DECIDE_MUTATION"
+                      : raw.operation === "REQUEST_MUTATION"
                         ? IntegrationMutationReceiptSchema.parse(
-                            await dependencies.decideMutation(
-                              MutationDecisionSchema.parse(raw),
+                            await dependencies.requestMutation(
+                              MutationRequestSchema.parse(raw),
                               now,
                             ),
                           )
-                        : await dependencies.create(IntegrationCreateSchema.parse(raw));
+                        : raw.operation === "DECIDE_MUTATION"
+                          ? IntegrationMutationReceiptSchema.parse(
+                              await dependencies.decideMutation(
+                                MutationDecisionSchema.parse(raw),
+                                now,
+                              ),
+                            )
+                          : await dependencies.create(IntegrationCreateSchema.parse(raw));
         return Response.json({ schemaVersion: 1, result }, { headers, status: 201 });
       } catch {
         return error("INTEGRATION_COMMAND_REJECTED", 409);

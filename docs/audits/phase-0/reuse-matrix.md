@@ -33,6 +33,7 @@ behind an adapter. Neither classification overrides the upstream license.
 | `n8n-io/n8n` | Sustainable Use core; enterprise code separate | Optional isolated service | Integration/workflow bus | Not agent brain; no code copying; exact use must pass license review |
 | `docker/mcp-gateway` | MIT | Service/adapter after VDS spike | Containerized MCP aggregation | Linux secrets/OAuth parity and failure isolation require verification |
 | `steel-dev/steel-browser` | Apache-2.0 | Optional isolated service | Persistent browser session lifecycle | Approved sites only; output untrusted; no consumer ChatGPT foundation |
+| `mscdex/ssh2` | MIT | Reuse as transport library | SSH client, key authentication and host-key verification | AI World owns typed operation allowlists and approvals; no interactive shell or arbitrary command API |
 | `openai/codex` | Apache-2.0 | Official SDK adapter | Specialist coding threads, streamed events, approvals | Prefer supported SDK; direct WebSocket remains experimental-gated |
 
 ## Composition invariants

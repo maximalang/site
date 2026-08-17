@@ -6,6 +6,7 @@ import type {
   IntegrationMutation,
   IntegrationMutationReceipt,
   IntegrationRegistry,
+  IntegrationSshOperationCreate,
   IntegrationToolAllowlistCreate,
 } from "@agent-world/read-model";
 import { useCallback, useEffect, useState } from "react";
@@ -20,6 +21,18 @@ export type IntegrationClient = {
   action(id: string, action: IntegrationAction, csrf: string): Promise<IntegrationActionResult>;
   registerTool(
     input: Omit<IntegrationToolAllowlistCreate, "createdAt">,
+    csrf: string,
+  ): Promise<void>;
+  registerSshOperation(
+    input:
+      | Omit<
+          Extract<IntegrationSshOperationCreate, { operationKind: "SYSTEMD_RESTART" }>,
+          "createdAt"
+        >
+      | Omit<
+          Extract<IntegrationSshOperationCreate, { operationKind: "DOCKER_COMPOSE_DEPLOY" }>,
+          "createdAt"
+        >,
     csrf: string,
   ): Promise<void>;
   requestMutation(
@@ -57,6 +70,13 @@ export function IntegrationPanel({
   const [mcpToolLabel, setMcpToolLabel] = useState("");
   const [mcpToolName, setMcpToolName] = useState("");
   const [mcpFixedArguments, setMcpFixedArguments] = useState("{}");
+  const [sshOperationKind, setSshOperationKind] = useState<
+    "SYSTEMD_RESTART" | "DOCKER_COMPOSE_DEPLOY"
+  >("SYSTEMD_RESTART");
+  const [sshOperationLabel, setSshOperationLabel] = useState("");
+  const [sshTarget, setSshTarget] = useState("");
+  const [sshWorkingDirectory, setSshWorkingDirectory] = useState("");
+  const [sshHostKeySha256, setSshHostKeySha256] = useState("");
   const refresh = useCallback(
     () =>
       client
@@ -192,6 +212,53 @@ export function IntegrationPanel({
         await client.requestMutation(
           integrationId,
           { kind: "MCP_CALL_REGISTERED_TOOL", toolAllowlistId },
+          csrfToken,
+        ),
+      );
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const registerSshOperation = async (integrationId: string) => {
+    setBusy(true);
+    setError(false);
+    try {
+      const uuid = crypto.randomUUID();
+      const common = {
+        id: `integration_ssh_operation_${uuid}` as const,
+        integrationId,
+        commandId: `integration:ssh-operation:create:${uuid}`,
+        label: sshOperationLabel,
+        hostKeySha256: sshHostKeySha256,
+      };
+      await client.registerSshOperation(
+        sshOperationKind === "SYSTEMD_RESTART"
+          ? { ...common, operationKind: sshOperationKind, systemdUnit: sshTarget }
+          : {
+              ...common,
+              operationKind: sshOperationKind,
+              composeProject: sshTarget,
+              workingDirectory: sshWorkingDirectory,
+            },
+        csrfToken,
+      );
+      await refresh();
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const requestSshOperation = async (integrationId: string, sshOperationId: string) => {
+    setBusy(true);
+    setError(false);
+    try {
+      setMutationReceipt(
+        await client.requestMutation(
+          integrationId,
+          { kind: "SSH_RUN_REGISTERED_OPERATION", sshOperationId },
           csrfToken,
         ),
       );
@@ -406,6 +473,86 @@ export function IntegrationPanel({
                           onClick={() => void requestMcpTool(item.id, tool.id)}
                         >
                           Запросить вызов
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            ) : null}
+            {item.kind === "SSH" ? (
+              <details>
+                <summary>Advanced · разрешённые server/deploy операции</summary>
+                <p>
+                  Fingerprint SHA-256 берётся из доверенного provisioning-канала; AI World отклоняет
+                  другой host key.
+                </p>
+                <label>
+                  Операция
+                  <select
+                    value={sshOperationKind}
+                    onChange={(event) =>
+                      setSshOperationKind(event.target.value as typeof sshOperationKind)
+                    }
+                  >
+                    <option value="SYSTEMD_RESTART">Restart systemd service</option>
+                    <option value="DOCKER_COMPOSE_DEPLOY">Deploy Docker Compose project</option>
+                  </select>
+                </label>
+                <label>
+                  Название операции
+                  <input
+                    value={sshOperationLabel}
+                    onChange={(event) => setSshOperationLabel(event.target.value)}
+                  />
+                </label>
+                <label>
+                  {sshOperationKind === "SYSTEMD_RESTART" ? "Systemd unit" : "Compose project"}
+                  <input value={sshTarget} onChange={(event) => setSshTarget(event.target.value)} />
+                </label>
+                {sshOperationKind === "DOCKER_COMPOSE_DEPLOY" ? (
+                  <label>
+                    Абсолютный deployment path
+                    <input
+                      value={sshWorkingDirectory}
+                      onChange={(event) => setSshWorkingDirectory(event.target.value)}
+                    />
+                  </label>
+                ) : null}
+                <label>
+                  Host key SHA-256
+                  <input
+                    value={sshHostKeySha256}
+                    onChange={(event) => setSshHostKeySha256(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    item.health !== "READY" ||
+                    !sshOperationLabel ||
+                    !sshTarget ||
+                    !/^SHA256:[A-Za-z0-9+/]{43}$/.test(sshHostKeySha256) ||
+                    (sshOperationKind === "DOCKER_COMPOSE_DEPLOY" && !sshWorkingDirectory)
+                  }
+                  onClick={() => void registerSshOperation(item.id)}
+                >
+                  Зарегистрировать операцию
+                </button>
+                <ul>
+                  {(registry.sshOperations ?? [])
+                    .filter((operation) => operation.integrationId === item.id)
+                    .map((operation) => (
+                      <li key={operation.id}>
+                        <span>
+                          {operation.label} · {operation.operationKind}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy || !operation.isEnabled || item.health !== "READY"}
+                          onClick={() => void requestSshOperation(item.id, operation.id)}
+                        >
+                          Запросить выполнение
                         </button>
                       </li>
                     ))}

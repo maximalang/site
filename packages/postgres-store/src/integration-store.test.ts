@@ -55,6 +55,7 @@ describe("PostgresIntegrationStore", () => {
         },
       ],
       [],
+      [],
     ]);
     const registry = await new PostgresIntegrationStore(
       fake.value,

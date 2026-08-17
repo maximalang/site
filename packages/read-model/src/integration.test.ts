@@ -4,6 +4,7 @@ import {
   IntegrationMutationReceiptSchema,
   IntegrationMutationSchema,
   IntegrationRegistrySchema,
+  IntegrationSshOperationCreateSchema,
   IntegrationToolAllowlistCreateSchema,
 } from "./integration.js";
 
@@ -54,6 +55,53 @@ describe("Integration contracts", () => {
         createdAt: "2026-08-15T12:00:00.000Z",
       }).fixedArguments,
     ).toEqual({ channel: "review" });
+  });
+
+  it("registers typed SSH operations and rejects arbitrary remote commands", () => {
+    expect(
+      IntegrationSshOperationCreateSchema.parse({
+        id: "integration_ssh_operation_11111111-1111-1111-1111-111111111111",
+        integrationId: "integration_11111111-1111-1111-1111-111111111111",
+        commandId: "integration:ssh-operation:create:1",
+        label: "Restart Agent World",
+        operationKind: "SYSTEMD_RESTART",
+        systemdUnit: "agent-world.service",
+        hostKeySha256: `SHA256:${"A".repeat(43)}`,
+        createdAt: "2026-08-15T12:00:00.000Z",
+      }).operationKind,
+    ).toBe("SYSTEMD_RESTART");
+    expect(() =>
+      IntegrationMutationSchema.parse({
+        kind: "SSH_RUN_REGISTERED_OPERATION",
+        command: "rm -rf /",
+      }),
+    ).toThrow();
+    expect(() =>
+      IntegrationSshOperationCreateSchema.parse({
+        id: "integration_ssh_operation_11111111-1111-1111-1111-111111111111",
+        integrationId: "integration_11111111-1111-1111-1111-111111111111",
+        commandId: "integration:ssh-operation:create:2",
+        label: "Unsafe deploy",
+        operationKind: "DOCKER_COMPOSE_DEPLOY",
+        composeProject: "agent-world;reboot",
+        workingDirectory: "/srv/agent-world && reboot",
+        hostKeySha256: `SHA256:${"A".repeat(43)}`,
+        createdAt: "2026-08-15T12:00:00.000Z",
+      }),
+    ).toThrow();
+    expect(() =>
+      IntegrationSshOperationCreateSchema.parse({
+        id: "integration_ssh_operation_22222222-2222-2222-2222-222222222222",
+        integrationId: "integration_11111111-1111-1111-1111-111111111111",
+        commandId: "integration:ssh-operation:create:3",
+        label: "Traversal deploy",
+        operationKind: "DOCKER_COMPOSE_DEPLOY",
+        composeProject: "agent-world",
+        workingDirectory: "/srv/../root",
+        hostKeySha256: `SHA256:${"A".repeat(43)}`,
+        createdAt: "2026-08-15T12:00:00.000Z",
+      }),
+    ).toThrow();
   });
 
   it("keeps an outcome-unknown mutation distinct from a retryable failure", () => {

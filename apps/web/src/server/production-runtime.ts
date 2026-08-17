@@ -703,6 +703,7 @@ export async function createProductionRuntime(
         }
         return integrationStore.createToolAllowlist(input);
       },
+      createIntegrationSshOperation: (input) => integrationStore.createSshOperation(input),
       requestIntegrationMutation: ({
         requestId,
         integrationId,
@@ -740,7 +741,7 @@ export async function createProductionRuntime(
           "INTEGRATION_CREDENTIAL",
         );
         const outcome = await integrationMutationExecutor({
-          endpointUrl: decision.execution.endpointUrl,
+          endpoint: decision.execution.endpoint,
           credential,
           mutation: decision.execution.mutation,
         });

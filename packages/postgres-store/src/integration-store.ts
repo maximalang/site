@@ -6,6 +6,9 @@ import {
   IntegrationCreateSchema,
   type IntegrationRegistry,
   IntegrationRegistrySchema,
+  type IntegrationSshOperationCreate,
+  IntegrationSshOperationCreateSchema,
+  IntegrationSshOperationSummarySchema,
   IntegrationSummarySchema,
   type IntegrationToolAllowlistCreate,
   IntegrationToolAllowlistCreateSchema,
@@ -35,6 +38,18 @@ type ToolRow = QueryResultRow & {
   label: string;
   tool_name: string;
   fixed_arguments: unknown;
+  is_enabled: boolean;
+  created_at: Date | string;
+};
+type SshOperationRow = QueryResultRow & {
+  id: string;
+  integration_id: string;
+  label: string;
+  operation_kind: "SYSTEMD_RESTART" | "DOCKER_COMPOSE_DEPLOY";
+  systemd_unit: string | null;
+  compose_project: string | null;
+  working_directory: string | null;
+  host_key_sha256: string;
   is_enabled: boolean;
   created_at: Date | string;
 };
@@ -80,9 +95,17 @@ export class PostgresIntegrationStore {
         `SELECT id, integration_id, label, tool_name, fixed_arguments, is_enabled, created_at
            FROM agent_world.integration_tool_allowlist ORDER BY created_at, id LIMIT 501`,
       );
+      const sshOperations = await client.query<SshOperationRow>(
+        `SELECT id, integration_id, label, operation_kind, systemd_unit, compose_project,
+                working_directory, host_key_sha256, is_enabled, created_at
+           FROM agent_world.integration_ssh_operation_allowlist
+          ORDER BY created_at, id LIMIT 501`,
+      );
       if (result.rows.length > 200) throw new Error("Integration registry exceeds bounded limit");
       if (tools.rows.length > 500)
         throw new Error("Integration tool allowlist exceeds bounded limit");
+      if (sshOperations.rows.length > 500)
+        throw new Error("Integration SSH operation allowlist exceeds bounded limit");
       return IntegrationRegistrySchema.parse({
         schemaVersion: 1,
         generatedAt: this.now().toISOString(),
@@ -94,6 +117,23 @@ export class PostgresIntegrationStore {
             label: row.label,
             toolName: row.tool_name,
             fixedArguments: row.fixed_arguments,
+            isEnabled: row.is_enabled,
+            createdAt: iso(row.created_at),
+          }),
+        ),
+        sshOperations: sshOperations.rows.map((row) =>
+          IntegrationSshOperationSummarySchema.parse({
+            id: row.id,
+            integrationId: row.integration_id,
+            label: row.label,
+            operationKind: row.operation_kind,
+            ...(row.operation_kind === "SYSTEMD_RESTART"
+              ? { systemdUnit: row.systemd_unit }
+              : {
+                  composeProject: row.compose_project,
+                  workingDirectory: row.working_directory,
+                }),
+            hostKeySha256: row.host_key_sha256,
             isEnabled: row.is_enabled,
             createdAt: iso(row.created_at),
           }),
@@ -159,6 +199,73 @@ export class PostgresIntegrationStore {
       );
       await client.query("COMMIT");
       return { outcome: "CREATED" as const, toolAllowlistId: input.id };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createSshOperation(inputValue: IntegrationSshOperationCreate) {
+    const input = IntegrationSshOperationCreateSchema.parse(inputValue);
+    const requestHash = hash(input);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        input.commandId,
+      ]);
+      const existing = await client.query<{
+        request_sha256: string;
+        ssh_operation_id: string;
+      }>(
+        `SELECT request_sha256, ssh_operation_id
+           FROM agent_world.integration_ssh_operation_receipts WHERE command_id = $1`,
+        [input.commandId],
+      );
+      if (existing.rows[0]) {
+        if (
+          existing.rows.length !== 1 ||
+          existing.rows[0].request_sha256 !== requestHash ||
+          existing.rows[0].ssh_operation_id !== input.id
+        ) {
+          throw new Error("INTEGRATION_COMMAND_CONFLICT");
+        }
+        await client.query("COMMIT");
+        return { outcome: "REPLAY" as const, sshOperationId: input.id };
+      }
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO agent_world.integration_ssh_operation_allowlist
+           (id, integration_id, label, operation_kind, systemd_unit, compose_project,
+            working_directory, host_key_sha256, created_at)
+         SELECT $1, endpoint.id, $3, $4, $5, $6, $7, $8, $9
+           FROM agent_world.integration_endpoints endpoint
+          WHERE endpoint.id = $2 AND endpoint.kind = 'SSH'
+            AND endpoint.transport = 'SSH' AND endpoint.is_enabled = true
+            AND endpoint.health = 'READY' AND endpoint.credential_ref IS NOT NULL
+         RETURNING id`,
+        [
+          input.id,
+          input.integrationId,
+          input.label,
+          input.operationKind,
+          input.operationKind === "SYSTEMD_RESTART" ? input.systemdUnit : null,
+          input.operationKind === "DOCKER_COMPOSE_DEPLOY" ? input.composeProject : null,
+          input.operationKind === "DOCKER_COMPOSE_DEPLOY" ? input.workingDirectory : null,
+          input.hostKeySha256,
+          input.createdAt,
+        ],
+      );
+      if (inserted.rows.length !== 1) throw new Error("INTEGRATION_SSH_UNAVAILABLE");
+      await client.query(
+        `INSERT INTO agent_world.integration_ssh_operation_receipts
+           (command_id, request_sha256, ssh_operation_id, created_at)
+         VALUES ($1, $2, $3, $4)`,
+        [input.commandId, requestHash, input.id, input.createdAt],
+      );
+      await client.query("COMMIT");
+      return { outcome: "CREATED" as const, sshOperationId: input.id };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

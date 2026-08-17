@@ -36,6 +36,7 @@ import type {
   IntegrationCreate,
   IntegrationMutation,
   IntegrationRegistry,
+  IntegrationSshOperationCreate,
   IntegrationToolAllowlistCreate,
   ModelRouteCheckResponse,
   OperationsReadModel,
@@ -108,6 +109,7 @@ export type ApplicationRuntime = {
     executedAt: string;
   }): Promise<unknown>;
   createIntegrationToolAllowlist(input: IntegrationToolAllowlistCreate): Promise<unknown>;
+  createIntegrationSshOperation(input: IntegrationSshOperationCreate): Promise<unknown>;
   requestIntegrationMutation(input: {
     requestId: string;
     integrationId: string;

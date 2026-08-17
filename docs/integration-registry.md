@@ -41,9 +41,16 @@ invalid response or transport/server interruption after dispatch is
 reused isolation/profile/secrets layer; AI World owns only its canonical
 allowlist, approval and event evidence.
 
-SSH service/deployment operations remain unavailable until a separate
-allowlisted service registry exists; arbitrary remote commands are
-intentionally not exposed.
+SSH service/deployment writes use `integration_ssh_operation_allowlist` and the
+same durable approval lifecycle. The registry accepts only two typed operations:
+a validated systemd unit restart or a Docker Compose deployment whose project
+name and absolute working directory satisfy strict non-shell grammars. The
+caller sends only the registered operation ID. The executor derives the command,
+uses the encrypted private key, resolves only an allowlisted host, and requires
+an exact conventional `SHA256:<base64>` host-key fingerprint supplied through a trusted provisioning
+channel. It allocates no PTY, bounds output, and never exposes a shell or raw
+command field. A transport interruption after dispatch is terminal
+`OUTCOME_UNKNOWN` and is not retried.
 
 Remote access is deny-by-default. Add exact hostnames to
 `AGENT_WORLD_INTEGRATION_ALLOWED_HOSTS`. If any allowlisted hostname resolves to
@@ -61,3 +68,4 @@ Protocol references:
 - [GitHub REST authentication](https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api)
 - [GitHub authenticated user endpoint](https://docs.github.com/en/rest/users/users#get-the-authenticated-user)
 - [GitHub workflow dispatch](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)
+- [`ssh2` client API and host verification](https://github.com/mscdex/ssh2)

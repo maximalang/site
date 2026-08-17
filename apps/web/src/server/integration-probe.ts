@@ -1,10 +1,87 @@
+import { createHash } from "node:crypto";
 import { promises as dns } from "node:dns";
 import { request as httpsRequest } from "node:https";
 import { BlockList, connect, isIP } from "node:net";
 import type { ExecutableIntegrationMutation } from "@agent-world/postgres-store";
 import type { IntegrationAction } from "@agent-world/read-model";
+import { Client as SshClient } from "ssh2";
 
 const MAX_REMOTE_RESPONSE_BYTES = 32_768;
+
+type SshExecutionInput = {
+  address: string;
+  port: number;
+  username: string;
+  privateKey: string;
+  hostKeySha256: string;
+  command: string;
+};
+
+function executeSsh(input: SshExecutionInput): Promise<{ code: number | null }> {
+  return new Promise((resolve, reject) => {
+    const client = new SshClient();
+    let settled = false;
+    let hostKeyMismatch = false;
+    const timeout = setTimeout(() => finish(new Error("SSH_EXECUTION_TIMEOUT")), 120_000);
+    timeout.unref();
+    const finish = (error?: Error, code: number | null = null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      client.end();
+      if (error) reject(error);
+      else resolve({ code });
+    };
+    client
+      .once("ready", () => {
+        client.exec(input.command, { pty: false }, (error, stream) => {
+          if (error) return finish(error);
+          let bytes = 0;
+          const consume = (chunk: Buffer) => {
+            bytes += chunk.length;
+            if (bytes > MAX_REMOTE_RESPONSE_BYTES) finish(new Error("SSH_OUTPUT_TOO_LARGE"));
+          };
+          stream.on("data", consume);
+          stream.stderr.on("data", consume);
+          stream.once("close", (code: number | null) => finish(undefined, code));
+          stream.once("error", finish);
+        });
+      })
+      .once("error", (error: Error) =>
+        finish(hostKeyMismatch ? new Error("HOST_KEY_MISMATCH") : error),
+      )
+      .once("close", () => finish(new Error("SSH_CONNECTION_CLOSED")))
+      .connect({
+        host: input.address,
+        port: input.port,
+        username: input.username,
+        privateKey: input.privateKey,
+        hostVerifier: (key: Buffer) => {
+          const fingerprint = `SHA256:${createHash("sha256")
+            .update(key)
+            .digest("base64")
+            .replace(/=+$/, "")}`;
+          const accepted = fingerprint === input.hostKeySha256;
+          hostKeyMismatch = !accepted;
+          return accepted;
+        },
+        readyTimeout: 10_000,
+        keepaliveInterval: 2_000,
+        keepaliveCountMax: 2,
+      });
+  });
+}
+
+function sshCommand(
+  operation: Extract<
+    ExecutableIntegrationMutation,
+    { kind: "SSH_RUN_REGISTERED_OPERATION" }
+  >["operation"],
+) {
+  return operation.kind === "SYSTEMD_RESTART"
+    ? `sudo -n systemctl restart -- ${operation.systemdUnit}`
+    : `cd -- ${operation.workingDirectory} && docker compose --project-name ${operation.composeProject} pull && docker compose --project-name ${operation.composeProject} up -d --remove-orphans`;
+}
 
 export type ProbeTarget = Awaited<
   ReturnType<import("@agent-world/postgres-store").PostgresIntegrationStore["loadProbeTarget"]>
@@ -332,22 +409,67 @@ export function createNodeIntegrationAction(
 
 export function createNodeIntegrationMutationExecutor(
   configuration: { allowedHosts: string[]; allowPrivateNetwork: boolean },
-  dependencies: { resolve?: typeof resolveHost; https?: typeof httpsCall } = {},
+  dependencies: {
+    resolve?: typeof resolveHost;
+    https?: typeof httpsCall;
+    ssh?: typeof executeSsh;
+  } = {},
 ) {
   const resolveTarget = dependencies.resolve ?? resolveHost;
   const callHttps = dependencies.https ?? httpsCall;
+  const callSsh = dependencies.ssh ?? executeSsh;
   const allowedHosts = new Set(
     configuration.allowedHosts.map((host) => host.trim().toLowerCase()).filter(Boolean),
   );
   return async (input: {
-    endpointUrl: string;
+    endpointUrl?: string;
+    endpoint?:
+      | { transport: "HTTPS"; url: string }
+      | { transport: "SSH"; host: string; port: number; username: string };
     credential: string;
     mutation: ExecutableIntegrationMutation;
   }): Promise<
     { state: "SUCCEEDED" } | { state: "FAILED" | "OUTCOME_UNKNOWN"; failureCode: string }
   > => {
     if (!input.credential) return { state: "FAILED", failureCode: "CREDENTIAL_REQUIRED" };
-    const base = new URL(input.endpointUrl);
+    if (input.mutation.kind === "SSH_RUN_REGISTERED_OPERATION") {
+      if (input.endpoint?.transport !== "SSH")
+        return { state: "FAILED", failureCode: "SSH_ENDPOINT_REQUIRED" };
+      let resolved: Awaited<ReturnType<typeof resolveHost>>;
+      try {
+        resolved = await resolveTarget(
+          input.endpoint.host,
+          allowedHosts,
+          configuration.allowPrivateNetwork,
+        );
+      } catch (error) {
+        return {
+          state: "FAILED",
+          failureCode: error instanceof Error ? error.message.slice(0, 64) : "ROUTE_UNAVAILABLE",
+        };
+      }
+      try {
+        const result = await callSsh({
+          address: resolved.address,
+          port: input.endpoint.port,
+          username: input.endpoint.username,
+          privateKey: input.credential,
+          hostKeySha256: input.mutation.hostKeySha256,
+          command: sshCommand(input.mutation.operation),
+        });
+        return result.code === 0
+          ? { state: "SUCCEEDED" }
+          : { state: "FAILED", failureCode: "REMOTE_REJECTED" };
+      } catch (error) {
+        return error instanceof Error && error.message === "HOST_KEY_MISMATCH"
+          ? { state: "FAILED", failureCode: "HOST_KEY_MISMATCH" }
+          : { state: "OUTCOME_UNKNOWN", failureCode: "INTERRUPTED_OUTCOME_UNKNOWN" };
+      }
+    }
+    const endpointUrl =
+      input.endpoint?.transport === "HTTPS" ? input.endpoint.url : input.endpointUrl;
+    if (!endpointUrl) return { state: "FAILED", failureCode: "HTTPS_ENDPOINT_REQUIRED" };
+    const base = new URL(endpointUrl);
     if (base.protocol !== "https:") return { state: "FAILED", failureCode: "HTTPS_REQUIRED" };
     let resolved: Awaited<ReturnType<typeof resolveHost>>;
     try {

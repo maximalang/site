@@ -214,6 +214,59 @@ describe("integration HTTP boundary", () => {
     expect(registerTool.mock.calls[0]?.[0]).not.toHaveProperty("operation");
   });
 
+  it("registers only a typed SSH operation without accepting a command string", async () => {
+    const registerSshOperation = vi.fn().mockResolvedValue({
+      outcome: "CREATED",
+      sshOperationId: "integration_ssh_operation_11111111-1111-1111-1111-111111111111",
+    });
+    const handlers = createIntegrationRouteHandlers({
+      authorize: async () => true,
+      list: vi.fn(),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action: vi.fn(),
+      registerSshOperation,
+      requestMutation: vi.fn(),
+      decideMutation: vi.fn(),
+      now: () => new Date(registry.generatedAt),
+    });
+    const response = await handlers.POST(
+      request({
+        operation: "REGISTER_SSH_OPERATION",
+        id: "integration_ssh_operation_11111111-1111-1111-1111-111111111111",
+        integrationId: create.id,
+        commandId: "integration:ssh-operation:create:1",
+        label: "Restart Agent World",
+        operationKind: "SYSTEMD_RESTART",
+        systemdUnit: "agent-world.service",
+        hostKeySha256: `SHA256:${"A".repeat(43)}`,
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(registerSshOperation.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ operationKind: "SYSTEMD_RESTART" }),
+    );
+    expect(registerSshOperation.mock.calls[0]?.[0]).not.toHaveProperty("operation");
+    expect(
+      (
+        await handlers.POST(
+          request({
+            operation: "REGISTER_SSH_OPERATION",
+            id: "integration_ssh_operation_22222222-2222-2222-2222-222222222222",
+            integrationId: create.id,
+            commandId: "integration:ssh-operation:create:2",
+            label: "Arbitrary",
+            operationKind: "SSH_COMMAND",
+            command: "reboot",
+            hostKeySha256: `SHA256:${"A".repeat(43)}`,
+          }),
+        )
+      ).status,
+    ).toBe(409);
+  });
+
   it("keeps mutation request and explicit owner approval as separate commands", async () => {
     const mutation = {
       kind: "GITHUB_DISPATCH_WORKFLOW" as const,

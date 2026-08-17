@@ -26,6 +26,7 @@ describe("IntegrationPanel", () => {
         executedAt: "2026-08-15T12:00:00.000Z",
       }),
       registerTool: vi.fn(),
+      registerSshOperation: vi.fn(),
       requestMutation: vi.fn(),
       decideMutation: vi.fn(),
     };
@@ -77,6 +78,7 @@ describe("IntegrationPanel", () => {
       probe,
       action: vi.fn(),
       registerTool: vi.fn(),
+      registerSshOperation: vi.fn(),
       requestMutation: vi.fn(),
       decideMutation: vi.fn(),
     };
@@ -121,6 +123,7 @@ describe("IntegrationPanel", () => {
       probe: vi.fn(),
       action,
       registerTool: vi.fn(),
+      registerSshOperation: vi.fn(),
       requestMutation: vi.fn(),
       decideMutation: vi.fn(),
     };
@@ -181,6 +184,7 @@ describe("IntegrationPanel", () => {
       probe: vi.fn(),
       action: vi.fn(),
       registerTool: vi.fn(),
+      registerSshOperation: vi.fn(),
       requestMutation,
       decideMutation,
     };
@@ -193,5 +197,90 @@ describe("IntegrationPanel", () => {
     expect(decideMutation).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Подтвердить запуск" }));
     await vi.waitFor(() => expect(decideMutation).toHaveBeenCalledOnce());
+  });
+
+  it("registers and requests only a typed SSH operation", async () => {
+    const integrationId = "integration_11111111-1111-4111-8111-111111111111";
+    const operationId = "integration_ssh_operation_11111111-1111-1111-1111-111111111111";
+    const pending = {
+      schemaVersion: 1 as const,
+      requestId: "integration_mutation_11111111-1111-1111-1111-111111111111",
+      integrationId,
+      mutation: { kind: "SSH_RUN_REGISTERED_OPERATION" as const, sshOperationId: operationId },
+      state: "PENDING" as const,
+      outcome: "RECORDED" as const,
+      requestedAt: "2026-08-15T12:00:00.000Z",
+    };
+    const registerSshOperation = vi.fn();
+    const requestMutation = vi.fn().mockResolvedValue(pending);
+    const client = {
+      list: vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        generatedAt: pending.requestedAt,
+        integrations: [
+          {
+            id: integrationId,
+            kind: "SSH",
+            label: "Timeweb VDS",
+            endpoint: { transport: "SSH", host: "vds.example", port: 22, username: "deploy" },
+            health: "READY",
+            isEnabled: true,
+            hasCredential: true,
+            createdAt: pending.requestedAt,
+            updatedAt: pending.requestedAt,
+          },
+        ],
+        sshOperations: [
+          {
+            id: operationId,
+            integrationId,
+            label: "Restart Agent World",
+            operationKind: "SYSTEMD_RESTART",
+            systemdUnit: "agent-world.service",
+            hostKeySha256: `SHA256:${"A".repeat(43)}`,
+            isEnabled: true,
+            createdAt: pending.requestedAt,
+          },
+        ],
+      }),
+      create: vi.fn(),
+      credential: vi.fn(),
+      lifecycle: vi.fn(),
+      probe: vi.fn(),
+      action: vi.fn(),
+      registerTool: vi.fn(),
+      registerSshOperation,
+      requestMutation,
+      decideMutation: vi.fn(),
+    };
+    render(<IntegrationPanel client={client} csrfToken="csrf" />);
+    fireEvent.click(await screen.findByText("Advanced · разрешённые server/deploy операции"));
+    fireEvent.change(screen.getByLabelText("Название операции"), {
+      target: { value: "Restart Agent World" },
+    });
+    fireEvent.change(screen.getByLabelText("Systemd unit"), {
+      target: { value: "agent-world.service" },
+    });
+    fireEvent.change(screen.getByLabelText("Host key SHA-256"), {
+      target: { value: `SHA256:${"A".repeat(43)}` },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Зарегистрировать операцию" }));
+    await vi.waitFor(() => expect(registerSshOperation).toHaveBeenCalledOnce());
+    expect(registerSshOperation.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        operationKind: "SYSTEMD_RESTART",
+        systemdUnit: "agent-world.service",
+      }),
+    );
+    const requestButton = screen.getByRole("button", { name: "Запросить выполнение" });
+    await vi.waitFor(() => expect((requestButton as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(requestButton);
+    await vi.waitFor(() =>
+      expect(requestMutation).toHaveBeenCalledWith(
+        integrationId,
+        { kind: "SSH_RUN_REGISTERED_OPERATION", sshOperationId: operationId },
+        "csrf",
+      ),
+    );
   });
 });

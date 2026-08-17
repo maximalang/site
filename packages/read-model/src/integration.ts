@@ -17,11 +17,20 @@ export const IntegrationMutationRequestIdSchema = z
 export const IntegrationToolAllowlistIdSchema = z
   .string()
   .regex(/^integration_tool_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+export const IntegrationSshOperationIdSchema = z
+  .string()
+  .regex(
+    /^integration_ssh_operation_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+  );
 const FixedToolArgumentsSchema = z
   .record(z.string().trim().min(1).max(120), z.json())
   .refine((value) => Object.keys(value).length <= 50, "Too many fixed tool arguments")
   .refine((value) => JSON.stringify(value).length <= 8_192, "Fixed tool arguments are too large");
 export const IntegrationMutationSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("SSH_RUN_REGISTERED_OPERATION"),
+    sshOperationId: IntegrationSshOperationIdSchema,
+  }),
   z.strictObject({
     kind: z.literal("MCP_CALL_REGISTERED_TOOL"),
     toolAllowlistId: IntegrationToolAllowlistIdSchema,
@@ -72,6 +81,60 @@ export const IntegrationToolAllowlistSummarySchema = IntegrationToolAllowlistCre
   commandId: true,
   createdAt: true,
 }).extend({ isEnabled: z.boolean(), createdAt: TimestampSchema });
+const SshHostKeySha256Schema = z.string().regex(/^SHA256:[A-Za-z0-9+/]{43}$/);
+const SystemdUnitSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(160)
+  .regex(/^[A-Za-z0-9_.@:-]+\.(?:service|socket|timer|target)$/);
+const ComposeProjectSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(63)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/);
+const AbsoluteDeploymentPathSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(512)
+  .regex(/^\/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/)
+  .refine(
+    (value) => value.split("/").every((segment) => segment !== "." && segment !== ".."),
+    "Deployment path cannot contain traversal segments",
+  );
+export const IntegrationSshOperationCreateSchema = z.discriminatedUnion("operationKind", [
+  z.strictObject({
+    id: IntegrationSshOperationIdSchema,
+    integrationId: IntegrationIdSchema,
+    commandId: z.string().trim().min(1).max(512),
+    label: z.string().trim().min(1).max(120),
+    operationKind: z.literal("SYSTEMD_RESTART"),
+    systemdUnit: SystemdUnitSchema,
+    hostKeySha256: SshHostKeySha256Schema,
+    createdAt: TimestampSchema,
+  }),
+  z.strictObject({
+    id: IntegrationSshOperationIdSchema,
+    integrationId: IntegrationIdSchema,
+    commandId: z.string().trim().min(1).max(512),
+    label: z.string().trim().min(1).max(120),
+    operationKind: z.literal("DOCKER_COMPOSE_DEPLOY"),
+    composeProject: ComposeProjectSchema,
+    workingDirectory: AbsoluteDeploymentPathSchema,
+    hostKeySha256: SshHostKeySha256Schema,
+    createdAt: TimestampSchema,
+  }),
+]);
+export const IntegrationSshOperationSummarySchema = z.discriminatedUnion("operationKind", [
+  IntegrationSshOperationCreateSchema.options[0]
+    .omit({ commandId: true, createdAt: true })
+    .extend({ isEnabled: z.boolean(), createdAt: TimestampSchema }),
+  IntegrationSshOperationCreateSchema.options[1]
+    .omit({ commandId: true, createdAt: true })
+    .extend({ isEnabled: z.boolean(), createdAt: TimestampSchema }),
+]);
 export const IntegrationMutationStateSchema = z.enum([
   "PENDING",
   "DENIED",
@@ -175,6 +238,7 @@ export const IntegrationRegistrySchema = z.strictObject({
   generatedAt: TimestampSchema,
   integrations: z.array(IntegrationSummarySchema).max(200),
   toolAllowlist: z.array(IntegrationToolAllowlistSummarySchema).max(500).optional(),
+  sshOperations: z.array(IntegrationSshOperationSummarySchema).max(500).optional(),
 });
 export type IntegrationCreate = z.infer<typeof IntegrationCreateSchema>;
 export type IntegrationRegistry = z.infer<typeof IntegrationRegistrySchema>;
@@ -183,3 +247,4 @@ export type IntegrationActionResult = z.infer<typeof IntegrationActionResultSche
 export type IntegrationMutation = z.infer<typeof IntegrationMutationSchema>;
 export type IntegrationMutationReceipt = z.infer<typeof IntegrationMutationReceiptSchema>;
 export type IntegrationToolAllowlistCreate = z.infer<typeof IntegrationToolAllowlistCreateSchema>;
+export type IntegrationSshOperationCreate = z.infer<typeof IntegrationSshOperationCreateSchema>;

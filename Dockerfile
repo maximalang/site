@@ -31,6 +31,11 @@ WORKDIR /app
 RUN groupadd --system --gid 10001 agent-world \
     && useradd --system --uid 10001 --gid agent-world --home-dir /nonexistent agent-world
 COPY --from=build --chown=10001:10001 /workspace/apps/web/.next/standalone ./
+COPY --from=build --chown=10001:10001 /workspace/node_modules/ssh2 ./node_modules/ssh2
+COPY --from=build --chown=10001:10001 /workspace/node_modules/asn1 ./node_modules/asn1
+COPY --from=build --chown=10001:10001 /workspace/node_modules/safer-buffer ./node_modules/safer-buffer
+COPY --from=build --chown=10001:10001 /workspace/node_modules/bcrypt-pbkdf ./node_modules/bcrypt-pbkdf
+COPY --from=build --chown=10001:10001 /workspace/node_modules/tweetnacl ./node_modules/tweetnacl
 
 USER 10001:10001
 EXPOSE 3000

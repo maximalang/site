@@ -55,6 +55,7 @@ describe("discoverMigrations", () => {
       { version: 40, name: "0040_atomic_model_agent_route.sql" },
       { version: 41, name: "0041_integration_mutation_approvals.sql" },
       { version: 42, name: "0042_integration_tool_allowlist.sql" },
+      { version: 43, name: "0043_integration_ssh_operation_allowlist.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -116,6 +117,9 @@ describe("discoverMigrations", () => {
     expect(migrations[39]?.sql).toContain("'MODEL_AGENT_ROUTE_PROVISION'");
     expect(migrations[40]?.sql).toContain("CREATE TABLE agent_world.integration_mutation_requests");
     expect(migrations[41]?.sql).toContain("CREATE TABLE agent_world.integration_tool_allowlist");
+    expect(migrations[42]?.sql).toContain(
+      "CREATE TABLE agent_world.integration_ssh_operation_allowlist",
+    );
     expect(migrations[30]?.sql).toContain(
       "CREATE TABLE agent_world.structured_meeting_criterion_assessments",
     );

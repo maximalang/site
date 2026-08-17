@@ -228,7 +228,7 @@ try {
   if (
     ledger.rowCount !== migrations.length ||
     ledger.rows[0]?.version !== 1 ||
-    ledger.rows.at(-1)?.version !== 42
+    ledger.rows.at(-1)?.version !== 43
   ) {
     throw new Error("Migration ledger does not match the discovered migration set");
   }
@@ -289,6 +289,8 @@ try {
     "hub_command_receipts",
     "integration_command_receipts",
     "integration_endpoints",
+    "integration_ssh_operation_allowlist",
+    "integration_ssh_operation_receipts",
     "integration_probe_observations",
     "execution_preference_overrides",
     "encrypted_secrets",
@@ -3376,6 +3378,69 @@ try {
     state: "SUCCEEDED",
     completedAt: "2026-08-15T11:05:59.000Z",
   });
+  const sshSecretRef = `secret-store:integrations/${sshIntegration.id}/credential`;
+  await secretStore.write({
+    commandId: "integration:credential:ssh-isolated",
+    secretRef: sshSecretRef,
+    purpose: "INTEGRATION_CREDENTIAL",
+    plaintext: "isolated-ssh-private-key",
+    writtenAt: "2026-08-15T11:06:00.000Z",
+  });
+  await integrationStore.bindCredential(
+    sshIntegration.id,
+    sshSecretRef,
+    "2026-08-15T11:06:00.000Z",
+  );
+  await pool.query(
+    `UPDATE agent_world.integration_endpoints
+        SET health = 'READY', updated_at = '2026-08-15T11:06:30.000Z'
+      WHERE id = $1`,
+    [sshIntegration.id],
+  );
+  const sshOperation = {
+    id: "integration_ssh_operation_e8e8e8e8-e8e8-48e8-88e8-e8e8e8e8e8e8",
+    integrationId: sshIntegration.id,
+    commandId: "integration:ssh-operation:create:isolated",
+    label: "Restart Agent World",
+    operationKind: "SYSTEMD_RESTART",
+    systemdUnit: "agent-world.service",
+    hostKeySha256: `SHA256:${"A".repeat(43)}`,
+    createdAt: "2026-08-15T11:06:40.000Z",
+  };
+  if (
+    (await integrationStore.createSshOperation(sshOperation)).outcome !== "CREATED" ||
+    (await integrationStore.createSshOperation(sshOperation)).outcome !== "REPLAY"
+  ) {
+    throw new Error("Integration SSH operation replay drifted");
+  }
+  const sshMutation = {
+    requestId: "integration_mutation_e9e9e9e9-e9e9-49e9-89e9-e9e9e9e9e9e9",
+    integrationId: sshIntegration.id,
+    commandId: "integration:mutation:request:ssh-operation",
+    mutation: { kind: "SSH_RUN_REGISTERED_OPERATION", sshOperationId: sshOperation.id },
+    requestedAt: "2026-08-15T11:06:45.000Z",
+  };
+  await mutationStore.request(sshMutation);
+  const approvedSsh = await mutationStore.decide({
+    requestId: sshMutation.requestId,
+    commandId: "integration:mutation:approve:ssh-operation",
+    decision: "APPROVE",
+    decidedAt: "2026-08-15T11:06:50.000Z",
+  });
+  if (
+    approvedSsh.execution?.endpoint.transport !== "SSH" ||
+    approvedSsh.execution.endpoint.host !== "vds.example" ||
+    approvedSsh.execution.mutation.kind !== "SSH_RUN_REGISTERED_OPERATION" ||
+    approvedSsh.execution.mutation.operation.kind !== "SYSTEMD_RESTART" ||
+    approvedSsh.execution.mutation.operation.systemdUnit !== "agent-world.service"
+  ) {
+    throw new Error("Approved SSH mutation did not resolve registry-owned operation");
+  }
+  await mutationStore.complete({
+    requestId: sshMutation.requestId,
+    state: "SUCCEEDED",
+    completedAt: "2026-08-15T11:06:55.000Z",
+  });
   const githubSecretRef = `secret-store:integrations/${githubIntegration.id}/credential`;
   await secretStore.write({
     commandId: "integration:credential:github-isolated",
@@ -3445,7 +3510,8 @@ try {
   if (
     approved.receipt.state !== "EXECUTING" ||
     approved.execution?.credentialRef !== githubSecretRef ||
-    approved.execution?.endpointUrl !== "https://api.github.com"
+    approved.execution?.endpoint.transport !== "HTTPS" ||
+    approved.execution.endpoint.url !== "https://api.github.com"
   ) {
     throw new Error("Integration mutation approval did not claim exact execution provenance");
   }
@@ -3465,6 +3531,7 @@ try {
   if (
     integrationRegistry.integrations.length !== 3 ||
     integrationRegistry.toolAllowlist?.length !== 1 ||
+    integrationRegistry.sshOperations?.length !== 1 ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.hasCredential !==
       true ||
     integrationRegistry.integrations.find(({ id }) => id === mcpIntegration.id)?.isEnabled !==

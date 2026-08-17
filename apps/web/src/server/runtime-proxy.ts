@@ -1,6 +1,8 @@
 import { getApplicationRuntime } from "./application-runtime";
 import type { OwnerAuthPort } from "./owner-auth-http";
 
+type WithoutCreatedAt<T> = T extends unknown ? Omit<T, "createdAt"> : never;
+
 function runtime() {
   const value = getApplicationRuntime();
   if (!value) {
@@ -163,6 +165,12 @@ export const applicationIntegrationDependencies = {
     >,
     createdAt: string,
   ) => runtime().createIntegrationToolAllowlist({ ...input, createdAt }),
+  registerSshOperation: (
+    input: WithoutCreatedAt<
+      Parameters<ReturnType<typeof runtime>["createIntegrationSshOperation"]>[0]
+    >,
+    createdAt: string,
+  ) => runtime().createIntegrationSshOperation({ ...input, createdAt }),
   requestMutation: (
     input: Omit<
       Parameters<ReturnType<typeof runtime>["requestIntegrationMutation"]>[0],

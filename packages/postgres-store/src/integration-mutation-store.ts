@@ -59,6 +59,9 @@ type TargetRow = QueryResultRow & {
   kind: string;
   transport: string;
   endpoint_url: string | null;
+  ssh_host: string | null;
+  ssh_port: number | null;
+  ssh_username: string | null;
   credential_ref: string | null;
   health: string;
   is_enabled: boolean;
@@ -69,13 +72,36 @@ type ToolRow = QueryResultRow & {
   fixed_arguments: Record<string, unknown>;
   is_enabled: boolean;
 };
+type SshOperationRow = QueryResultRow & {
+  integration_id: string;
+  operation_kind: "SYSTEMD_RESTART" | "DOCKER_COMPOSE_DEPLOY";
+  systemd_unit: string | null;
+  compose_project: string | null;
+  working_directory: string | null;
+  host_key_sha256: string;
+  is_enabled: boolean;
+};
 
 export type ExecutableIntegrationMutation =
-  | Exclude<IntegrationMutation, { kind: "MCP_CALL_REGISTERED_TOOL" }>
+  | Exclude<
+      IntegrationMutation,
+      { kind: "MCP_CALL_REGISTERED_TOOL" | "SSH_RUN_REGISTERED_OPERATION" }
+    >
   | {
       kind: "MCP_CALL_REGISTERED_TOOL";
       toolName: string;
       fixedArguments: Record<string, unknown>;
+    }
+  | {
+      kind: "SSH_RUN_REGISTERED_OPERATION";
+      operation:
+        | { kind: "SYSTEMD_RESTART"; systemdUnit: string }
+        | {
+            kind: "DOCKER_COMPOSE_DEPLOY";
+            composeProject: string;
+            workingDirectory: string;
+          };
+      hostKeySha256: string;
     };
 
 const iso = (value: Date | string) =>
@@ -109,7 +135,12 @@ export class PostgresIntegrationMutationStore {
   async request(inputValue: z.input<typeof RequestSchema>) {
     const input = RequestSchema.parse(inputValue);
     const requestHash = hash(input);
-    const expectedKind = input.mutation.kind === "MCP_CALL_REGISTERED_TOOL" ? "MCP" : "GITHUB";
+    const expectedKind =
+      input.mutation.kind === "MCP_CALL_REGISTERED_TOOL"
+        ? "MCP"
+        : input.mutation.kind === "SSH_RUN_REGISTERED_OPERATION"
+          ? "SSH"
+          : "GITHUB";
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -134,7 +165,8 @@ export class PostgresIntegrationMutationStore {
         return receipt(row, "REPLAY");
       }
       const target = await client.query<TargetRow>(
-        `SELECT id, kind, transport, endpoint_url, credential_ref, health, is_enabled
+        `SELECT id, kind, transport, endpoint_url, ssh_host, ssh_port, ssh_username,
+                credential_ref, health, is_enabled
            FROM agent_world.integration_endpoints WHERE id = $1 FOR SHARE`,
         [input.integrationId],
       );
@@ -153,11 +185,30 @@ export class PostgresIntegrationMutationStore {
           throw new Error("INTEGRATION_TOOL_UNAVAILABLE");
         }
       }
+      if (input.mutation.kind === "SSH_RUN_REGISTERED_OPERATION") {
+        const operation = await client.query<SshOperationRow>(
+          `SELECT integration_id, operation_kind, systemd_unit, compose_project,
+                  working_directory, host_key_sha256, is_enabled
+             FROM agent_world.integration_ssh_operation_allowlist WHERE id = $1 FOR SHARE`,
+          [input.mutation.sshOperationId],
+        );
+        if (
+          operation.rows.length !== 1 ||
+          operation.rows[0]?.integration_id !== input.integrationId ||
+          operation.rows[0]?.is_enabled !== true
+        ) {
+          throw new Error("INTEGRATION_SSH_OPERATION_UNAVAILABLE");
+        }
+      }
       if (
         !integration ||
         integration.kind !== expectedKind ||
-        integration.transport !== "HTTPS" ||
-        integration.endpoint_url === null ||
+        (expectedKind === "SSH"
+          ? integration.transport !== "SSH" ||
+            integration.ssh_host === null ||
+            integration.ssh_port === null ||
+            integration.ssh_username === null
+          : integration.transport !== "HTTPS" || integration.endpoint_url === null) ||
         integration.is_enabled !== true ||
         integration.health !== "READY" ||
         integration.credential_ref === null
@@ -239,14 +290,20 @@ export class PostgresIntegrationMutationStore {
         return { receipt: receipt(row, "RECORDED") };
       }
       const target = await client.query<TargetRow>(
-        `SELECT id, kind, transport, endpoint_url, credential_ref, health, is_enabled
+        `SELECT id, kind, transport, endpoint_url, ssh_host, ssh_port, ssh_username,
+                credential_ref, health, is_enabled
            FROM agent_world.integration_endpoints WHERE id = $1 FOR SHARE`,
         [row.integration_id],
       );
       const integration = target.rows[0];
       if (
-        integration?.transport !== "HTTPS" ||
-        integration.endpoint_url === null ||
+        !integration ||
+        (integration.kind === "SSH"
+          ? integration.transport !== "SSH" ||
+            integration.ssh_host === null ||
+            integration.ssh_port === null ||
+            integration.ssh_username === null
+          : integration.transport !== "HTTPS" || integration.endpoint_url === null) ||
         integration.credential_ref === null ||
         integration.is_enabled !== true ||
         integration.health !== "READY"
@@ -256,7 +313,7 @@ export class PostgresIntegrationMutationStore {
       const mutation = IntegrationMutationSchema.parse(row.mutation) as IntegrationMutation;
       let executableMutation: ExecutableIntegrationMutation = mutation as Exclude<
         IntegrationMutation,
-        { kind: "MCP_CALL_REGISTERED_TOOL" }
+        { kind: "MCP_CALL_REGISTERED_TOOL" | "SSH_RUN_REGISTERED_OPERATION" }
       >;
       if (mutation.kind === "MCP_CALL_REGISTERED_TOOL") {
         const tool = await client.query<ToolRow>(
@@ -277,12 +334,48 @@ export class PostgresIntegrationMutationStore {
           fixedArguments: tool.rows[0].fixed_arguments,
         };
       }
+      if (mutation.kind === "SSH_RUN_REGISTERED_OPERATION") {
+        const operation = await client.query<SshOperationRow>(
+          `SELECT integration_id, operation_kind, systemd_unit, compose_project,
+                  working_directory, host_key_sha256, is_enabled
+             FROM agent_world.integration_ssh_operation_allowlist WHERE id = $1`,
+          [mutation.sshOperationId],
+        );
+        const value = operation.rows[0];
+        if (
+          operation.rows.length !== 1 ||
+          value?.integration_id !== row.integration_id ||
+          value?.is_enabled !== true
+        ) {
+          throw new Error("INTEGRATION_SSH_OPERATION_UNAVAILABLE");
+        }
+        executableMutation = {
+          kind: "SSH_RUN_REGISTERED_OPERATION",
+          operation:
+            value.operation_kind === "SYSTEMD_RESTART"
+              ? { kind: "SYSTEMD_RESTART", systemdUnit: value.systemd_unit ?? "" }
+              : {
+                  kind: "DOCKER_COMPOSE_DEPLOY",
+                  composeProject: value.compose_project ?? "",
+                  workingDirectory: value.working_directory ?? "",
+                },
+          hostKeySha256: value.host_key_sha256,
+        };
+      }
       await client.query("COMMIT");
       return {
         receipt: receipt(row, "RECORDED"),
         execution: {
           integrationId: IntegrationIdSchema.parse(integration.id),
-          endpointUrl: integration.endpoint_url,
+          endpoint:
+            integration.kind === "SSH"
+              ? {
+                  transport: "SSH" as const,
+                  host: integration.ssh_host as string,
+                  port: integration.ssh_port as number,
+                  username: integration.ssh_username as string,
+                }
+              : { transport: "HTTPS" as const, url: integration.endpoint_url as string },
           credentialRef: integration.credential_ref,
           mutation: executableMutation,
         },
