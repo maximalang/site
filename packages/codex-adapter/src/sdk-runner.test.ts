@@ -169,6 +169,30 @@ describe("OpenAiCodexSdkRunner", () => {
     expect(JSON.stringify(emitted)).not.toContain("provider-secret");
   });
 
+  it("normalizes caller cancellation without reflecting thrown SDK data", async () => {
+    const cancellation = new AbortController();
+    cancellation.abort();
+    const emitted: unknown[] = [];
+    const runner = new OpenAiCodexSdkRunner({
+      createClient: () => ({
+        resumeThread: () => ({
+          runStreamed: async (_prompt, options) => {
+            if (!options.signal.aborted) throw new Error("wrong cancellation signal");
+            throw new Error("token provider-secret");
+          },
+        }),
+      }),
+      environment: {},
+      now: () => "2026-08-13T12:00:00.000Z",
+    });
+
+    await expect(
+      runner.run(request, async (event) => emitted.push(event), cancellation.signal),
+    ).rejects.toMatchObject({ code: "CANCELLED" });
+    expect(emitted.at(-1)).toMatchObject({ eventType: "RUN_FAILED", failureCode: "CANCELLED" });
+    expect(JSON.stringify(emitted)).not.toContain("provider-secret");
+  });
+
   it("stops immediately when the durable event sink rejects", async () => {
     const runner = new OpenAiCodexSdkRunner({
       createClient: () => ({
