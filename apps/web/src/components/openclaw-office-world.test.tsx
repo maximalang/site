@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildContractFixture } from "../test-fixtures";
 import { OpenClawOfficeWorld } from "./openclaw-office-world";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 describe("OpenClaw Office World presentation", () => {
   it("renders canonical agents in one four-zone open floor without a canvas", () => {
@@ -91,5 +94,38 @@ describe("OpenClaw Office World presentation", () => {
 
     expect(screen.getByText("Research Lead → Reviewer")).toBeTruthy();
     expect(container.querySelectorAll("[data-handoff-cue]")).toHaveLength(1);
+  });
+
+  it("persists a user skin preference without changing canonical agents and resets to project skin", () => {
+    const world = projectWorldView(buildContractFixture());
+    const { container } = render(
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+        projectSkinId="minimal-grid-v1"
+      />,
+    );
+
+    const worldSurface = container.querySelector("[data-skin]");
+    expect(worldSurface?.getAttribute("data-skin")).toBe("minimal-grid-v1");
+    expect(worldSurface?.getAttribute("data-theme")).toBe("MINIMAL_GRID");
+
+    fireEvent.change(screen.getByLabelText("Map / skin"), {
+      target: { value: "space-station-v1" },
+    });
+
+    expect(worldSurface?.getAttribute("data-skin")).toBe("space-station-v1");
+    expect(worldSurface?.getAttribute("data-theme")).toBe("SPACE_STATION");
+    expect(window.localStorage.getItem("agent-world.office-skin.v1")).toBe("space-station-v1");
+    for (const agent of world.agents) {
+      expect(screen.getByRole("button", { name: new RegExp(agent.core.displayName) })).toBeTruthy();
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Project / system default" }));
+    expect(worldSurface?.getAttribute("data-skin")).toBe("minimal-grid-v1");
+    expect(worldSurface?.getAttribute("data-theme")).toBe("MINIMAL_GRID");
+    expect(window.localStorage.getItem("agent-world.office-skin.v1")).toBeNull();
   });
 });
