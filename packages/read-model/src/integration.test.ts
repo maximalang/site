@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  IntegrationActionSchema,
   IntegrationCreateSchema,
   IntegrationMutationReceiptSchema,
   IntegrationMutationSchema,
@@ -136,6 +137,14 @@ describe("Integration contracts", () => {
       endpoint: { transport: "HTTPS", url: "https://world.example/api/mcp" },
       createdAt: "2026-08-15T12:00:00.000Z",
     });
+    const steel = IntegrationCreateSchema.parse({
+      id: "integration_33333333-3333-4333-8333-333333333333",
+      commandId: "integration:create:steel",
+      kind: "STEEL",
+      label: "Steel browser sessions",
+      endpoint: { transport: "HTTPS", url: "https://steel.example" },
+      createdAt: "2026-08-15T12:00:00.000Z",
+    });
     const ssh = IntegrationCreateSchema.parse({
       id: "integration_22222222-2222-4222-8222-222222222222",
       commandId: "integration:create:2",
@@ -145,8 +154,10 @@ describe("Integration contracts", () => {
       createdAt: "2026-08-15T12:00:00.000Z",
     });
     expect(https.endpoint.transport).toBe("HTTPS");
+    expect(steel.endpoint.transport).toBe("HTTPS");
+    expect(IntegrationActionSchema.parse("STEEL_LIST_SESSIONS")).toBe("STEEL_LIST_SESSIONS");
     expect(ssh.endpoint).toEqual(expect.objectContaining({ port: 22 }));
-    expect(JSON.stringify([https, ssh])).not.toMatch(/password|privateKey|token/);
+    expect(JSON.stringify([https, steel, ssh])).not.toMatch(/password|privateKey|token/);
   });
 
   it("rejects insecure remote HTTP and credential leakage", () => {
