@@ -79,10 +79,10 @@ Phase 0 reuse and license audit
 ### Phases 3-4: Model and Codex execution
 
 - [x] Integrate one `ModelGateway` implementation and local-model routes.
-- [ ] Integrate official ChatGPT-authenticated Codex execution.
+- [x] Integrate official ChatGPT-authenticated Codex execution.
 - [ ] Represent Chat/Work transports explicitly as official, experimental,
       unsupported or disabled.
-- [ ] Deliver Native Plus Chat dispatch-only launcher and authenticated
+- [x] Deliver Native Plus Chat dispatch-only launcher and authenticated
       pull/Control API through one custom MCP/App connected to each Plus
       account, with Custom GPT Actions retained only as a fallback.
 
@@ -101,7 +101,7 @@ Phase 0 reuse and license audit
 ### Phases 9-11: Integrations and production readiness
 
 - [ ] Integrate n8n, MCP Gateway, GitHub, SSH/VDS and permitted browser sessions.
-- [ ] Integrate Langfuse telemetry behind the product Observatory.
+- [x] Integrate Langfuse telemetry behind the product Observatory.
 - [ ] Complete native Chat/Work adapter interfaces without unsupported scraping.
 - [ ] Verify security, backup/restore, restart/replay and all 24 product-level
       acceptance criteria.
