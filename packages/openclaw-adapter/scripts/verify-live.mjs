@@ -243,10 +243,41 @@ try {
       `Pinned OpenClaw Gateway did not become ready: ${JSON.stringify(telemetry).slice(-2_000)} ${gatewayOutput.slice(-2_000)}`,
     );
   }
+  const runId = "run_11111111-1111-1111-1111-111111111111";
+  const taskId = "task_11111111-1111-1111-1111-111111111111";
+  const agentId = "agent_22222222-2222-2222-2222-222222222222";
+  const contextPack = {
+    schemaVersion: 1,
+    compilerVersion: "1.0.0",
+    id: "context_pack_55555555-5555-5555-5555-555555555555",
+    runId,
+    taskId,
+    agentId,
+    projectId: "project_66666666-6666-6666-6666-666666666666",
+    routeId: "route_77777777-7777-7777-7777-777777777777",
+    tokenBudget: 4_096,
+    estimatedTokens: 64,
+    contentHash: "b".repeat(64),
+    compiledAt: "2026-08-17T00:00:00.000Z",
+    sections: [
+      { name: "GOAL", content: "Return the live proof marker." },
+      { name: "CURRENT_PROJECT_STATE", content: "Disposable isolated OpenClaw verification." },
+      { name: "RELEVANT_DECISIONS", content: "Use the pinned OpenClaw Gateway." },
+      { name: "RELEVANT_MEMORY", content: "None." },
+      { name: "RELEVANT_FINDINGS", content: "None." },
+      { name: "REQUIRED_SKILLS", content: "None." },
+      { name: "AVAILABLE_TOOLS", content: "None." },
+      { name: "ARTIFACT_REFERENCES", content: "None." },
+      { name: "EXPECTED_OUTPUT", content: "Reply with the exact requested marker." },
+      { name: "HANDOFF_CONTRACT", content: "No handoff is required." },
+    ],
+    rendered: "Return the live proof marker. Reply with the exact requested marker.",
+    evidence: [],
+  };
   const receipt = await adapter.executeTask({
-    runId: "run_11111111-1111-1111-1111-111111111111",
-    taskId: "task_11111111-1111-1111-1111-111111111111",
-    agentId: "agent_22222222-2222-2222-2222-222222222222",
+    runId,
+    taskId,
+    agentId,
     bindingId: "binding_33333333-3333-3333-3333-333333333333",
     sessionId: "session_44444444-4444-4444-4444-444444444444",
     externalAgentId: "researcher",
@@ -254,6 +285,7 @@ try {
     title: "Return the live proof marker",
     description: "Reply with the exact requested marker.",
     idempotencyKey: "run:11111111-1111-1111-1111-111111111111",
+    contextPack,
   });
   const terminal = await adapter.waitForTask(receipt.externalRunId, 20_000);
   if (terminal.status !== "COMPLETED" || modelRequests !== 1) {
