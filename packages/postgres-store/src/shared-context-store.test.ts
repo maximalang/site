@@ -100,6 +100,63 @@ describe("PostgresSharedContextStore", () => {
     });
   });
 
+  it("commits a document and all provenance-linked chunks in one transaction", async () => {
+    const secondChunk = "document_chunk_55555555-5555-5555-5555-555555555555";
+    const secondContext = "context_item_66666666-6666-6666-6666-666666666666";
+    const { pool, query } = poolFor((sql, params) => {
+      if (sql.includes("INSERT INTO agent_world.rag_documents"))
+        return { rows: [{ id: ids.document, inserted: true }], rowCount: 1 };
+      if (sql.includes("INSERT INTO agent_world.rag_document_sources"))
+        return { rows: [], rowCount: 1 };
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunks"))
+        return {
+          rows: [{ id: params?.[3] === 0 ? ids.chunk : secondChunk, inserted: true }],
+          rowCount: 1,
+        };
+      if (sql.includes("INSERT INTO agent_world.context_items"))
+        return { rows: [{ id: params?.[0] }], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const chunk = (id: string, contextItemId: string, ordinal: number) => ({
+      schemaVersion: 1 as const,
+      id,
+      contextItemId,
+      documentId: ids.document,
+      projectId: ids.project,
+      ordinal,
+      content: `Canonical context evidence ${ordinal}.`,
+      contentHash: String(ordinal + 1).repeat(64),
+      estimatedTokens: 6,
+      temperature: "COLD" as const,
+      importance: 0.5,
+      embeddingModel: "rag-embedding-v1",
+      embedding,
+      createdAt: now,
+    });
+    const receipt = await new PostgresSharedContextStore(pool as never).ingestDocumentWithChunks({
+      document: {
+        schemaVersion: 1,
+        id: ids.document,
+        projectId: ids.project,
+        title: "Canonical architecture",
+        contentHash: "a".repeat(64),
+        mimeType: "text/markdown",
+        byteSize: 100,
+        source: { kind: "PROJECT_FILE", ref: "docs/architecture.md", observedAt: now },
+        createdAt: now,
+      },
+      chunks: [chunk(ids.chunk, ids.context, 0), chunk(secondChunk, secondContext, 1)],
+    });
+    expect(receipt).toEqual({
+      outcome: "CREATED",
+      documentId: ids.document,
+      chunkIds: [ids.chunk, secondChunk],
+      contextItemIds: [ids.context, secondContext],
+    });
+    expect(query.mock.calls.filter(([sql]) => sql === "BEGIN")).toHaveLength(1);
+    expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(1);
+  });
+
   it("serializes validated vectors as a parameter and filters retrieval by project", async () => {
     const { pool, query } = poolFor((sql) => {
       if (sql.startsWith("SET LOCAL")) return { rows: [], rowCount: 0 };

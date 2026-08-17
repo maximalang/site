@@ -208,6 +208,186 @@ export class PostgresSharedContextStore {
     }
   }
 
+  async ingestDocumentWithChunks(value: unknown): Promise<{
+    outcome: "CREATED" | "DEDUPLICATED";
+    documentId: string;
+    chunkIds: string[];
+    contextItemIds: string[];
+  }> {
+    if (!value || typeof value !== "object" || !("document" in value) || !("chunks" in value)) {
+      throw new TypeError("Atomic RAG write is invalid");
+    }
+    const document = RagDocumentIngestSchema.parse(value.document);
+    if (!Array.isArray(value.chunks)) throw new TypeError("Atomic RAG chunks are invalid");
+    const chunks = value.chunks.map((chunk) => RagDocumentChunkWriteSchema.parse(chunk));
+    if (
+      chunks.length < 1 ||
+      chunks.length > 2_000 ||
+      chunks.some(
+        (chunk, ordinal) =>
+          chunk.projectId !== document.projectId ||
+          chunk.documentId !== document.id ||
+          chunk.ordinal !== ordinal,
+      )
+    ) {
+      throw new TypeError("Atomic RAG chunks must be contiguous and belong to the document");
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const documentResult = await client.query<CanonicalRow>(
+        `WITH inserted AS (
+           INSERT INTO agent_world.rag_documents
+             (id, project_id, title, content_sha256, mime_type, byte_size, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (project_id, content_sha256) DO NOTHING
+           RETURNING id
+         )
+         SELECT id, true AS inserted FROM inserted
+         UNION ALL
+         SELECT id, false AS inserted
+           FROM agent_world.rag_documents
+          WHERE project_id = $2 AND content_sha256 = $4
+            AND NOT EXISTS (SELECT 1 FROM inserted)
+         LIMIT 1`,
+        [
+          document.id,
+          document.projectId,
+          document.title,
+          document.contentHash,
+          document.mimeType,
+          document.byteSize,
+          document.createdAt,
+        ],
+      );
+      let canonicalDocument = documentResult.rows[0];
+      if (!canonicalDocument) {
+        const raced = await client.query<CanonicalRow>(
+          `SELECT id, false AS inserted
+             FROM agent_world.rag_documents
+            WHERE project_id = $1 AND content_sha256 = $2`,
+          [document.projectId, document.contentHash],
+        );
+        canonicalDocument = raced.rows[0];
+      }
+      if (!canonicalDocument) throw new Error("Canonical RAG document was not persisted");
+      await client.query(
+        `INSERT INTO agent_world.rag_document_sources
+           (document_id, source_kind, source_ref, observed_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (document_id, source_kind, source_ref) DO NOTHING`,
+        [
+          canonicalDocument.id,
+          document.source.kind,
+          document.source.ref,
+          document.source.observedAt,
+        ],
+      );
+
+      const chunkIds: string[] = [];
+      const contextItemIds: string[] = [];
+      let created = canonicalDocument.inserted;
+      for (const chunk of chunks) {
+        const result = await client.query<CanonicalRow>(
+          `WITH inserted AS (
+             INSERT INTO agent_world.rag_document_chunks
+               (id, document_id, project_id, ordinal, content, content_sha256,
+                estimated_tokens, embedding_model, embedding, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector, $10)
+             ON CONFLICT DO NOTHING
+             RETURNING id
+           )
+           SELECT id, true AS inserted FROM inserted
+           UNION ALL
+           SELECT id, false AS inserted
+             FROM agent_world.rag_document_chunks
+            WHERE project_id = $3 AND content_sha256 = $6
+              AND NOT EXISTS (SELECT 1 FROM inserted)
+           LIMIT 1`,
+          [
+            chunk.id,
+            canonicalDocument.id,
+            chunk.projectId,
+            chunk.ordinal,
+            chunk.content,
+            chunk.contentHash,
+            chunk.estimatedTokens,
+            chunk.embeddingModel ?? null,
+            chunk.embedding ? vectorLiteral(chunk.embedding) : null,
+            chunk.createdAt,
+          ],
+        );
+        let canonicalChunk = result.rows[0];
+        if (!canonicalChunk) {
+          const raced = await client.query<CanonicalRow>(
+            `SELECT id, false AS inserted
+               FROM agent_world.rag_document_chunks
+              WHERE project_id = $1 AND content_sha256 = $2`,
+            [chunk.projectId, chunk.contentHash],
+          );
+          canonicalChunk = raced.rows[0];
+        }
+        if (!canonicalChunk) throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+        created ||= canonicalChunk.inserted;
+        const contextResult = await client.query<{ id: string }>(
+          `WITH inserted AS (
+             INSERT INTO agent_world.context_items
+               (id, project_id, kind, temperature, content, content_sha256,
+                estimated_tokens, importance, provenance_kind, document_chunk_id, created_at)
+             VALUES ($1, $2, 'RAG_CHUNK', $3, $4, $5, $6, $7,
+                     'DOCUMENT_CHUNK', $8, $9)
+             ON CONFLICT DO NOTHING
+             RETURNING id
+           )
+           SELECT id FROM inserted
+           UNION ALL
+           SELECT id FROM agent_world.context_items
+            WHERE project_id = $2 AND kind = 'RAG_CHUNK' AND content_sha256 = $5
+              AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $8
+              AND NOT EXISTS (SELECT 1 FROM inserted)
+           LIMIT 1`,
+          [
+            chunk.contextItemId,
+            chunk.projectId,
+            chunk.temperature,
+            chunk.content,
+            chunk.contentHash,
+            chunk.estimatedTokens,
+            chunk.importance,
+            canonicalChunk.id,
+            chunk.createdAt,
+          ],
+        );
+        let contextItemId = contextResult.rows[0]?.id;
+        if (!contextItemId) {
+          const raced = await client.query<{ id: string }>(
+            `SELECT id
+               FROM agent_world.context_items
+              WHERE project_id = $1 AND kind = 'RAG_CHUNK' AND content_sha256 = $2
+                AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $3`,
+            [chunk.projectId, chunk.contentHash, canonicalChunk.id],
+          );
+          contextItemId = raced.rows[0]?.id;
+        }
+        if (!contextItemId) throw new Error("Canonical RAG context item was not persisted");
+        chunkIds.push(canonicalChunk.id);
+        contextItemIds.push(contextItemId);
+      }
+      await client.query("COMMIT");
+      return {
+        outcome: created ? "CREATED" : "DEDUPLICATED",
+        documentId: canonicalDocument.id,
+        chunkIds,
+        contextItemIds,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async retrieve(value: unknown): Promise<RagRetrievalResult[]> {
     const input: RagRetrievalRequest = RagRetrievalRequestSchema.parse(value);
     const client = await this.pool.connect();

@@ -131,6 +131,12 @@ export const applicationMemoryDependencies = {
     runtime().decideMemory(input),
 };
 
+export const applicationRagDependencies = {
+  authorize: (request: Request) => runtime().auth.authorize(request),
+  ingest: (input: Parameters<ReturnType<typeof runtime>["ingestRagDocument"]>[0]) =>
+    runtime().ingestRagDocument(input),
+};
+
 export const applicationIntegrationDependencies = {
   authorize: (request: Request) => runtime().auth.authorize(request),
   list: () => runtime().readIntegrations(),

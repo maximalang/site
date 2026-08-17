@@ -34,6 +34,7 @@ function runtime() {
     readMemoryTimeline: vi.fn(),
     readMemoryNetwork: vi.fn(),
     decideMemory: vi.fn(),
+    ingestRagDocument: vi.fn(),
     readHub: vi.fn(),
     readOperations: vi.fn(),
     readIntegrations: vi.fn(),

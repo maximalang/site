@@ -50,6 +50,27 @@ export const RagDocumentSourceSchema = z.discriminatedUnion("kind", [
 ]);
 export type RagDocumentSource = z.infer<typeof RagDocumentSourceSchema>;
 
+export const RagIngestionRequestSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  projectId: ProjectIdSchema,
+  title: z.string().trim().min(1).max(500),
+  mimeType: z.enum(["text/plain", "text/markdown"]),
+  content: z.string().trim().min(1).max(5_000_000),
+  source: RagDocumentSourceSchema,
+});
+export type RagIngestionRequest = z.infer<typeof RagIngestionRequestSchema>;
+
+export const RagIngestionReceiptSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  outcome: z.enum(["CREATED", "DEDUPLICATED"]),
+  documentId: DocumentIdSchema,
+  chunkCount: z.number().int().positive().max(2_000),
+  chunkIds: z.array(DocumentChunkIdSchema).min(1).max(2_000),
+  contextItemIds: z.array(ContextItemIdSchema).min(1).max(2_000),
+  embeddingModel: z.string().trim().min(1).max(200),
+});
+export type RagIngestionReceipt = z.infer<typeof RagIngestionReceiptSchema>;
+
 export const RagDocumentIngestSchema = z.strictObject({
   schemaVersion: z.literal(1),
   id: DocumentIdSchema,

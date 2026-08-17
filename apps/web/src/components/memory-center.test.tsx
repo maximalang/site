@@ -36,9 +36,10 @@ describe("MemoryCenter", () => {
       ],
     }));
     const decide = vi.fn(async () => ({ outcome: "CREATED" }));
+    const ingest = vi.fn();
     render(
       <MemoryCenter
-        client={{ load: load as never, decide }}
+        client={{ load: load as never, decide, ingest }}
         csrfToken="csrf"
         projects={[project] as never}
       />,
@@ -50,5 +51,34 @@ describe("MemoryCenter", () => {
     expect(decide).toHaveBeenCalledWith(expect.objectContaining({ action: "ACCEPT" }), "csrf");
     fireEvent(dialog, new Event("cancel", { bubbles: false, cancelable: true }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("indexes a source into project-scoped shared RAG with Auto MIME", async () => {
+    const user = userEvent.setup();
+    const ingest = vi.fn(async () => ({ outcome: "CREATED" }));
+    render(
+      <MemoryCenter
+        client={{ load: vi.fn() as never, decide: vi.fn(), ingest }}
+        csrfToken="csrf"
+        projects={[project] as never}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Добавить RAG источник" }));
+    await user.type(screen.getByLabelText("Название"), "Architecture");
+    await user.type(screen.getByLabelText("Источник / имя файла"), "architecture.md");
+    await user.type(
+      screen.getByLabelText("Текст для общей базы знаний"),
+      "PostgreSQL is canonical.",
+    );
+    await user.click(screen.getByRole("button", { name: "Индексировать" }));
+    expect(ingest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: project.projectId,
+        mimeType: "text/markdown",
+        source: expect.objectContaining({ kind: "UPLOAD", ref: "architecture.md" }),
+      }),
+      "csrf",
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent("Источник добавлен");
   });
 });

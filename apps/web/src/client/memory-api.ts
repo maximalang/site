@@ -6,6 +6,9 @@ import {
   MemoryNetworkSchema,
   type MemoryTimeline,
   MemoryTimelineSchema,
+  type RagIngestionReceipt,
+  RagIngestionReceiptSchema,
+  type RagIngestionRequest,
 } from "@agent-world/domain";
 
 export type MemoryView = "INBOX" | "TIMELINE" | "NETWORK";
@@ -48,4 +51,20 @@ export async function submitMemoryDecision(
   });
   if (!response.ok) throw new Error("Memory decision was not committed");
   return response.json();
+}
+
+export async function ingestRagDocument(
+  input: RagIngestionRequest,
+  csrfToken: string,
+  fetcher: FetchMemory = fetch,
+): Promise<RagIngestionReceipt> {
+  const response = await fetcher("/api/rag", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json", "x-agent-world-csrf": csrfToken },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error("RAG ingestion failed");
+  return RagIngestionReceiptSchema.parse(await response.json());
 }

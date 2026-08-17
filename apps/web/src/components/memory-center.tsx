@@ -5,11 +5,13 @@ import type {
   MemoryInbox,
   MemoryNetwork,
   MemoryTimeline,
+  type RagIngestionRequest,
 } from "@agent-world/domain";
 import type { HubReadModel } from "@agent-world/read-model";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
   loadMemoryView,
+  ingestRagDocument,
   type MemoryView,
   type MemoryViewModel,
   submitMemoryDecision,
@@ -18,11 +20,13 @@ import {
 export type MemoryCenterClient = {
   load(projectId: string, view: MemoryView): Promise<MemoryViewModel>;
   decide(input: MemoryCurationDecisionInput, csrfToken: string): Promise<unknown>;
+  ingest(input: RagIngestionRequest, csrfToken: string): Promise<unknown>;
 };
 
 const defaultClient: MemoryCenterClient = {
   load: loadMemoryView,
   decide: submitMemoryDecision,
+  ingest: ingestRagDocument,
 };
 
 function decisionId(): string {
@@ -308,11 +312,55 @@ export function MemoryCenter({
   const available = projects.filter((project) => !project.isArchived);
   const [projectId, setProjectId] = useState(available[0]?.projectId ?? "");
   const [open, setOpen] = useState(false);
+  const [ragOpen, setRagOpen] = useState(false);
+  const [ragTitle, setRagTitle] = useState("");
+  const [ragRef, setRagRef] = useState("");
+  const [ragContent, setRagContent] = useState("");
+  const [ragMimeType, setRagMimeType] = useState<"AUTO" | "text/plain" | "text/markdown">(
+    "AUTO",
+  );
+  const [ragPending, setRagPending] = useState(false);
+  const [ragStatus, setRagStatus] = useState<"IDLE" | "SUCCEEDED" | "FAILED">("IDLE");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const project = available.find((item) => item.projectId === projectId);
   const close = () => {
     setOpen(false);
     requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+  const ingest = async () => {
+    if (!project || ragPending) return;
+    setRagPending(true);
+    setRagStatus("IDLE");
+    try {
+      await client.ingest(
+        {
+          schemaVersion: 1,
+          projectId: project.projectId,
+          title: ragTitle,
+          mimeType:
+            ragMimeType === "AUTO"
+              ? ragRef.toLowerCase().endsWith(".md")
+                ? "text/markdown"
+                : "text/plain"
+              : ragMimeType,
+          content: ragContent,
+          source: {
+            kind: "UPLOAD",
+            ref: ragRef,
+            observedAt: new Date().toISOString(),
+          },
+        },
+        csrfToken,
+      );
+      setRagTitle("");
+      setRagRef("");
+      setRagContent("");
+      setRagStatus("SUCCEEDED");
+    } catch {
+      setRagStatus("FAILED");
+    } finally {
+      setRagPending(false);
+    }
   };
   return (
     <section className="memory-center-launcher" aria-labelledby="memory-center-launcher-title">
@@ -349,8 +397,72 @@ export function MemoryCenter({
           >
             Открыть Memory Center
           </button>
+          <button onClick={() => setRagOpen((value) => !value)} type="button">
+            {ragOpen ? "Скрыть RAG ingestion" : "Добавить RAG источник"}
+          </button>
         </div>
       )}
+      {ragOpen && project ? (
+        <form
+          className="rag-ingestion-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void ingest();
+          }}
+        >
+          <label>
+            Название
+            <input
+              maxLength={500}
+              onChange={(event) => setRagTitle(event.target.value)}
+              required
+              value={ragTitle}
+            />
+          </label>
+          <label>
+            Источник / имя файла
+            <input
+              maxLength={2048}
+              onChange={(event) => setRagRef(event.target.value)}
+              required
+              value={ragRef}
+            />
+          </label>
+          <label>
+            Текст для общей базы знаний
+            <textarea
+              maxLength={5_000_000}
+              onChange={(event) => setRagContent(event.target.value)}
+              required
+              rows={8}
+              value={ragContent}
+            />
+          </label>
+          <details>
+            <summary>Advanced</summary>
+            <label>
+              MIME type
+              <select
+                onChange={(event) =>
+                  setRagMimeType(event.target.value as typeof ragMimeType)
+                }
+                value={ragMimeType}
+              >
+                <option value="AUTO">Auto</option>
+                <option value="text/plain">text/plain</option>
+                <option value="text/markdown">text/markdown</option>
+              </select>
+            </label>
+          </details>
+          <button className="primary-button" disabled={ragPending} type="submit">
+            {ragPending ? "Индексируем…" : "Индексировать"}
+          </button>
+          {ragStatus === "SUCCEEDED" ? <p role="status">Источник добавлен в shared RAG.</p> : null}
+          {ragStatus === "FAILED" ? (
+            <p role="alert">RAG ingestion недоступен или отклонил источник.</p>
+          ) : null}
+        </form>
+      ) : null}
       {open && project ? (
         <MemoryDrawer
           client={client}

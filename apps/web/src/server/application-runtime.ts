@@ -4,6 +4,7 @@ import type {
   AgentId,
   AgentSchedule,
   MemoryCurationDecision,
+  RagIngestionRequest,
   Mission,
   MissionDecomposition,
   MissionId,
@@ -81,6 +82,7 @@ export type ApplicationRuntime = {
   readMemoryTimeline(projectId: string, limit: number): Promise<unknown>;
   readMemoryNetwork(projectId: string, limit: number): Promise<unknown>;
   decideMemory(input: MemoryCurationDecision): Promise<unknown>;
+  ingestRagDocument(input: RagIngestionRequest): Promise<unknown>;
   readHub(): Promise<HubReadModel>;
   readOperations(): Promise<OperationsReadModel>;
   readIntegrations(): Promise<IntegrationRegistry>;

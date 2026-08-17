@@ -159,6 +159,32 @@ export interface ModelGateway {
   health(options?: { signal?: AbortSignal }): Promise<ModelGatewayHealth>;
 }
 
+export const EmbeddingGatewayRequestSchema = z
+  .strictObject({
+    modelRouteId: ModelRouteIdSchema,
+    texts: z.array(z.string().trim().min(1).max(20_000)).min(1).max(256),
+    timeoutMs: z.number().int().min(1_000).max(600_000),
+  })
+  .refine((value) => value.texts.reduce((total, text) => total + text.length, 0) <= 1_000_000, {
+    message: "Embedding request text is too large",
+  });
+export type EmbeddingGatewayRequest = z.infer<typeof EmbeddingGatewayRequestSchema>;
+
+const EmbeddingVectorSchema = z
+  .array(z.number().finite())
+  .length(1536)
+  .refine((value) => value.some((coordinate) => coordinate !== 0));
+
+export const EmbeddingGatewayResultSchema = z.strictObject({
+  model: z.string().trim().min(1).max(200),
+  vectors: z.array(EmbeddingVectorSchema).min(1).max(256),
+});
+export type EmbeddingGatewayResult = z.infer<typeof EmbeddingGatewayResultSchema>;
+
+export interface EmbeddingGateway {
+  embed(request: EmbeddingGatewayRequest): Promise<EmbeddingGatewayResult>;
+}
+
 export function parseModelGatewayRequest(value: unknown): ModelGatewayRequest {
   return ModelGatewayRequestSchema.parse(value);
 }

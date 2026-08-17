@@ -1,10 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { CodexTaskExecutionAdapter } from "@agent-world/codex-adapter";
-import { ConversationSendService, TaskDispatchService } from "@agent-world/conversation-service";
-import { ContextItemIdSchema, EventIdSchema, RunIdSchema } from "@agent-world/domain";
+import {
+  ConversationSendService,
+  RagIngestionService,
+  TaskDispatchService,
+} from "@agent-world/conversation-service";
+import {
+  ContextItemIdSchema,
+  EventIdSchema,
+  ModelRouteIdSchema,
+  RunIdSchema,
+} from "@agent-world/domain";
 import { GraphitiMemoryAdapter, HttpGraphitiMcpTransport } from "@agent-world/graphiti-adapter";
 import {
   DurableModelExecutionDispatcher,
+  LiteLlmEmbeddingGateway,
   LiteLlmModelGateway,
   LiteLlmProjectionReconciler,
   ModelTaskExecutionAdapter,
@@ -52,6 +62,7 @@ import {
   PostgresRunProvenanceReader,
   PostgresRuntimeMessageStore,
   PostgresScheduleStore,
+  PostgresSharedContextStore,
   PostgresWorldProjectionStore,
   RouteResolutionError,
   SecretStoreError,
@@ -320,6 +331,22 @@ export async function createProductionRuntime(
           },
         })
       : undefined;
+    const ragEmbeddingRoute = environment.AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID?.trim();
+    const ragIngestion =
+      liteLlmConfig && ragEmbeddingRoute
+        ? new RagIngestionService({
+            embeddingGateway: new LiteLlmEmbeddingGateway({
+              baseUrl: liteLlmConfig.baseUrl,
+              credentialProvider: async () => liteLlmConfig.masterKey,
+              routeResolver: async (modelRouteId) => {
+                const route = await routeResolver.resolve(modelRouteId);
+                return { modelRouteId: route.modelRouteId, modelAlias: route.modelAlias };
+              },
+            }),
+            store: new PostgresSharedContextStore(pool),
+            embeddingModelRouteId: ModelRouteIdSchema.parse(ragEmbeddingRoute),
+          })
+        : undefined;
     const projectionReconciler = liteLlmConfig
       ? new LiteLlmProjectionReconciler({
           baseUrl: liteLlmConfig.baseUrl,
@@ -625,6 +652,10 @@ export async function createProductionRuntime(
       readMemoryTimeline: (projectId, limit) => memoryReader.timeline(projectId, limit),
       readMemoryNetwork: (projectId, limit) => memoryReader.network(projectId, limit),
       decideMemory: (input) => memoryStore.decide(input),
+      ingestRagDocument: (input) => {
+        if (!ragIngestion) throw new Error("RAG ingestion is not configured");
+        return ragIngestion.ingest(input);
+      },
       readHub: () => hubReader.read(),
       readOperations: () => operationsReader.read(),
       readIntegrations: () => integrationStore.list(),
