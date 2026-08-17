@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryCenter } from "./memory-center";
 
 const project = {
@@ -13,6 +13,8 @@ const project = {
   createdAt: "2026-08-15T00:00:00.000Z",
   agentIds: [],
 };
+
+afterEach(cleanup);
 
 describe("MemoryCenter", () => {
   it("opens an accessible modal and commits an Inbox decision", async () => {
