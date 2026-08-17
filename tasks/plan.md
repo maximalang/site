@@ -3,16 +3,37 @@
 ## Overview
 
 Build a single-owner, self-hosted Agent Operating Environment in which World and
-Command are two projections of one canonical domain and API. The project starts
-with an evidence-backed OSS reuse audit. Production implementation is gated on
-that audit so the product reuses mature components instead of recreating an
-agent framework, model gateway, memory stack, or control panels.
+Command are two projections of one canonical domain and API. Reuse decisions
+are evidence-backed and pinned; PostgreSQL remains canonical while runtimes,
+model gateways, memory graphs and telemetry systems remain adapters or
+projections.
 
 This web surface is an owner control shell, not a customer billing product. It
 must not grow checkout, payment collection, invoices, subscription sales or a
 provider-billing ingestion/reconciliation subsystem. Cost signals may appear as
 bounded operational estimates when execution providers expose them, but they
 are never presented as a customer charge or invoiced truth.
+
+## Current verification state
+
+Repository implementation for Phases 0-11 is present. The full CI matrix at
+commit `0e34d0e7158fc28003d15c1304da4d93c325ef0d` passes all eight jobs. The
+current authoritative product matrix is
+[`docs/audits/acceptance-2026-08-17.md`](../docs/audits/acceptance-2026-08-17.md):
+**22/24 PASS, 2/24 PARTIAL, 0/24 OPEN**.
+
+The two product-acceptance gaps are external live proofs, not missing repo
+surfaces:
+
+- criterion 4: one real personal Plus AI World MCP/App run through terminal
+  `commit_result`;
+- criterion 18: one approved bounded operation against a real provisioned SSH
+  host with its pinned host key.
+
+A successful real ChatGPT-authenticated Codex Run is also required before full
+production activation, although it is separate from the numbered 24-item
+product matrix. These gates must not be replaced with fixtures or marked green
+from deterministic CI alone.
 
 ## Non-negotiable architecture constraints
 
@@ -27,9 +48,10 @@ are never presented as a customer charge or invoiced truth.
 - World renders real typed events and never spends LLM tokens on decorative
   animation or chatter.
 - All execution backends sit behind a versioned `ExecutionAdapter` contract.
-- Native Plus Chat uses an on-demand browser launcher only to choose an Account,
-  create a Chat and submit `run_id`; output is committed through Control API
-  tools and is never read from the DOM.
+- Native Plus Chat uses an on-demand host-local browser launcher only to choose
+  an Account, create a Chat and submit `run_id`; output is committed through
+  supported Control/MCP tools and is never read from the DOM. The laptop does
+  not connect to PostgreSQL; it uses a scoped HTTPS launcher-control endpoint.
 - Chat context is lazy/pull-based: memory, RAG, skills and project state are
   fetched only when needed under Context/Token Governor budgets.
 - One Resource Broker chooses Account/Chat/Work/Codex/API/Local from quality,
@@ -39,7 +61,7 @@ are never presented as a customer charge or invoiced truth.
 - UI configuration has Simple/Advanced levels and defaults most choices to
   safe `Auto` policies.
 - One primary World renderer—the narrow OpenClaw Office presentation port—and
-  one model gateway are selected for the first production deployment.
+  one model gateway are selected for production.
 - The first deployment targets one VDS with Docker Compose, not Kubernetes.
 
 ## Dependency graph
@@ -57,7 +79,7 @@ Phase 0 reuse and license audit
 
 ## Delivery phases
 
-### Phase 0: Reuse audit (current)
+### Phase 0: Reuse audit
 
 - [x] Record immutable upstream SHAs, versions, licenses, architecture and APIs.
 - [x] Reassess World candidates and choose OpenClaw Office as the primary
@@ -113,17 +135,20 @@ Phase 0 reuse and license audit
 - [x] Complete native Chat/Work adapter interfaces without unsupported scraping.
       `CHAT` has its dispatch/Control API contract; `WORK` is explicitly
       `UNSUPPORTED` and non-selectable until a supported transport is proven.
-- [ ] Verify security, backup/restore, restart/replay and all 24 product-level
-      acceptance criteria.
+- [x] Verify automated security, dependency signatures, backup/restore,
+      restart/replay, PostgreSQL/runtime, responsive browser, Compose,
+      orchestration, OpenClaw, LiteLLM and Codex test families.
+- [ ] Pass all 24 product-level acceptance criteria with real evidence. Current:
+      22 PASS / 2 PARTIAL / 0 OPEN; see the authoritative acceptance audit.
 
 ## Checkpoints
 
 ### Audit gate
 
-- [x] Every named upstream has current primary-source evidence.
+- [x] Every named upstream has primary-source evidence at the pinned version/SHA.
 - [x] License obligations and prohibited code movement are explicit.
 - [x] Selected composition has no duplicate runtime, renderer or gateway.
-- [x] The Phase 1 plan is decomposed into small vertical slices.
+- [x] Delivery plans are decomposed into vertical slices with acceptance tests.
 
 ### Working-shell gate
 
@@ -133,10 +158,14 @@ Phase 0 reuse and license audit
 
 ### Production gate
 
-- [x] Required automated test families pass for the completed Phase 0-2 scope.
+- [x] Full automated CI matrix is green on the current audited head.
 - [x] Docker Compose core starts without optional profiles.
-- [x] Backup/restore and upgrade are verified on an isolated environment.
-- [ ] Every acceptance criterion has authoritative runtime evidence.
+- [x] Backup/restore and upgrade behavior are verified on an isolated environment.
+- [x] Every numbered acceptance criterion has an authoritative evidence row and
+      no criterion is `OPEN`.
+- [ ] Every numbered acceptance criterion is `PASS` in real product scope.
+- [ ] One successful real owner-authenticated Codex Run records terminal
+      provenance.
 
 ## Risks and mitigations
 
@@ -145,16 +174,18 @@ Phase 0 reuse and license audit
 | Upstream license differs from repository metadata | High | Read LICENSE/NOTICE and package-level terms at pinned SHA before reuse. |
 | Upstream APIs drift rapidly | High | Pin commit/tag, isolate through adapters and add contract tests. |
 | AGPL or source-available UI contaminates permissive core | High | Treat as reference-only or separately deployed service unless an explicit licensing decision is accepted. |
-| World UI imports the wrong Agent/Account model | High | Define canonical contracts before porting UI state. |
-| Multiple sources of truth emerge | High | Persist authority in PostgreSQL and make all runtime configs projections. |
-| Browser automation becomes an unsupported Chat state/output channel | High | Isolate launcher to opening an authenticated Account/Chat and submitting `run_id`; accept results only through authenticated supported Actions/App tools. |
+| World UI imports the wrong Agent/Account model | High | Keep canonical contracts and branded IDs at every adapter boundary. |
+| Multiple sources of truth emerge | High | Persist authority in PostgreSQL and make runtime/config/telemetry systems projections. |
+| Browser automation becomes an unsupported Chat state/output channel | High | Limit the host launcher to opening the authenticated profile and submitting `run_id`; accept completion only through supported authenticated Control/MCP calls. |
+| Host-local launcher bypasses the private data boundary | High | Keep PostgreSQL unpublished; use only the scoped HTTPS launcher-control endpoint and a dedicated token whose server stores only SHA-256. |
 | One-VDS stack becomes operationally excessive | Medium | Keep optional Compose profiles and require the core profile to stand alone. |
 
-## Open questions resolved during Phase 0
+## Resolved composition questions
 
-- Exact OpenClaw extension boundaries that are stable enough for an adapter.
-- Whether `geezerrrr/agent-town` has a legally reusable license at the pinned SHA.
-- Which World components can be ported without introducing a second renderer.
-- Whether LiteLLM or Bifrost is the better first gateway after current licensing,
-  operational and API analysis.
-- Which third-party control-center components are reusable code versus patterns.
+- OpenClaw adapter boundaries are pinned and isolated from product authority.
+- OpenClaw Office is presentation-only; AI World owns canonical World state.
+- LiteLLM is the selected single model gateway; local/API models remain Routes.
+- Graphiti/FalkorDB and Langfuse are optional projections, not product sources of
+  truth.
+- Native Chat uses supported OAuth/MCP Control semantics and never treats DOM
+  output as completion evidence.
