@@ -3,12 +3,15 @@
   "compilerOptions": {
     "incremental": false,
     "paths": {
+      "@agent-world/codex-adapter": ["../../packages/codex-adapter/src/index.ts"],
       "@agent-world/conversation-service": ["../../packages/conversation-service/src/index.ts"],
       "@agent-world/domain": ["../../packages/domain/src/index.ts"],
+      "@agent-world/graphiti-adapter": ["../../packages/graphiti-adapter/src/index.ts"],
       "@agent-world/model-gateway": ["../../packages/model-gateway/src/index.ts"],
       "@agent-world/openclaw-adapter": ["../../packages/openclaw-adapter/src/index.ts"],
       "@agent-world/postgres-store": ["../../packages/postgres-store/src/index.ts"],
-      "@agent-world/read-model": ["../../packages/read-model/src/index.ts"]
+      "@agent-world/read-model": ["../../packages/read-model/src/index.ts"],
+      "@agent-world/scheduler": ["../../packages/scheduler/src/index.ts"]
     }
   }
 }
