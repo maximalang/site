@@ -9,6 +9,24 @@ const UUIDS = {
 
 const observedAt = "2026-08-14T10:00:00.000Z";
 const expiresAt = "2026-08-14T10:05:00.000Z";
+const policy = {
+  version: "resource-broker-v1",
+  weights: { quality: 0.4, remainingLimits: 0.3, cost: 0.1, speed: 0.1, load: 0.1 },
+};
+const nativeChatCandidate = {
+  routeId: `route_${UUIDS.chat}`,
+  accountId: `account_${UUIDS.account}`,
+  mode: "CHAT" as const,
+  adapterKind: "NATIVE_CHATGPT" as const,
+  isAvailable: true,
+  quality: 0.95,
+  remainingLimits: 0.8,
+  cost: 1,
+  speed: 0.6,
+  load: 0.7,
+  observedAt,
+  expiresAt,
+};
 
 describe("selectResourceRoute", () => {
   it("returns an explicit empty decision when no observed route is eligible", () => {
@@ -25,28 +43,12 @@ describe("selectResourceRoute", () => {
     expect(decision.selected).toBeUndefined();
   });
 
-  it("excludes experimental Native Chat until live evidence enables the transport", () => {
+  it("excludes experimental Native Chat from ordinary selection", () => {
     const decision = selectResourceRoute({
-      policy: {
-        version: "resource-broker-v1",
-        weights: { quality: 0.4, remainingLimits: 0.3, cost: 0.1, speed: 0.1, load: 0.1 },
-      },
+      policy,
       now: "2026-08-14T10:01:00.000Z",
       candidates: [
-        {
-          routeId: `route_${UUIDS.chat}`,
-          accountId: `account_${UUIDS.account}`,
-          mode: "CHAT",
-          adapterKind: "NATIVE_CHATGPT",
-          isAvailable: true,
-          quality: 0.95,
-          remainingLimits: 0.8,
-          cost: 1,
-          speed: 0.6,
-          load: 0.7,
-          observedAt,
-          expiresAt,
-        },
+        nativeChatCandidate,
         {
           routeId: `route_${UUIDS.codex}`,
           accountId: `account_${UUIDS.account}`,
@@ -71,6 +73,43 @@ describe("selectResourceRoute", () => {
       exclusion: "TRANSPORT_NOT_SELECTABLE",
     });
     expect(decision.evaluations[1]?.score).toBe(0.69);
+  });
+
+  it("allows a bounded explicit activation of an experimental Chat transport", () => {
+    const decision = selectResourceRoute({
+      policy,
+      now: "2026-08-14T10:01:00.000Z",
+      candidates: [nativeChatCandidate],
+      experimentalActivationAdapterKinds: ["NATIVE_CHATGPT"],
+    });
+
+    expect(decision.selected?.routeId).toBe(nativeChatCandidate.routeId);
+    expect(decision.evaluations[0]).toMatchObject({
+      transportSupportStatus: "EXPERIMENTAL",
+      transportActivation: "EXPLICIT_OWNER_TASK_MODE",
+      score: 0.85,
+    });
+  });
+
+  it("does not use the activation override for an unsupported Work transport", () => {
+    const decision = selectResourceRoute({
+      policy,
+      now: "2026-08-14T10:01:00.000Z",
+      candidates: [
+        {
+          ...nativeChatCandidate,
+          mode: "WORK",
+          adapterKind: "NATIVE_WORK",
+        },
+      ],
+      experimentalActivationAdapterKinds: ["NATIVE_WORK"],
+    });
+
+    expect(decision.selected).toBeUndefined();
+    expect(decision.evaluations[0]).toMatchObject({
+      transportSupportStatus: "UNSUPPORTED",
+      exclusion: "TRANSPORT_NOT_SELECTABLE",
+    });
   });
 
   it("fails closed on stale or unavailable evidence", () => {
@@ -145,37 +184,5 @@ describe("selectResourceRoute", () => {
     });
 
     expect(decision.selected?.routeId).toBe(`route_${UUIDS.chat}`);
-  });
-
-  it("records Native Work as unsupported instead of scoring it", () => {
-    const decision = selectResourceRoute({
-      policy: {
-        version: "resource-broker-v1",
-        weights: { quality: 0.2, remainingLimits: 0.2, cost: 0.2, speed: 0.2, load: 0.2 },
-      },
-      now: "2026-08-14T10:01:00.000Z",
-      candidates: [
-        {
-          routeId: `route_${UUIDS.chat}`,
-          accountId: `account_${UUIDS.account}`,
-          mode: "WORK",
-          adapterKind: "NATIVE_WORK",
-          isAvailable: true,
-          quality: 1,
-          remainingLimits: 1,
-          cost: 1,
-          speed: 1,
-          load: 1,
-          observedAt,
-          expiresAt,
-        },
-      ],
-    });
-
-    expect(decision.selected).toBeUndefined();
-    expect(decision.evaluations[0]).toMatchObject({
-      transportSupportStatus: "UNSUPPORTED",
-      exclusion: "TRANSPORT_NOT_SELECTABLE",
-    });
   });
 });
