@@ -1,5 +1,5 @@
 import type { MemoryNetwork } from "@agent-world/domain";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import styles from "./memory-network-graph.module.css";
 
 type NetworkVertex = {
@@ -15,9 +15,11 @@ type NetworkPoint = NetworkVertex & {
   y: number;
 };
 
-const CELL_WIDTH = 180;
+const DEFAULT_CANVAS_WIDTH = 640;
+const MIN_CANVAS_WIDTH = 280;
+const MIN_CELL_WIDTH = 160;
 const CELL_HEIGHT = 124;
-const CANVAS_PADDING = 64;
+const CANVAS_PADDING = 40;
 const LABEL_LINE_LENGTH = 20;
 const LABEL_MAX_LINES = 2;
 
@@ -94,22 +96,34 @@ function buildVertices(network: MemoryNetwork): NetworkVertex[] {
     });
 }
 
-function layoutVertices(vertices: NetworkVertex[]): {
+function layoutVertices(
+  vertices: NetworkVertex[],
+  availableWidth = DEFAULT_CANVAS_WIDTH,
+): {
   points: NetworkPoint[];
   width: number;
   height: number;
 } {
-  if (vertices.length === 0) return { points: [], width: 640, height: 280 };
-  const columns = Math.max(1, Math.ceil(Math.sqrt(vertices.length * 1.35)));
+  const width = Math.max(MIN_CANVAS_WIDTH, Math.floor(availableWidth));
+  if (vertices.length === 0) return { points: [], width, height: 280 };
+
+  const naturalColumns = Math.max(1, Math.ceil(Math.sqrt(vertices.length * 1.35)));
+  const maxColumns = Math.max(
+    1,
+    Math.floor(Math.max(MIN_CELL_WIDTH, width - CANVAS_PADDING * 2) / MIN_CELL_WIDTH),
+  );
+  const columns = Math.min(naturalColumns, maxColumns);
   const rows = Math.ceil(vertices.length / columns);
-  const width = Math.max(640, CANVAS_PADDING * 2 + columns * CELL_WIDTH);
+  const innerWidth = Math.max(MIN_CELL_WIDTH, width - CANVAS_PADDING * 2);
+  const cellWidth = innerWidth / columns;
   const height = Math.max(280, CANVAS_PADDING * 2 + rows * CELL_HEIGHT);
+
   return {
     width,
     height,
     points: vertices.map((vertex, index) => ({
       ...vertex,
-      x: CANVAS_PADDING + CELL_WIDTH / 2 + (index % columns) * CELL_WIDTH,
+      x: CANVAS_PADDING + cellWidth * ((index % columns) + 0.5),
       y: CANVAS_PADDING + CELL_HEIGHT / 2 + Math.floor(index / columns) * CELL_HEIGHT,
     })),
   };
@@ -127,9 +141,26 @@ export function MemoryNetworkGraph({
   advanced: boolean;
 }) {
   const markerId = `memory-network-arrow-${useId().replaceAll(":", "")}`;
+  const canvasRef = useRef<HTMLElement>(null);
+  const [canvasWidth, setCanvasWidth] = useState(DEFAULT_CANVAS_WIDTH);
   const vertices = buildVertices(network);
-  const layout = layoutVertices(vertices);
+  const layout = layoutVertices(vertices, canvasWidth);
   const pointById = new Map(layout.points.map((point) => [point.id, point]));
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const updateWidth = () => {
+      const measuredWidth = Math.floor(canvas.clientWidth);
+      if (measuredWidth <= 0) return;
+      setCanvasWidth((current) => (current === measuredWidth ? current : measuredWidth));
+    };
+    updateWidth();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   // biome-ignore-start lint/a11y/noNoninteractiveTabindex: WCAG requires the scrollable graph region to be keyboard-focusable.
   return (
@@ -145,6 +176,7 @@ export function MemoryNetworkGraph({
           <section
             aria-label="Прокручиваемая схема Memory Network"
             className={styles.canvas}
+            ref={canvasRef}
             tabIndex={0}
           >
             <svg

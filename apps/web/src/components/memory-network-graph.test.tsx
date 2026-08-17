@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { MemoryNetwork } from "@agent-world/domain";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { MemoryNetworkGraph } from "./memory-network-graph";
 
@@ -70,6 +70,32 @@ describe("MemoryNetworkGraph", () => {
     expect(screen.getByText("PostgreSQL remains")).toBeTruthy();
     expect(screen.getByText("canonical.")).toBeTruthy();
     expect(screen.getByText("Memory: PostgreSQL remains canonical.")).toBeTruthy();
+  });
+
+  it("reflows provenance vertices into one column when the graph canvas is narrow", async () => {
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get: () => 360,
+    });
+    try {
+      const { container } = render(<MemoryNetworkGraph advanced={false} network={network} />);
+      const graph = screen.getByTestId("memory-network-graph");
+
+      await waitFor(() => expect(graph.getAttribute("width")).toBe("360"));
+      const transforms = [...container.querySelectorAll("[data-memory-kind]")].map((element) =>
+        element.getAttribute("transform"),
+      );
+      expect(transforms).toEqual([
+        "translate(180 102)",
+        "translate(180 226)",
+        "translate(180 350)",
+      ]);
+      expect(graph.getAttribute("height")).toBe("452");
+    } finally {
+      if (original) Object.defineProperty(HTMLElement.prototype, "clientWidth", original);
+      else Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
+    }
   });
 
   it("shows full canonical and provenance identifiers only in Advanced details", () => {
