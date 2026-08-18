@@ -13,7 +13,7 @@ permissions:
 jobs:
   validate-edge:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -33,3 +33,11 @@ jobs:
           URL="$(cat ops/agent-world-edge-upstream.txt | tr -d '\n\r')"
           curl --fail --retry 5 --retry-delay 2 "${URL}/api/health/live"
           curl --fail --retry 5 --retry-delay 2 "${URL}/api/health/ready"
+
+      - name: Check OAuth and MCP metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(cat ops/agent-world-edge-upstream.txt | tr -d '\n\r')"
+          curl --fail --retry 5 --retry-delay 2 "${URL}/.well-known/oauth-authorization-server/oauth"
+          curl --fail --retry 5 --retry-delay 2 "${URL}/.well-known/oauth-protected-resource/api/mcp"
