@@ -1,0 +1,27 @@
+name: Agent World Edge Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/agent-world-edge-bootstrap.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate temporary edge
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(cat ops/agent-world-edge-upstream.txt | tr -d '\\n\\r')"
+          echo "Checking ${URL}"
+          curl --fail --retry 5 --retry-delay 2 "${URL}/api/health/live"
+          curl --fail --retry 5 --retry-delay 2 "${URL}/api/health/ready"
+          echo "AI World edge bootstrap validation passed"
