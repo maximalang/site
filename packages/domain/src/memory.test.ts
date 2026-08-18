@@ -13,6 +13,7 @@ const ids = {
   project: "project_33333333-3333-3333-3333-333333333333",
   source: "context_item_44444444-4444-4444-4444-444444444444",
   target: "context_item_55555555-5555-5555-5555-555555555555",
+  replacement: "context_item_77777777-7777-7777-7777-777777777777",
   event: "event_66666666-6666-6666-6666-666666666666",
 } as const;
 const now = "2026-08-15T00:00:00.000Z";
@@ -47,6 +48,7 @@ describe("memory curation contracts", () => {
         decisionId: ids.decision,
         action: "MERGE",
         sourceContextItemId: ids.source,
+        targetContextItemId: ids.target,
         materializedContextItemId: ids.target,
         content: "Canonical memory.",
         occurredAt: now,
@@ -65,16 +67,68 @@ describe("memory curation contracts", () => {
     ).toMatchObject({ projectId: ids.project, nodes: [], edges: [] });
   });
 
-  it("requires a target only for merge and rejects unknown fields", () => {
+  it("requires targets for merge and supersede and preserves supersession targets", () => {
+    for (const action of ["MERGE", "SUPERSEDE"] as const) {
+      expect(() =>
+        MemoryCurationDecisionSchema.parse({
+          schemaVersion: 1,
+          id: ids.decision,
+          proposalId: ids.proposal,
+          projectId: ids.project,
+          action,
+          idempotencyKey: `memory:${action.toLowerCase()}-1`,
+          decidedAt: now,
+        }),
+      ).toThrow();
+    }
+    const supersede = MemoryCurationDecisionSchema.parse({
+      schemaVersion: 1,
+      id: ids.decision,
+      proposalId: ids.proposal,
+      projectId: ids.project,
+      action: "SUPERSEDE",
+      targetContextItemId: ids.target,
+      idempotencyKey: "memory:supersede-1",
+      decidedAt: now,
+    });
+    expect(supersede.action).toBe("SUPERSEDE");
+    if (supersede.action !== "SUPERSEDE") throw new Error("Expected supersede decision");
+    expect(supersede.targetContextItemId).toBe(ids.target);
+
+    const projected = MemoryProjectionEventSchema.parse({
+      schemaVersion: 1,
+      sequence: 2,
+      eventId: ids.event,
+      eventType: "MEMORY_CURATED",
+      projectId: ids.project,
+      proposalId: ids.proposal,
+      decisionId: ids.decision,
+      action: "SUPERSEDE",
+      sourceContextItemId: ids.source,
+      targetContextItemId: ids.target,
+      materializedContextItemId: ids.replacement,
+      content: "Replacement canonical memory.",
+      occurredAt: now,
+    });
+    expect(projected.targetContextItemId).toBe(ids.target);
+  });
+
+  it("rejects self-supersession and unknown fields", () => {
     expect(() =>
-      MemoryCurationDecisionSchema.parse({
+      MemoryProjectionEventSchema.parse({
         schemaVersion: 1,
-        id: ids.decision,
-        proposalId: ids.proposal,
+        sequence: 2,
+        eventId: ids.event,
+        eventType: "MEMORY_CURATED",
         projectId: ids.project,
-        action: "MERGE",
-        idempotencyKey: "memory:merge-1",
-        decidedAt: now,
+        proposalId: ids.proposal,
+        decisionId: ids.decision,
+        action: "SUPERSEDE",
+        sourceContextItemId: ids.source,
+        targetContextItemId: ids.target,
+        materializedContextItemId: ids.target,
+        content: "Invalid self replacement.",
+        occurredAt: now,
       }),
     ).toThrow();
     expect(() =>
@@ -90,18 +144,5 @@ describe("memory curation contracts", () => {
         accountId: "account_66666666-6666-6666-6666-666666666666",
       }),
     ).toThrow();
-    const merge = MemoryCurationDecisionSchema.parse({
-      schemaVersion: 1,
-      id: ids.decision,
-      proposalId: ids.proposal,
-      projectId: ids.project,
-      action: "MERGE",
-      targetContextItemId: ids.target,
-      idempotencyKey: "memory:merge-1",
-      decidedAt: now,
-    });
-    expect(merge.action).toBe("MERGE");
-    if (merge.action !== "MERGE") throw new Error("Expected merge decision");
-    expect(merge.targetContextItemId).toBe(ids.target);
   });
 });
