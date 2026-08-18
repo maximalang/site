@@ -41,3 +41,6 @@ jobs:
           URL="$(cat ops/agent-world-edge-upstream.txt | tr -d '\n\r')"
           curl --fail --retry 5 --retry-delay 2 "${URL}/.well-known/oauth-authorization-server/oauth"
           curl --fail --retry 5 --retry-delay 2 "${URL}/.well-known/oauth-protected-resource/api/mcp"
+
+      - name: Validation marker
+        run: echo "temporary AI World edge validation retrigger"
