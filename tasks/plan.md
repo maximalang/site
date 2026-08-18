@@ -16,15 +16,20 @@ never presented as a customer charge or invoiced truth.
 
 ## Current verification state
 
-Repository implementation for Phases 0-11 is present. Repository-side production
-preparation now includes the hardened Caddy/OAuth boundary, deterministic
-workspace lockfile validation, a read-only public production preflight and a
-single owner live-acceptance runbook. The final repository-side change set is PR
-#9 and is mergeable only after its complete exact-head eight-job CI matrix.
-Final run/tree-equivalence evidence is recorded in the PR audit trail so a
-post-green documentation commit does not invalidate the proof.
+Repository implementation for Phases 0-11 is present and repository-side
+production preparation is complete. PR #9 merged the hardened Caddy/OAuth
+boundary, deterministic workspace lockfile validation, read-only public
+production preflight and the final owner live-acceptance runbook.
 
-Dependency maintenance is closed in ordered, freshly rebased steps:
+PR #9 exact head `2890d53543daca0907e3d48a4e4a8601db1bf3b2` passed CI run
+`32178938077` with all eight jobs green. GitHub's tested synthetic merge
+`e1847542979f16a728c92e4d44fe442c70d534a6` and actual merge commit
+`851be54c4844a4455529893c702b63f803716dbd` share tree SHA
+`06a7df57989318d7fa2d099a3385304ce5753032`, proving that the code-bearing tree
+merged to the default branch is exactly the tree validated by the release
+matrix.
+
+Dependency maintenance is also closed in ordered, freshly rebased steps:
 
 - `oidc-provider` 9.11.3 — PR #2, CI `32175451514`, 8/8 green;
 - Next.js 16.3.1 — PR #3, CI `32176613840`, 8/8 green;
@@ -32,10 +37,9 @@ Dependency maintenance is closed in ordered, freshly rebased steps:
 - LangChain Core 1.2.8 — PR #4, CI `32177971551`, 8/8 green after explicit
   review of its retry-classification behavior change.
 
-The resulting dependency baseline is
-`f4180b549fb65db56d66f9fcaed312dd92280ed9`. The Native Chat launcher lockfile
-entry drift discovered during dependency maintenance is corrected, and CI now
-fails if workspace dependency metadata and `package-lock.json` diverge again.
+The Native Chat launcher lockfile entry drift discovered during dependency
+maintenance is corrected, and CI now fails if workspace dependency metadata and
+`package-lock.json` diverge again.
 
 The current authoritative product matrix is
 [`docs/audits/acceptance-2026-08-18.md`](../docs/audits/acceptance-2026-08-18.md):
@@ -192,13 +196,14 @@ Phase 0 reuse and license audit
 ### Production gate
 
 - [x] Ordered dependency updates each pass the complete exact-head CI matrix.
+- [x] Final PR #9 exact-head eight-job matrix is green and its exact tree is
+      merged to the default branch.
 - [x] Docker Compose core starts without optional profiles.
 - [x] Backup/restore and upgrade behavior are verified on an isolated environment.
 - [x] Workspace manifest/package-lock drift is a CI failure.
 - [x] Public production preflight exists and is read-only/fail-closed.
 - [x] Every numbered acceptance criterion has an authoritative evidence row and
       no criterion is `OPEN`.
-- [ ] Final PR #9 exact-head eight-job matrix is green and merged.
 - [ ] Every numbered acceptance criterion is `PASS` in real product scope.
 - [ ] One successful real owner-authenticated Codex Run records terminal
       provenance.
