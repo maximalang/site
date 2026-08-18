@@ -150,7 +150,8 @@ export function compileContextPack(
 
   const eligible = candidates.filter(
     (candidate) =>
-      candidate.item.validUntil === undefined || Date.parse(candidate.item.validUntil) > compiledAtMs,
+      candidate.item.validUntil === undefined ||
+      Date.parse(candidate.item.validUntil) > compiledAtMs,
   );
   const unique = new Map<string, Candidate>();
   for (const candidate of ranked(eligible)) {
