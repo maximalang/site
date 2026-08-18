@@ -143,7 +143,7 @@ describe("compileContextPack", () => {
     const constrained = {
       ...input,
       tokenBudget: 256,
-      task: { ...input.task, description: "low-priority task detail ".repeat(2_000) },
+      task: { ...input.task, description: "low-priority task detail ".repeat(500) },
     };
     const pack = compileContextPack(constrained, [], "2026-08-14T21:00:00.000Z");
     const goal = pack.sections.find(({ name }) => name === "GOAL")?.content ?? "";
