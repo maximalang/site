@@ -64,16 +64,40 @@ await check("OAuth discovery, PKCE, refresh and DCR", async () => {
   expectStatus(response, 200, "OAuth metadata");
   oauthMetadata = await readJson(response, "OAuth metadata");
   assert(oauthMetadata?.issuer === expectedIssuer, `issuer must equal ${expectedIssuer}`);
-  expectExactUrl(oauthMetadata?.authorization_endpoint, `${expectedIssuer}/auth`, "authorization_endpoint");
+  expectExactUrl(
+    oauthMetadata?.authorization_endpoint,
+    `${expectedIssuer}/auth`,
+    "authorization_endpoint",
+  );
   expectExactUrl(oauthMetadata?.token_endpoint, `${expectedIssuer}/token`, "token_endpoint");
-  expectExactUrl(oauthMetadata?.registration_endpoint, `${expectedIssuer}/reg`, "registration_endpoint");
-  expectExactUrl(oauthMetadata?.revocation_endpoint, `${expectedIssuer}/token/revocation`, "revocation_endpoint");
+  expectExactUrl(
+    oauthMetadata?.registration_endpoint,
+    `${expectedIssuer}/reg`,
+    "registration_endpoint",
+  );
+  expectExactUrl(
+    oauthMetadata?.revocation_endpoint,
+    `${expectedIssuer}/token/revocation`,
+    "revocation_endpoint",
+  );
   expectExactUrl(oauthMetadata?.jwks_uri, `${expectedIssuer}/jwks`, "jwks_uri");
-  expectIncludes(oauthMetadata?.grant_types_supported, "authorization_code", "grant_types_supported");
+  expectIncludes(
+    oauthMetadata?.grant_types_supported,
+    "authorization_code",
+    "grant_types_supported",
+  );
   expectIncludes(oauthMetadata?.grant_types_supported, "refresh_token", "grant_types_supported");
   expectIncludes(oauthMetadata?.response_types_supported, "code", "response_types_supported");
-  expectIncludes(oauthMetadata?.code_challenge_methods_supported, "S256", "code_challenge_methods_supported");
-  expectIncludes(oauthMetadata?.token_endpoint_auth_methods_supported, "none", "token_endpoint_auth_methods_supported");
+  expectIncludes(
+    oauthMetadata?.code_challenge_methods_supported,
+    "S256",
+    "code_challenge_methods_supported",
+  );
+  expectIncludes(
+    oauthMetadata?.token_endpoint_auth_methods_supported,
+    "none",
+    "token_endpoint_auth_methods_supported",
+  );
   expectIncludes(oauthMetadata?.scopes_supported, "offline_access", "scopes_supported");
   expectIncludes(oauthMetadata?.scopes_supported, WRITE_SCOPE, "scopes_supported");
 });
@@ -85,7 +109,10 @@ await check("Public ES256 JWKS contains no private key material", async () => {
   expectStatus(response, 200, "JWKS");
   const jwks = await readJson(response, "JWKS");
   assert(Array.isArray(jwks?.keys) && jwks.keys.length >= 1, "JWKS must contain at least one key");
-  assert(jwks.keys.every((key) => key && key.d === undefined), "public JWKS must not expose private d values");
+  assert(
+    jwks.keys.every((key) => key && key.d === undefined),
+    "public JWKS must not expose private d values",
+  );
   assert(
     jwks.keys.some(
       (key) =>
@@ -113,10 +140,19 @@ await check("MCP resource fails closed without bearer token", async () => {
   });
   expectStatus(response, 401, "unauthenticated MCP request");
   const body = await readJson(response, "unauthenticated MCP request");
-  assert(body?.error?.code === "UNAUTHORIZED", "MCP must return UNAUTHORIZED without a bearer token");
+  assert(
+    body?.error?.code === "UNAUTHORIZED",
+    "MCP must return UNAUTHORIZED without a bearer token",
+  );
   const challenge = response.headers.get("www-authenticate") ?? "";
-  assert(challenge.includes(`resource_metadata=\"${protectedMetadataUrl}\"`), "MCP challenge must point to protected-resource metadata");
-  assert(challenge.includes(`scope=\"${WRITE_SCOPE}\"`), "MCP challenge must request the write scope");
+  assert(
+    challenge.includes(`resource_metadata="${protectedMetadataUrl}"`),
+    "MCP challenge must point to protected-resource metadata",
+  );
+  assert(
+    challenge.includes(`scope="${WRITE_SCOPE}"`),
+    "MCP challenge must request the write scope",
+  );
 });
 
 await check("Native Chat launcher control is enabled and bearer-protected", async () => {
@@ -127,7 +163,10 @@ await check("Native Chat launcher control is enabled and bearer-protected", asyn
   });
   expectStatus(response, 401, "unauthenticated launcher control request");
   const body = await readJson(response, "unauthenticated launcher control request");
-  assert(body?.error?.code === "UNAUTHORIZED", "launcher control must be configured and bearer-protected");
+  assert(
+    body?.error?.code === "UNAUTHORIZED",
+    "launcher control must be configured and bearer-protected",
+  );
 });
 
 await check("Custom GPT Actions fallback contract", async () => {
@@ -144,7 +183,10 @@ await check("Custom GPT Actions fallback contract", async () => {
     ["/api/chat-actions/runs/fail", "failRun"],
   ]);
   for (const [path, operationId] of expectedOperations) {
-    assert(spec?.paths?.[path]?.post?.operationId === operationId, `${path} must expose ${operationId}`);
+    assert(
+      spec?.paths?.[path]?.post?.operationId === operationId,
+      `${path} must expose ${operationId}`,
+    );
     const security = spec.paths[path].post.security;
     assert(
       Array.isArray(security) && security.some((entry) => entry?.oauth?.includes?.(WRITE_SCOPE)),
@@ -152,8 +194,14 @@ await check("Custom GPT Actions fallback contract", async () => {
     );
   }
   const flow = spec?.components?.securitySchemes?.oauth?.flows?.authorizationCode;
-  assert(flow?.authorizationUrl === `${expectedIssuer}/auth`, "Actions authorization URL must use the AI World issuer");
-  assert(flow?.tokenUrl === `${expectedIssuer}/token`, "Actions token URL must use the AI World issuer");
+  assert(
+    flow?.authorizationUrl === `${expectedIssuer}/auth`,
+    "Actions authorization URL must use the AI World issuer",
+  );
+  assert(
+    flow?.tokenUrl === `${expectedIssuer}/token`,
+    "Actions token URL must use the AI World issuer",
+  );
 });
 
 process.stdout.write(
@@ -228,7 +276,9 @@ function canonicalProductionOrigin(value) {
     url.hash ||
     (url.pathname !== "/" && url.pathname !== "")
   ) {
-    throw new Error("Production preflight target must be an HTTPS origin without path, credentials, query or fragment");
+    throw new Error(
+      "Production preflight target must be an HTTPS origin without path, credentials, query or fragment",
+    );
   }
   const hostname = url.hostname.toLowerCase();
   if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname)) {
@@ -259,7 +309,10 @@ function expectIncludes(value, expected, label) {
 }
 
 function expectStatus(response, expected, label) {
-  assert(response.status === expected, `${label} returned HTTP ${response.status}; expected ${expected}`);
+  assert(
+    response.status === expected,
+    `${label} returned HTTP ${response.status}; expected ${expected}`,
+  );
 }
 
 function assert(condition, message) {
