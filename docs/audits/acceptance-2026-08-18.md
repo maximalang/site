@@ -1,36 +1,57 @@
 # Product acceptance audit — 2026-08-18
 
 This is the authoritative current-state acceptance matrix for AI World after the
-production-activation regression pass. `PASS` requires repository/runtime evidence
-at the criterion scope. `PARTIAL` means implementation exists but a real owner or
-environment proof is still required. `OPEN` means a required product surface is
-absent.
+production-activation regression and auth-edge hardening passes. `PASS` requires
+repository/runtime evidence at the criterion scope. `PARTIAL` means implementation
+exists but a real owner or environment proof is still required. `OPEN` means a
+required product surface is absent.
 
 Current product result: **22/24 PASS, 2/24 PARTIAL, 0/24 OPEN**.
 
-This product score is not a release claim. At audit start the repository default
-branch was `codex/phase-1-contracts` at
-`8a58c88c8ddb60e8a792ec70ac189bec8ee6a0c4`, 25 commits ahead of the previous
-fully audited green commit `0e34d0e7158fc28003d15c1304da4d93c325ef0d`.
-PR #6 (`codex/production-activation-pass-2026-08-18`) is the release-candidate
-line for this pass. Exact-head CI for the latest PR head is required before merge
-or deployment; historical green evidence is not substituted for it.
+The latest code-bearing production hardening is merged. PR #6 removed obsolete
+temporary production-edge state, fixed the inherited formatter regression and
+re-established exact-tree release evidence. PR #7 then hardened Native Chat auth
+rate-limit identity at the Caddy boundary by overwriting `X-Real-IP` with Caddy's
+computed client IP and added a Compose regression contract for that boundary.
+
+PR #7 head `19d16bd85f8c5a8a9eb1f98e3a4d5fc49f47cd79` passed the complete eight-job CI
+workflow in run `32171862239`: quality, PostgreSQL/runtime, orchestration,
+OpenClaw, LiteLLM, Codex deterministic verification, browser/E2E plus visual
+evidence, and container/Compose. GitHub tested synthetic merge commit
+`d7e58d52c87527d3f12c68ac8debb9401b757921`; the actual merge commit
+`4c565936dd12427516f6ba7aadddf614f6a9c931` has the same tree SHA
+`a44620f06137fd4e2e154e44f7925856bdc30463`. Therefore the code-bearing tree
+merged to the default branch is exactly the tree validated by the successful
+full CI matrix.
+
+This product score is still not a production-activation claim. The remaining
+acceptance gaps are external live proofs and must not be replaced with fixtures,
+historical runs or deterministic CI.
 
 ## Current-pass findings
 
-- The last default-branch commit introduced a Biome formatting regression in
-  `apps/native-chat-auth/src/entrypoint.js`; exact-head CI exposed it and PR #6
-  contains the formatter-only correction without changing retry semantics.
-- Production ingress is the documented Caddy/DNS HTTPS path. Two temporary
-  Pinggy validation workflows and the tracked ephemeral edge URL were obsolete
-  production-facing state and are removed in PR #6.
-- The Pinggy helper remains only as an explicit local-development tool and no
-  longer writes an ephemeral URL into the repository.
-- The isolated Native Chat Compose verifier now uses an AI World fixture origin
-  rather than stale Recruiter Radar naming.
-- Repository governance remains unusual: `codex/phase-1-contracts` is still the
-  default branch and no `main` branch is present. This pass does not rewrite
-  history or change the default branch automatically.
+- The inherited Biome formatting regression in Native Chat auth startup was
+  exposed by exact-head CI and corrected without changing retry semantics.
+- Production ingress is the documented Caddy/DNS HTTPS path. Temporary Pinggy
+  validation workflows and tracked ephemeral edge state were removed; the local
+  helper remains development-only and no longer mutates the repository.
+- Native Chat Compose verification uses an AI World fixture origin rather than
+  stale Recruiter Radar naming.
+- Native Chat auth now binds pre-auth rate limiting/login throttling to the client
+  IP supplied by the trusted Caddy edge rather than a client-controlled
+  `X-Real-IP` header, and Compose verification enforces that proxy contract.
+- Repository-wide review found no known `TODO`, `FIXME`, `Not implemented` or
+  placeholder product implementation tail.
+- SSH mutation execution is implemented through `ssh2`, no PTY, bounded output,
+  host allowlisting, explicit private-network acknowledgement, SHA-256 host-key
+  pinning and registered operation schemas whose command-bearing fields exclude
+  shell metacharacters/traversal.
+- Integration mutations remain approval-gated and durable: request, explicit
+  approve/deny decision, execution and terminal result are persisted with
+  idempotency/conflict checks and runtime readiness revalidation.
+- Repository governance remains unusual: `codex/phase-1-contracts` is the default
+  branch and no `main` branch is present. This audit does not rewrite history or
+  change the default branch automatically.
 
 | # | Product criterion | Status | Current evidence / remaining gate |
 |---:|---|---|---|
@@ -59,17 +80,24 @@ or deployment; historical green evidence is not substituted for it.
 | 23 | Do not send every Agent the full history | PASS | Lazy MCP/context pulls and compiler budgets exclude full transcripts by default. |
 | 24 | Avoid third-party dashboards in normal work | PASS | World, Command, Hub, Memory and Observatory are native surfaces; integrations remain adapters/projections. |
 
-## Exact-head release evidence
+## Automated release evidence
 
-The complete CI workflow still contains eight release jobs: quality,
-PostgreSQL/runtime, orchestration, OpenClaw, LiteLLM, Codex, browser/E2E and
-container/Compose. The release decision must use the latest PR #6 head and its
-corresponding workflow run. A superseded or historical run does not count.
+The complete code-bearing release matrix is green. CI run `32171862239` completed
+successfully on the PR #7 synthetic merge tree, including:
 
-The first PR #6 run correctly exposed the inherited Biome failure before
-`typecheck`, unit tests and build could execute. That failure is repaired on the
-candidate branch. The final audit result must therefore be read together with
-the latest exact-head CI state, not the failed superseded run.
+- dependency audit/signature verification, formatting/lint, typecheck, unit tests
+  and production build;
+- PostgreSQL migrations/runtime/restart coverage;
+- orchestration, OpenClaw, LiteLLM and official Codex deterministic verifiers;
+- responsive browser/E2E plus visual evidence upload;
+- isolated container/Compose verification, including the hardened Caddy/Native
+  Chat topology.
+
+The actual PR #7 merge commit carries the identical tree SHA, so no code delta
+exists between the tree CI validated and the code-bearing tree merged to the
+default branch. Subsequent documentation-only evidence maintenance does not
+replace or weaken this proof; any new code-bearing change requires a new
+exact-tree release matrix.
 
 ## External live gates
 
@@ -85,16 +113,26 @@ These are not replaceable by fixtures or deterministic CI:
    provenance. A deterministic Codex verifier or a prior allowance rejection is
    not a production success.
 
+## Maintenance outside acceptance
+
+Open Dependabot pull requests are dependency-maintenance work, not evidence that
+a numbered product criterion is missing. They are intentionally not folded into
+this production-closure pass without fresh compatibility review. In particular,
+the proposed `@langchain/core` update includes retry-behavior changes and must not
+be treated as a blind patch-only upgrade. Current release CI dependency audit and
+registry-signature verification are green.
+
 ## Release decision
 
 - **Repository implementation:** no known `OPEN` numbered criterion.
-- **Product acceptance:** 22/24 PASS; criteria 4 and 18 remain PARTIAL pending
-  real owner/environment evidence.
-- **Temporary production edge dependency:** removed from the release candidate;
-  Pinggy remains local-development-only.
-- **Repository governance:** not normalized automatically; default branch remains
-  `codex/phase-1-contracts` until a deliberate branch-policy decision is made.
-- **Automated release matrix:** must be green on the latest PR #6 head before
-  merge/deploy.
-- **Production activation:** **NOT YET CLAIMED** until exact-head CI and all three
-  external live gates above are proven.
+- **Automated code-bearing release matrix:** **GREEN** on the exact tree merged by
+  PR #7.
+- **Product acceptance:** **22/24 PASS, 2/24 PARTIAL**; criteria 4 and 18 remain
+  pending only on real owner/environment evidence.
+- **Temporary production edge dependency:** removed; Pinggy is local-development
+  only.
+- **Auth edge:** hardened and Compose-verified.
+- **Repository governance:** default branch remains `codex/phase-1-contracts`;
+  no automatic history/default-branch rewrite was performed.
+- **Production activation:** **NOT YET CLAIMED** until all three external live
+  gates above are proven in the real owner environment.
