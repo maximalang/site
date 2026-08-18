@@ -28,6 +28,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      - run: npm run test:lockfile
       - run: npm audit --audit-level=high
       - run: npm audit signatures
       - run: npm run lint
