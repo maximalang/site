@@ -10,14 +10,15 @@ integrations, Observatory telemetry, Native Plus Chat Control/MCP boundaries and
 a hardened one-VDS Docker Compose topology. The application remains fail-closed
 when an external execution surface has not been owner-activated.
 
-Current automated release evidence is tracked in
-[`docs/audits/acceptance-2026-08-17.md`](docs/audits/acceptance-2026-08-17.md).
-At the recorded head, all eight CI jobs pass and 22/24 product acceptance
-criteria are PASS. The remaining two criteria require real owner/environment
-proof: one personal Plus MCP/App terminal run and one approved operation against
-a provisioned SSH host. A successful real ChatGPT-authenticated Codex Run is a
-separate production-activation gate. No fixture substitutes for these live
-proofs.
+Current release and acceptance evidence is tracked in
+[`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md).
+The product matrix remains 22/24 PASS and 2/24 PARTIAL, but production readiness
+also requires a green full CI matrix on the latest release-candidate exact head.
+The remaining product criteria require real owner/environment proof: one personal
+Plus MCP/App terminal run and one approved operation against a provisioned SSH
+host. A successful real ChatGPT-authenticated Codex Run is a separate
+production-activation gate. No fixture or historical green SHA substitutes for
+these live proofs or the current exact-head CI requirement.
 
 ## Quick start
 
@@ -163,7 +164,7 @@ durable approval. No generic raw shell or PTY surface is exposed.
 The hardened topology, backup/restore procedure and rollback gates are in
 [`ops/DEPLOYMENT.md`](ops/DEPLOYMENT.md). The current product acceptance matrix
 and live gates are in
-[`docs/audits/acceptance-2026-08-17.md`](docs/audits/acceptance-2026-08-17.md).
+[`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md).
 The implementation plan is [`tasks/plan.md`](tasks/plan.md).
 
 Key architecture decisions and reuse evidence remain under
