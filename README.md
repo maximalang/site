@@ -12,13 +12,15 @@ when an external execution surface has not been owner-activated.
 
 Current release and acceptance evidence is tracked in
 [`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md).
-The product matrix remains 22/24 PASS and 2/24 PARTIAL, but production readiness
-also requires a green full CI matrix on the latest release-candidate exact head.
-The remaining product criteria require real owner/environment proof: one personal
-Plus MCP/App terminal run and one approved operation against a provisioned SSH
-host. A successful real ChatGPT-authenticated Codex Run is a separate
-production-activation gate. No fixture or historical green SHA substitutes for
-these live proofs or the current exact-head CI requirement.
+The latest code-bearing production hardening is merged and its complete eight-job
+CI matrix is green on the exact tree merged to the default branch, including
+PostgreSQL/runtime, orchestration, OpenClaw, LiteLLM, Codex deterministic
+verification, browser/E2E, visual evidence and container/Compose. Product
+acceptance remains **22/24 PASS, 2/24 PARTIAL, 0 OPEN** because two criteria still
+require real owner/environment proof: one personal Plus MCP/App terminal run and
+one approved operation against a provisioned SSH host. A successful real
+ChatGPT-authenticated Codex Run is a separate production-activation gate. No
+fixture or deterministic verifier substitutes for these live proofs.
 
 ## Quick start
 
@@ -95,9 +97,11 @@ calls.
 
 The laptop no longer connects directly to PostgreSQL. It calls the scoped
 `/api/native-chat-launcher` HTTPS endpoint with a dedicated random token whose
-SHA-256 verifier is stored server-side. PostgreSQL remains private. See
-[`docs/native-chat-mcp.md`](docs/native-chat-mcp.md) for bootstrap, profile and
-live-proof instructions.
+SHA-256 verifier is stored server-side. PostgreSQL remains private. The Caddy
+edge overwrites the auth service's `X-Real-IP` with its computed client IP so
+pre-auth rate limiting and login throttling do not trust a caller-supplied value.
+See [`docs/native-chat-mcp.md`](docs/native-chat-mcp.md) for bootstrap, profile
+and live-proof instructions.
 
 ### RAG and local models
 
