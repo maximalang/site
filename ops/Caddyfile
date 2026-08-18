@@ -7,11 +7,13 @@
 	handle /oauth* {
 		reverse_proxy native-chat-auth:3002 {
 			header_up X-Forwarded-Proto https
+			header_up X-Real-IP {client_ip}
 		}
 	}
 	handle /.well-known/oauth-authorization-server/oauth {
 		reverse_proxy native-chat-auth:3002 {
 			header_up X-Forwarded-Proto https
+			header_up X-Real-IP {client_ip}
 		}
 	}
 	handle {

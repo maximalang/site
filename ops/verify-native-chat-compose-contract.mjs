@@ -60,7 +60,13 @@ for (const [, body] of oauthProxyBlocks) {
     );
   }
 }
+const trustedClientIpHeaders = caddyfile.match(/header_up\s+X-Real-IP\s+\{client_ip\}/g) ?? [];
+if (trustedClientIpHeaders.length !== 2) {
+  throw new Error(
+    "Every native-chat-auth proxy block must overwrite X-Real-IP with Caddy's computed client IP",
+  );
+}
 
 process.stdout.write(
-  `${JSON.stringify({ status: "PASS", nativeChatMigrationOrdering: true, oauthProxyScheme: "https" })}\n`,
+  `${JSON.stringify({ status: "PASS", nativeChatMigrationOrdering: true, oauthProxyScheme: "https", oauthClientIpBoundary: "caddy-client-ip" })}\n`,
 );
