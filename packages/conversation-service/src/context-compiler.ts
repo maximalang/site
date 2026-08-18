@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.1.0";
+const COMPILER_VERSION = "1.2.0";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -74,8 +74,8 @@ function candidateBlock(candidate: Candidate): string {
 function ranked(candidates: Candidate[]): Candidate[] {
   return candidates.toSorted((left, right) => {
     return (
-      TEMPERATURE_RANK[right.item.temperature] - TEMPERATURE_RANK[left.item.temperature] ||
       right.relevance - left.relevance ||
+      TEMPERATURE_RANK[right.item.temperature] - TEMPERATURE_RANK[left.item.temperature] ||
       right.item.importance - left.item.importance ||
       Date.parse(right.item.createdAt) - Date.parse(left.item.createdAt) ||
       left.item.id.localeCompare(right.item.id)

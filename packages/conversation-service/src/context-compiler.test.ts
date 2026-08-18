@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.1.0");
+    expect(first.compilerVersion).toBe("1.2.0");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -151,6 +151,30 @@ describe("compileContextPack", () => {
     expect(pack.estimatedTokens).toBeLessThanOrEqual(256);
     expect(goal).toContain("Canonical instructions: Preserve canonical state.");
     expect(goal).toContain("[TRUNCATED]");
+  });
+
+  it("prioritizes task relevance over memory temperature under budget pressure", () => {
+    const constrained = { ...input, tokenBudget: 700 };
+    const lowRelevanceHot = item("11111111", "MEMORY", `hot ${"x".repeat(1_600)}`, {
+      temperature: "HOT",
+      importance: 1,
+    });
+    const highRelevanceCold = item("22222222", "MEMORY", `cold ${"y".repeat(1_600)}`, {
+      temperature: "COLD",
+      importance: 0,
+    });
+    const pack = compileContextPack(
+      constrained,
+      [
+        { item: lowRelevanceHot, relevance: 0.05 },
+        { item: highRelevanceCold, relevance: 0.95 },
+      ],
+      "2026-08-14T21:00:00.000Z",
+    );
+
+    expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([highRelevanceCold.id]);
+    expect(pack.rendered).toContain(highRelevanceCold.content);
+    expect(pack.rendered).not.toContain(lowRelevanceHot.content);
   });
 
   it("fits only complete optional entries and deterministically truncates mandatory fields", () => {
