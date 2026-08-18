@@ -114,7 +114,10 @@ export const MemoryProjectionEventSchema = z
         context.addIssue({ code: "custom", message: "Targeted memory action requires a target" });
       }
     } else if (event.targetContextItemId) {
-      context.addIssue({ code: "custom", message: "Untargeted memory action cannot contain a target" });
+      context.addIssue({
+        code: "custom",
+        message: "Untargeted memory action cannot contain a target",
+      });
     }
     if (event.action !== "REJECT" && !event.materializedContextItemId) {
       context.addIssue({ code: "custom", message: "Accepted memory requires a materialized item" });
@@ -134,7 +137,10 @@ export const MemoryProjectionEventSchema = z
       event.targetContextItemId &&
       event.materializedContextItemId === event.targetContextItemId
     ) {
-      context.addIssue({ code: "custom", message: "Superseding memory must replace a distinct target" });
+      context.addIssue({
+        code: "custom",
+        message: "Superseding memory must replace a distinct target",
+      });
     }
   });
 export type MemoryProjectionEvent = z.infer<typeof MemoryProjectionEventSchema>;
