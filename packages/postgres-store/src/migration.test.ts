@@ -56,6 +56,7 @@ describe("discoverMigrations", () => {
       { version: 41, name: "0041_integration_mutation_approvals.sql" },
       { version: 42, name: "0042_integration_tool_allowlist.sql" },
       { version: 43, name: "0043_integration_ssh_operation_allowlist.sql" },
+      { version: 44, name: "0044_memory_supersession.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -120,6 +121,8 @@ describe("discoverMigrations", () => {
     expect(migrations[42]?.sql).toContain(
       "CREATE TABLE agent_world.integration_ssh_operation_allowlist",
     );
+    expect(migrations[43]?.sql).toContain("'SUPERSEDE'");
+    expect(migrations[43]?.sql).toContain("target_context_item_id");
     expect(migrations[30]?.sql).toContain(
       "CREATE TABLE agent_world.structured_meeting_criterion_assessments",
     );

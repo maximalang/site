@@ -10,7 +10,13 @@ import { IdempotencyKeySchema, TimestampSchema } from "./primitives.js";
 
 const ContentHashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
-export const MemoryProposalStatusSchema = z.enum(["PENDING", "ACCEPTED", "MERGED", "REJECTED"]);
+export const MemoryProposalStatusSchema = z.enum([
+  "PENDING",
+  "ACCEPTED",
+  "MERGED",
+  "SUPERSEDED",
+  "REJECTED",
+]);
 export type MemoryProposalStatus = z.infer<typeof MemoryProposalStatusSchema>;
 
 export const MemoryProposalSchema = z.strictObject({
@@ -42,6 +48,11 @@ export const MemoryCurationDecisionInputSchema = z.discriminatedUnion("action", 
     action: z.literal("MERGE"),
     targetContextItemId: ContextItemIdSchema,
   }),
+  z.strictObject({
+    ...DecisionBase,
+    action: z.literal("SUPERSEDE"),
+    targetContextItemId: ContextItemIdSchema,
+  }),
   z.strictObject({ ...DecisionBase, action: z.literal("REJECT") }),
 ]);
 export type MemoryCurationDecisionInput = z.infer<typeof MemoryCurationDecisionInputSchema>;
@@ -54,9 +65,17 @@ export const MemoryCurationDecisionSchema = z.discriminatedUnion("action", [
     targetContextItemId: ContextItemIdSchema,
     decidedAt: TimestampSchema,
   }),
+  z.strictObject({
+    ...DecisionBase,
+    action: z.literal("SUPERSEDE"),
+    targetContextItemId: ContextItemIdSchema,
+    decidedAt: TimestampSchema,
+  }),
   z.strictObject({ ...DecisionBase, action: z.literal("REJECT"), decidedAt: TimestampSchema }),
 ]);
 export type MemoryCurationDecision = z.infer<typeof MemoryCurationDecisionSchema>;
+
+const MemoryActionSchema = z.enum(["ACCEPT", "MERGE", "SUPERSEDE", "REJECT"]);
 
 export const MemoryProjectionEventSchema = z
   .strictObject({
@@ -67,27 +86,61 @@ export const MemoryProjectionEventSchema = z
     projectId: ProjectIdSchema,
     proposalId: MemoryProposalIdSchema,
     decisionId: MemoryDecisionIdSchema.optional(),
-    action: z.enum(["ACCEPT", "MERGE", "REJECT"]).optional(),
+    action: MemoryActionSchema.optional(),
     sourceContextItemId: ContextItemIdSchema,
+    targetContextItemId: ContextItemIdSchema.optional(),
     materializedContextItemId: ContextItemIdSchema.optional(),
     content: z.string().trim().min(1).max(20_000),
     occurredAt: TimestampSchema,
   })
   .superRefine((event, context) => {
     if (event.eventType === "MEMORY_PROPOSED") {
-      if (event.decisionId || event.action || event.materializedContextItemId) {
+      if (
+        event.decisionId ||
+        event.action ||
+        event.targetContextItemId ||
+        event.materializedContextItemId
+      ) {
         context.addIssue({ code: "custom", message: "Proposal event cannot contain a decision" });
       }
       return;
     }
     if (!event.decisionId || !event.action) {
       context.addIssue({ code: "custom", message: "Curated event requires a decision" });
+      return;
+    }
+    if (event.action === "MERGE" || event.action === "SUPERSEDE") {
+      if (!event.targetContextItemId) {
+        context.addIssue({ code: "custom", message: "Targeted memory action requires a target" });
+      }
+    } else if (event.targetContextItemId) {
+      context.addIssue({
+        code: "custom",
+        message: "Untargeted memory action cannot contain a target",
+      });
     }
     if (event.action !== "REJECT" && !event.materializedContextItemId) {
       context.addIssue({ code: "custom", message: "Accepted memory requires a materialized item" });
     }
     if (event.action === "REJECT" && event.materializedContextItemId) {
       context.addIssue({ code: "custom", message: "Rejected memory cannot materialize context" });
+    }
+    if (
+      event.action === "MERGE" &&
+      event.targetContextItemId &&
+      event.materializedContextItemId !== event.targetContextItemId
+    ) {
+      context.addIssue({ code: "custom", message: "Merged memory must materialize as its target" });
+    }
+    if (
+      event.action === "SUPERSEDE" &&
+      event.targetContextItemId &&
+      event.materializedContextItemId === event.targetContextItemId
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Superseding memory must replace a distinct target",
+      });
     }
   });
 export type MemoryProjectionEvent = z.infer<typeof MemoryProjectionEventSchema>;
@@ -102,8 +155,9 @@ export type MemoryInbox = z.infer<typeof MemoryInboxSchema>;
 export const MemoryTimelineEntrySchema = z.strictObject({
   decisionId: MemoryDecisionIdSchema,
   proposalId: MemoryProposalIdSchema,
-  action: z.enum(["ACCEPT", "MERGE", "REJECT"]),
+  action: MemoryActionSchema,
   sourceContextItemId: ContextItemIdSchema,
+  targetContextItemId: ContextItemIdSchema.optional(),
   materializedContextItemId: ContextItemIdSchema.optional(),
   content: z.string().trim().min(1).max(20_000),
   decidedAt: TimestampSchema,
@@ -128,7 +182,7 @@ export const MemoryNetworkEdgeSchema = z.strictObject({
   decisionId: MemoryDecisionIdSchema,
   sourceContextItemId: ContextItemIdSchema,
   targetContextItemId: ContextItemIdSchema,
-  relation: z.enum(["ACCEPTED_FROM", "MERGED_INTO"]),
+  relation: z.enum(["ACCEPTED_FROM", "MERGED_INTO", "SUPERSEDES"]),
   createdAt: TimestampSchema,
 });
 

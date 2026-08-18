@@ -22,6 +22,7 @@ type EventRow = QueryResultRow & {
   proposal_id: string;
   decision_id: string | null;
   source_context_item_id: string;
+  target_context_item_id: string | null;
   materialized_context_item_id: string | null;
   action: string | null;
   content: string;
@@ -62,8 +63,8 @@ export class PostgresMemoryProjectionStore {
     const limit = positiveLimit(limitValue);
     const result = await this.pool.query<EventRow>(
       `SELECT sequence, id, event_type, project_id, proposal_id, decision_id,
-              source_context_item_id, materialized_context_item_id, action,
-              content, occurred_at
+              source_context_item_id, target_context_item_id,
+              materialized_context_item_id, action, content, occurred_at
          FROM agent_world.memory_events
         WHERE sequence > $1
         ORDER BY sequence, id
@@ -81,6 +82,9 @@ export class PostgresMemoryProjectionStore {
         ...(row.decision_id === null ? {} : { decisionId: row.decision_id }),
         ...(row.action === null ? {} : { action: row.action }),
         sourceContextItemId: row.source_context_item_id,
+        ...(row.target_context_item_id === null
+          ? {}
+          : { targetContextItemId: row.target_context_item_id }),
         ...(row.materialized_context_item_id === null
           ? {}
           : { materializedContextItemId: row.materialized_context_item_id }),
