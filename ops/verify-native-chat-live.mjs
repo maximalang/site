@@ -11,7 +11,7 @@ const project = `agent-world-native-chat-${suffix}`;
 const imageTag = `native-chat-${suffix}`;
 const secretDirectory = fileURLToPath(new URL(`../.native-chat-secrets-${suffix}/`, import.meta.url));
 const maxBuffer = 64 * 1024 * 1024;
-const publicOrigin = "https://recruiter-radar.invalid";
+const publicOrigin = "https://ai-world.invalid";
 const compose = ["compose", "--project-name", project, "--profile", "native-chat"];
 
 function randomSecret() {
@@ -81,7 +81,7 @@ function get(port, path, expectedStatus) {
         port,
         path,
         method: "GET",
-        headers: { host: "recruiter-radar.invalid" },
+        headers: { host: "ai-world.invalid" },
         timeout: 5_000,
       },
       (response) => {
