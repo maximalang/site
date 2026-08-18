@@ -1,0 +1,70 @@
+name: One-shot memory merge active target fix
+on:
+  push:
+    branches:
+      - codex/memory-merge-active-target
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.15.0
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - name: Apply focused merge-target invariant
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('packages/postgres-store/src/memory-curation-store.ts')
+          text = path.read_text()
+          old = '''      if (decision.action === "MERGE") {
+        const target = await client.query<{ id: string }>(
+          `SELECT id FROM agent_world.context_items
+            WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
+            FOR SHARE`,
+          [decision.targetContextItemId, decision.projectId],
+        );
+        if (!target.rows[0]) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
+        targetContextItemId = target.rows[0].id;
+        materializedContextItemId = target.rows[0].id;
+'''
+          new = '''      if (decision.action === "MERGE") {
+        const target = await client.query<TargetRow>(
+          `SELECT id, created_at, valid_until
+             FROM agent_world.context_items
+            WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
+            FOR SHARE`,
+          [decision.targetContextItemId, decision.projectId],
+        );
+        const targetRow = target.rows[0];
+        if (!targetRow) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
+        const decidedAt = Date.parse(decision.decidedAt);
+        if (
+          timestamp(targetRow.created_at) >= decidedAt ||
+          (targetRow.valid_until !== null && timestamp(targetRow.valid_until) <= decidedAt)
+        ) {
+          throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
+        }
+        targetContextItemId = targetRow.id;
+        materializedContextItemId = targetRow.id;
+'''
+          if old not in text:
+              raise SystemExit('expected merge block not found')
+          path.write_text(text.replace(old, new))
+      - run: npx biome check --write packages/postgres-store/src/memory-curation-store.ts
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/one-shot-memory-merge-active-target.yml
+      - name: Commit focused fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/postgres-store/src/memory-curation-store.ts .github/workflows/one-shot-memory-merge-active-target.yml
+          git commit -m "Require active memory merge targets"
+          git push origin HEAD:codex/memory-merge-active-target
