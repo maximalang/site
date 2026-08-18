@@ -11,11 +11,11 @@ a hardened one-VDS Docker Compose topology. The application remains fail-closed
 when an external execution surface has not been owner-activated.
 
 Current release and acceptance evidence is tracked in
-[`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md).
-The latest code-bearing production hardening is merged and its complete eight-job
-CI matrix is green on the exact tree merged to the default branch, including
-PostgreSQL/runtime, orchestration, OpenClaw, LiteLLM, Codex deterministic
-verification, browser/E2E, visual evidence and container/Compose. Product
+[`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md), and
+the final real-owner test sequence is in
+[`docs/live-acceptance.md`](docs/live-acceptance.md). Dependency maintenance has
+been closed through `oidc-provider` 9.11.3, Next.js 16.3.1, LangGraph 1.4.10 and
+LangChain Core 1.2.8, each through a fresh ordered full CI matrix. Product
 acceptance remains **22/24 PASS, 2/24 PARTIAL, 0 OPEN** because two criteria still
 require real owner/environment proof: one personal Plus MCP/App terminal run and
 one approved operation against a provisioned SSH host. A successful real
@@ -28,6 +28,7 @@ Requirements: Node.js `24.15.x` and npm `11.12.x`.
 
 ```powershell
 npm ci
+npm run test:lockfile
 npm test
 npm run typecheck
 npm run lint
@@ -36,13 +37,16 @@ npm run test:e2e
 ```
 
 The committed `.npmrc` disables dependency lifecycle scripts. The authoritative
-lock file is used by CI with `npm ci --ignore-scripts`.
+lock file is used by CI with `npm ci --ignore-scripts`, followed by a workspace
+manifest/package-lock consistency check so stale workspace dependency metadata
+fails before the rest of the release matrix.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `npm ci` | Frozen installation from the authoritative lock file |
+| `npm run test:lockfile` | Verify every workspace manifest matches its `package-lock.json` entry |
 | `npm test` | Deterministic Vitest contract/unit suite |
 | `npm run typecheck` | Strict TypeScript validation without emit |
 | `npm run lint` | Biome formatting, lint and import checks |
@@ -56,6 +60,7 @@ lock file is used by CI with `npm ci --ignore-scripts`.
 | `npm run test:litellm-live` | Pinned LiteLLM gateway/projection verifier |
 | `npm run test:codex-live` | Official Codex SDK/CLI deterministic verifier |
 | `npm run test:compose` | Isolated HTTPS Compose, degradation and backup/restore verification |
+| `npm run test:production-preflight -- https://<host>` | Read-only public production control-plane preflight before owner live tests |
 | `npm run bootstrap:token --workspace @agent-world/native-chat-launcher -- <absolute-token-file>` | Generate the host-launcher bearer token and print only its SHA-256 verifier |
 | `npm start --workspace @agent-world/native-chat-launcher` | Run the host-local Native Plus Chat `run_id` launcher |
 | `npm run clean` | Remove TypeScript project-reference outputs |
@@ -68,6 +73,21 @@ Chat and local-model origins are optional and fail closed when their required
 configuration is absent.
 
 ## Production activation boundaries
+
+Before any owner-authenticated production proof, run the read-only public
+preflight against the real HTTPS origin:
+
+```sh
+npm run test:production-preflight -- https://ai-world.example.com
+```
+
+It validates live/readiness, one-year HSTS, removal of the public `Server`
+header, RFC 9728 protected-resource metadata, isolated OAuth discovery,
+Authorization Code + refresh + public-client DCR + PKCE S256, public ES256 JWKS,
+MCP fail-closed challenge, configured bearer-protected launcher control and the
+bounded Custom GPT Actions fallback contract. A preflight `PASS` proves only the
+public control plane; it does not replace the three real owner/environment
+proofs in `docs/live-acceptance.md`.
 
 ### Codex
 
@@ -100,8 +120,10 @@ The laptop no longer connects directly to PostgreSQL. It calls the scoped
 SHA-256 verifier is stored server-side. PostgreSQL remains private. The Caddy
 edge overwrites the auth service's `X-Real-IP` with its computed client IP so
 pre-auth rate limiting and login throttling do not trust a caller-supplied value.
-See [`docs/native-chat-mcp.md`](docs/native-chat-mcp.md) for bootstrap, profile
-and live-proof instructions.
+The same edge enforces a one-year HSTS policy and removes its public `Server`
+header. See [`docs/native-chat-mcp.md`](docs/native-chat-mcp.md) for bootstrap and
+profile details and [`docs/live-acceptance.md`](docs/live-acceptance.md) for the
+final terminal proof.
 
 ### RAG and local models
 
@@ -167,9 +189,10 @@ durable approval. No generic raw shell or PTY surface is exposed.
 
 The hardened topology, backup/restore procedure and rollback gates are in
 [`ops/DEPLOYMENT.md`](ops/DEPLOYMENT.md). The current product acceptance matrix
-and live gates are in
-[`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md).
-The implementation plan is [`tasks/plan.md`](tasks/plan.md).
+is in [`docs/audits/acceptance-2026-08-18.md`](docs/audits/acceptance-2026-08-18.md),
+and the owner live-proof procedure is
+[`docs/live-acceptance.md`](docs/live-acceptance.md). The implementation plan is
+[`tasks/plan.md`](tasks/plan.md).
 
 Key architecture decisions and reuse evidence remain under
 [`docs/decisions`](docs/decisions) and [`docs/audits/phase-0`](docs/audits/phase-0).
