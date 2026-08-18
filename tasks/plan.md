@@ -16,13 +16,26 @@ never presented as a customer charge or invoiced truth.
 
 ## Current verification state
 
-Repository implementation for Phases 0-11 is present. The latest code-bearing
-production hardening is merged and the complete eight-job CI matrix is green on
-the exact tree merged to the default branch. PR #7 head
-`19d16bd85f8c5a8a9eb1f98e3a4d5fc49f47cd79` passed CI run `32171862239`.
-GitHub's tested synthetic merge commit and the actual merge commit
-`4c565936dd12427516f6ba7aadddf614f6a9c931` share tree SHA
-`a44620f06137fd4e2e154e44f7925856bdc30463`.
+Repository implementation for Phases 0-11 is present. Repository-side production
+preparation now includes the hardened Caddy/OAuth boundary, deterministic
+workspace lockfile validation, a read-only public production preflight and a
+single owner live-acceptance runbook. The final repository-side change set is PR
+#9 and is mergeable only after its complete exact-head eight-job CI matrix.
+Final run/tree-equivalence evidence is recorded in the PR audit trail so a
+post-green documentation commit does not invalidate the proof.
+
+Dependency maintenance is closed in ordered, freshly rebased steps:
+
+- `oidc-provider` 9.11.3 — PR #2, CI `32175451514`, 8/8 green;
+- Next.js 16.3.1 — PR #3, CI `32176613840`, 8/8 green;
+- LangGraph 1.4.10 — PR #5, CI `32177355645`, 8/8 green;
+- LangChain Core 1.2.8 — PR #4, CI `32177971551`, 8/8 green after explicit
+  review of its retry-classification behavior change.
+
+The resulting dependency baseline is
+`f4180b549fb65db56d66f9fcaed312dd92280ed9`. The Native Chat launcher lockfile
+entry drift discovered during dependency maintenance is corrected, and CI now
+fails if workspace dependency metadata and `package-lock.json` diverge again.
 
 The current authoritative product matrix is
 [`docs/audits/acceptance-2026-08-18.md`](../docs/audits/acceptance-2026-08-18.md):
@@ -38,14 +51,15 @@ surfaces:
 
 A successful real ChatGPT-authenticated Codex Run is also required before full
 production activation, although it is separate from the numbered 24-item
-product matrix. These gates must not be replaced with fixtures or marked green
-from deterministic CI alone.
+product matrix. The exact operator/evidence checklist is
+[`docs/live-acceptance.md`](../docs/live-acceptance.md). These gates must not be
+replaced with fixtures or marked green from deterministic CI alone.
 
 The repository default branch remains `codex/phase-1-contracts`; no `main` branch
-is currently present. This production pass does not rewrite history or switch the
-default branch automatically. Temporary Pinggy edge workflows/tracked upstream
-state are removed; the local helper remains development-only. Native Chat auth
-rate-limit identity is hardened at the Caddy edge and enforced by Compose
+is currently present. This pass does not rewrite history or switch the default
+branch automatically. Temporary Pinggy production state is removed; the local
+helper remains development-only. Native Chat auth client-IP identity, HSTS and
+public header behavior are enforced at the Caddy edge and covered by Compose
 verification.
 
 ## Non-negotiable architecture constraints
@@ -88,6 +102,7 @@ Phase 0 reuse and license audit
           -> Mission + Resource Broker + lazy context + native Chat Control API
             -> ContextCompiler, RAG, memory and LangGraph orchestration
             -> integrations, observability and production hardening
+              -> public preflight + owner live acceptance
 ```
 
 ## Delivery phases
@@ -150,8 +165,12 @@ Phase 0 reuse and license audit
       `UNSUPPORTED` and non-selectable until a supported transport is proven.
 - [x] Verify automated security, dependency signatures, backup/restore,
       restart/replay, PostgreSQL/runtime, responsive browser, Compose,
-      orchestration, OpenClaw, LiteLLM and Codex test families on the latest
-      code-bearing merged tree.
+      orchestration, OpenClaw, LiteLLM and Codex test families on ordered
+      dependency baselines.
+- [x] Add deterministic workspace lockfile consistency validation.
+- [x] Add one-year HSTS and enforce public `Server` header removal at Caddy.
+- [x] Add a read-only public production control-plane preflight.
+- [x] Add a single final runbook for real Plus, SSH and Codex acceptance proofs.
 - [ ] Pass all 24 product-level acceptance criteria with real evidence. Current:
       22 PASS / 2 PARTIAL / 0 OPEN; see the authoritative acceptance audit.
 
@@ -172,11 +191,14 @@ Phase 0 reuse and license audit
 
 ### Production gate
 
-- [x] Full automated CI matrix is green on the latest code-bearing merged tree.
+- [x] Ordered dependency updates each pass the complete exact-head CI matrix.
 - [x] Docker Compose core starts without optional profiles.
 - [x] Backup/restore and upgrade behavior are verified on an isolated environment.
+- [x] Workspace manifest/package-lock drift is a CI failure.
+- [x] Public production preflight exists and is read-only/fail-closed.
 - [x] Every numbered acceptance criterion has an authoritative evidence row and
       no criterion is `OPEN`.
+- [ ] Final PR #9 exact-head eight-job matrix is green and merged.
 - [ ] Every numbered acceptance criterion is `PASS` in real product scope.
 - [ ] One successful real owner-authenticated Codex Run records terminal
       provenance.
@@ -187,11 +209,14 @@ Phase 0 reuse and license audit
 | --- | --- | --- |
 | Upstream license differs from repository metadata | High | Read LICENSE/NOTICE and package-level terms at pinned SHA before reuse. |
 | Upstream APIs drift rapidly | High | Pin commit/tag, isolate through adapters and add contract tests. |
+| Dependency patch changes runtime behavior | High | Rebase updates in dependency order and require full orchestration/runtime/browser/Compose CI; review behavior-changing release notes explicitly. |
+| Workspace manifests and lockfile drift | High | Run deterministic `test:lockfile` before the main quality matrix. |
 | AGPL or source-available UI contaminates permissive core | High | Treat as reference-only or separately deployed service unless an explicit licensing decision is accepted. |
 | World UI imports the wrong Agent/Account model | High | Keep canonical contracts and branded IDs at every adapter boundary. |
 | Multiple sources of truth emerge | High | Persist authority in PostgreSQL and make runtime/config/telemetry systems projections. |
 | Browser automation becomes an unsupported Chat state/output channel | High | Limit the host launcher to opening the authenticated profile and submitting `run_id`; accept completion only through supported authenticated Control/MCP calls. |
 | Host-local launcher bypasses the private data boundary | High | Keep PostgreSQL unpublished; use only the scoped HTTPS launcher-control endpoint and a dedicated token whose server stores only SHA-256. |
+| Public OAuth/MCP edge drifts from production contract | High | Require Caddy/Compose contract checks plus read-only production preflight before live owner tests. |
 | One-VDS stack becomes operationally excessive | Medium | Keep optional Compose profiles and require the core profile to stand alone. |
 
 ## Resolved composition questions
