@@ -1,6 +1,5 @@
 param(
-  [string]$LocalUrl = "http://127.0.0.1:18080",
-  [string]$UpstreamFile = "ops/agent-world-edge-upstream.txt"
+  [string]$LocalUrl = "http://127.0.0.1:18080"
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,10 +33,5 @@ if (-not $url) {
   throw "Pinggy tunnel URL was not published"
 }
 
-$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$file = Join-Path $root "agent-world-edge-upstream.txt"
-
-Set-Content -Path $file -Value $url -NoNewline
-
 Write-Host "EDGE_URL=$url"
-Write-Host "UPSTREAM_FILE=$file"
+Write-Host "Temporary edge is for local development only; no repository file was changed."
