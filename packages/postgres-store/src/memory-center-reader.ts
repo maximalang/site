@@ -31,6 +31,7 @@ type TimelineRow = QueryResultRow & {
   proposal_id: string;
   action: string;
   source_context_item_id: string;
+  target_context_item_id: string | null;
   materialized_context_item_id: string | null;
   content: string;
   decided_at: Date | string;
@@ -103,8 +104,8 @@ export class PostgresMemoryCenterReader {
     const result = await this.pool.query<TimelineRow>(
       `/* MEMORY_TIMELINE */
        SELECT decision.id AS decision_id, decision.proposal_id, decision.action,
-              proposal.source_context_item_id, decision.materialized_context_item_id,
-              proposal.content, decision.decided_at
+              proposal.source_context_item_id, decision.target_context_item_id,
+              decision.materialized_context_item_id, proposal.content, decision.decided_at
          FROM agent_world.memory_curation_decisions decision
          JOIN agent_world.memory_proposals proposal
            ON proposal.id = decision.proposal_id AND proposal.project_id = decision.project_id
@@ -121,6 +122,9 @@ export class PostgresMemoryCenterReader {
         proposalId: row.proposal_id,
         action: row.action,
         sourceContextItemId: row.source_context_item_id,
+        ...(row.target_context_item_id === null
+          ? {}
+          : { targetContextItemId: row.target_context_item_id }),
         ...(row.materialized_context_item_id === null
           ? {}
           : { materializedContextItemId: row.materialized_context_item_id }),
@@ -144,23 +148,29 @@ export class PostgresMemoryCenterReader {
            JOIN agent_world.context_items memory
              ON memory.id = decision.materialized_context_item_id
             AND memory.project_id = decision.project_id AND memory.kind = 'MEMORY'
-          WHERE decision.project_id = $1 AND decision.action = 'ACCEPT'
+          WHERE decision.project_id = $1 AND decision.action IN ('ACCEPT', 'SUPERSEDE')
           ORDER BY memory.importance DESC, memory.created_at DESC, memory.id
           LIMIT $2`,
         [projectId, limit],
       ),
       this.pool.query<EdgeRow>(
         `/* MEMORY_NETWORK_EDGES */
-         SELECT decision.id AS decision_id, proposal.source_context_item_id,
-                decision.materialized_context_item_id AS target_context_item_id,
-                CASE WHEN decision.action = 'ACCEPT'
-                     THEN 'ACCEPTED_FROM' ELSE 'MERGED_INTO' END AS relation,
+         SELECT decision.id AS decision_id,
+                CASE WHEN decision.action = 'SUPERSEDE'
+                     THEN decision.materialized_context_item_id
+                     ELSE proposal.source_context_item_id END AS source_context_item_id,
+                CASE WHEN decision.action = 'SUPERSEDE'
+                     THEN decision.target_context_item_id
+                     ELSE decision.materialized_context_item_id END AS target_context_item_id,
+                CASE WHEN decision.action = 'ACCEPT' THEN 'ACCEPTED_FROM'
+                     WHEN decision.action = 'MERGE' THEN 'MERGED_INTO'
+                     ELSE 'SUPERSEDES' END AS relation,
                 decision.decided_at AS created_at
            FROM agent_world.memory_curation_decisions decision
            JOIN agent_world.memory_proposals proposal
              ON proposal.id = decision.proposal_id AND proposal.project_id = decision.project_id
           WHERE decision.project_id = $1
-            AND decision.action IN ('ACCEPT', 'MERGE')
+            AND decision.action IN ('ACCEPT', 'MERGE', 'SUPERSEDE')
           ORDER BY decision.decided_at DESC, decision.id
           LIMIT $2`,
         [projectId, Math.min(limit * 2, 500)],
