@@ -15,7 +15,7 @@ historical runs, deterministic CI or visible Chat DOM output.
 
 ## Repository closure sequence
 
-The repository-side closure is carried by PRs #6 through #9:
+Repository-side production preparation is complete through PRs #6-#9:
 
 - PR #6 removed obsolete temporary Pinggy production-edge state, corrected the
   inherited Native Chat formatter regression and restored exact-tree release
@@ -27,13 +27,26 @@ The repository-side closure is carried by PRs #6 through #9:
   CI whole-job timeout so Playwright system dependency installation cannot consume
   the complete E2E window. E2E assertions and visual-evidence requirements were
   not weakened.
-- PR #9 is the final repository-side activation-preparation change set: read-only
-  public production preflight, an owner live-acceptance runbook, one-year HSTS,
-  explicit public `Server` header removal verification, and a workspace
-  package-lock consistency gate. Its merge policy is a complete exact-head CI
-  matrix. Final run/tree-equivalence evidence is recorded in the immutable PR #9
-  audit trail rather than creating a self-invalidating post-green documentation
-  commit.
+- PR #9 added the final repository-side activation preparation: read-only public
+  production preflight, an owner live-acceptance runbook, one-year HSTS, explicit
+  public `Server` header removal verification, and a workspace package-lock
+  consistency gate.
+
+PR #9 exact head `2890d53543daca0907e3d48a4e4a8601db1bf3b2` passed CI run
+`32178938077` with all eight jobs green. The run included the new lockfile gate,
+dependency audit/signatures, lint/typecheck/unit/build, PostgreSQL/runtime,
+orchestration, OpenClaw, LiteLLM, deterministic Codex, browser E2E/visual
+evidence and container/Compose. Browser evidence artifact `9340136396` has digest
+`sha256:1bd78606186069748bfc6f07ea6e1b44f08a90922ee10c8d609fdfb662fde250`.
+
+GitHub tested synthetic merge
+`e1847542979f16a728c92e4d44fe442c70d534a6`; the actual PR #9 merge commit is
+`851be54c4844a4455529893c702b63f803716dbd`. Both carry tree SHA
+`06a7df57989318d7fa2d099a3385304ce5753032`. Therefore the code-bearing content
+merged to the default branch is exactly the content validated by the successful
+full release matrix. Later documentation-only evidence maintenance does not
+change that code-bearing tree and must not be treated as a substitute for future
+CI if runtime code changes again.
 
 ## Dependency maintenance closure
 
@@ -61,10 +74,10 @@ next update became the baseline:
   retry/review remains in AI World orchestration and passed the full orchestration,
   PostgreSQL/runtime and Compose matrix.
 
-The resulting dependency baseline is merge commit
-`f4180b549fb65db56d66f9fcaed312dd92280ed9`. PR #9 adds a deterministic
-`npm run test:lockfile` CI gate so manifest/workspace lockfile drift fails the
-quality job instead of being discovered incidentally by a future dependency PR.
+The resulting dependency baseline before PR #9 was merge commit
+`f4180b549fb65db56d66f9fcaed312dd92280ed9`. CI now runs deterministic
+`npm run test:lockfile` so manifest/workspace lockfile drift fails the quality job
+instead of being discovered incidentally by a future dependency PR.
 
 ## Current-pass findings
 
@@ -76,9 +89,9 @@ quality job instead of being discovered incidentally by a future dependency PR.
 - Native Chat auth binds pre-auth rate limiting/login throttling to the client IP
   supplied by the trusted Caddy edge rather than a client-controlled
   `X-Real-IP` header, and Compose verification enforces that proxy contract.
-- The production Caddy edge now carries `Strict-Transport-Security:
-  max-age=31536000`, removes the public `Server` header, and the Compose contract
-  fails if either boundary disappears.
+- The production Caddy edge carries `Strict-Transport-Security: max-age=31536000`,
+  removes the public `Server` header, and the Compose contract fails if either
+  boundary disappears.
 - A read-only production preflight checks live/readiness, HSTS/header behavior,
   RFC 9728 protected-resource metadata, isolated OAuth discovery, Authorization
   Code + refresh + public-client DCR + PKCE S256, public ES256 JWKS, MCP
@@ -124,24 +137,6 @@ quality job instead of being discovered incidentally by a future dependency PR.
 | 23 | Do not send every Agent the full history | PASS | Lazy MCP/context pulls and compiler budgets exclude full transcripts by default. |
 | 24 | Avoid third-party dashboards in normal work | PASS | World, Command, Hub, Memory and Observatory are native surfaces; integrations remain adapters/projections. |
 
-## Automated release evidence
-
-The dependency baseline is green through the ordered exact-head matrices listed
-above. The final repository-side PR #9 must additionally prove on its exact head:
-
-- workspace manifest/package-lock consistency;
-- dependency audit/signature verification, formatting/lint, typecheck, unit tests
-  and production build;
-- PostgreSQL migrations/runtime/restart coverage;
-- orchestration, OpenClaw, LiteLLM and official Codex deterministic verifiers;
-- responsive browser/E2E plus visual evidence upload;
-- isolated container/Compose verification, including Caddy HSTS, public-header
-  removal and the hardened Native Chat topology.
-
-The successful PR #9 run, synthetic merge and actual merge tree equality are kept
-in PR #9's immutable audit comment. Any later code-bearing change requires a new
-exact-tree release matrix.
-
 ## External live gates
 
 The exact operator sequence and evidence checklist is
@@ -161,14 +156,15 @@ by fixtures or deterministic CI:
 ## Release decision
 
 - **Repository implementation:** no known `OPEN` numbered criterion.
-- **Dependency maintenance:** closed on the ordered, fully verified baseline above.
-- **Repository-side production preparation:** preflight, HSTS, lockfile drift
-  detection and live-proof runbook are implemented in PR #9 and gated by its full
-  exact-head matrix.
+- **Dependency maintenance:** complete and fully verified on the ordered baseline.
+- **Repository-side production preparation:** **COMPLETE**; PR #9 exact merged
+  code-bearing tree passed the complete release matrix.
 - **Product acceptance:** **22/24 PASS, 2/24 PARTIAL**; criteria 4 and 18 remain
   pending only on real owner/environment evidence.
 - **Temporary production edge dependency:** removed; Pinggy is local-development
   only.
+- **Auth/public edge:** client-IP boundary, HSTS and public-header policy are
+  Compose-verified; production preflight is ready for the real host.
 - **Repository governance:** default branch remains `codex/phase-1-contracts`;
   no automatic history/default-branch rewrite is performed.
 - **Production activation:** **NOT YET CLAIMED** until all three external live
