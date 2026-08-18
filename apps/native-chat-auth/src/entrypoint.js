@@ -23,8 +23,7 @@ async function start() {
     } catch (error) {
       lastError = error;
       const retryable =
-        error?.code === "57P03" ||
-        error?.message?.includes("database system is starting up");
+        error?.code === "57P03" || error?.message?.includes("database system is starting up");
 
       if (!retryable || attempt === STARTUP_RETRIES) {
         throw error;

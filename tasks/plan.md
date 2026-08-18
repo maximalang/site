@@ -11,16 +11,22 @@ projections.
 This web surface is an owner control shell, not a customer billing product. It
 must not grow checkout, payment collection, invoices, subscription sales or a
 provider-billing ingestion/reconciliation subsystem. Cost signals may appear as
-bounded operational estimates when execution providers expose them, but they
-are never presented as a customer charge or invoiced truth.
+bounded operational estimates when execution providers expose them, but they are
+never presented as a customer charge or invoiced truth.
 
 ## Current verification state
 
-Repository implementation for Phases 0-11 is present. The full CI matrix at
-commit `0e34d0e7158fc28003d15c1304da4d93c325ef0d` passes all eight jobs. The
-current authoritative product matrix is
-[`docs/audits/acceptance-2026-08-17.md`](../docs/audits/acceptance-2026-08-17.md):
-**22/24 PASS, 2/24 PARTIAL, 0/24 OPEN**.
+Repository implementation for Phases 0-11 is present. The previous fully audited
+CI baseline was commit `0e34d0e7158fc28003d15c1304da4d93c325ef0d`, where all
+eight jobs passed. That historical green SHA is no longer sufficient release
+evidence because the default branch advanced by 25 commits before this production
+activation pass.
+
+The current authoritative product matrix is
+[`docs/audits/acceptance-2026-08-18.md`](../docs/audits/acceptance-2026-08-18.md):
+**22/24 PASS, 2/24 PARTIAL, 0/24 OPEN**. Release readiness additionally requires
+an exact-head green CI run for the latest PR #6 head; a superseded run does not
+count.
 
 The two product-acceptance gaps are external live proofs, not missing repo
 surfaces:
@@ -34,6 +40,12 @@ A successful real ChatGPT-authenticated Codex Run is also required before full
 production activation, although it is separate from the numbered 24-item
 product matrix. These gates must not be replaced with fixtures or marked green
 from deterministic CI alone.
+
+The repository default branch remains `codex/phase-1-contracts`; no `main` branch
+is currently present. This production pass does not rewrite history or switch the
+default branch automatically. Temporary Pinggy edge workflows/tracked upstream
+state are removed from the release candidate; the local helper remains a
+development-only tool.
 
 ## Non-negotiable architecture constraints
 
@@ -137,7 +149,8 @@ Phase 0 reuse and license audit
       `UNSUPPORTED` and non-selectable until a supported transport is proven.
 - [x] Verify automated security, dependency signatures, backup/restore,
       restart/replay, PostgreSQL/runtime, responsive browser, Compose,
-      orchestration, OpenClaw, LiteLLM and Codex test families.
+      orchestration, OpenClaw, LiteLLM and Codex test families at the historical
+      audited baseline. Latest exact-head proof remains a release gate.
 - [ ] Pass all 24 product-level acceptance criteria with real evidence. Current:
       22 PASS / 2 PARTIAL / 0 OPEN; see the authoritative acceptance audit.
 
@@ -158,9 +171,9 @@ Phase 0 reuse and license audit
 
 ### Production gate
 
-- [x] Full automated CI matrix is green on the current audited head.
-- [x] Docker Compose core starts without optional profiles.
-- [x] Backup/restore and upgrade behavior are verified on an isolated environment.
+- [ ] Full automated CI matrix is green on the latest release-candidate exact head.
+- [x] Docker Compose core starts without optional profiles at the historical audited baseline.
+- [x] Backup/restore and upgrade behavior are verified on an isolated environment at the historical audited baseline.
 - [x] Every numbered acceptance criterion has an authoritative evidence row and
       no criterion is `OPEN`.
 - [ ] Every numbered acceptance criterion is `PASS` in real product scope.

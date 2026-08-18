@@ -1,17 +1,12 @@
 param(
-    [string]$Url = ""
+    [Parameter(Mandatory = $true)]
+    [string]$Url
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not $Url) {
-    if (Test-Path "ops/agent-world-edge-upstream.txt") {
-        $Url = (Get-Content "ops/agent-world-edge-upstream.txt" -Raw).Trim()
-    }
-}
-
-if (-not $Url) {
-    throw "No AI World edge URL configured."
+if (-not $Url.StartsWith("https://")) {
+    throw "Temporary edge URL must use HTTPS."
 }
 
 $checks = @(
@@ -29,4 +24,4 @@ foreach ($path in $checks) {
 }
 
 Write-Host "EDGE_URL=$Url"
-Write-Host "AI World edge verification completed."
+Write-Host "AI World local edge verification completed."
