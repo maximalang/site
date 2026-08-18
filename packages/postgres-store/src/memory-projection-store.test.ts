@@ -57,7 +57,10 @@ describe("memory graph projection", () => {
         },
       ],
     }));
-    const [projected] = await new PostgresMemoryProjectionStore({ query } as never).readEvents(1, 50);
+    const [projected] = await new PostgresMemoryProjectionStore({ query } as never).readEvents(
+      1,
+      50,
+    );
     expect(projected).toMatchObject({
       action: "SUPERSEDE",
       targetContextItemId: "context_item_77777777-7777-7777-7777-777777777777",
