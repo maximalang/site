@@ -10,7 +10,6 @@
     "start": "node .next/standalone/apps/web/server.js",
     "test:e2e": "playwright test",
     "test:e2e:production": "playwright test --config playwright.production.config.ts",
-    "test:production-preflight": "node scripts/verify-production-preflight.mjs",
     "test:runtime:isolated": "node scripts/verify-runtime-isolated.mjs",
     "typecheck": "next typegen && tsc -p tsconfig.typecheck.json --noEmit"
   },
@@ -25,7 +24,7 @@
     "@agent-world/postgres-store": "0.0.0",
     "@agent-world/read-model": "0.0.0",
     "@agent-world/scheduler": "0.0.0",
-    "next": "16.3.0",
+    "next": "16.3.1",
     "pg": "8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
