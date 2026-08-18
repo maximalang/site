@@ -66,7 +66,13 @@ if (trustedClientIpHeaders.length !== 2) {
     "Every native-chat-auth proxy block must overwrite X-Real-IP with Caddy's computed client IP",
   );
 }
+if (!/Strict-Transport-Security\s+"max-age=31536000"/.test(caddyfile)) {
+  throw new Error("Caddy must enforce a one-year Strict-Transport-Security policy");
+}
+if (!/-Server/.test(caddyfile)) {
+  throw new Error("Caddy must remove the public Server response header");
+}
 
 process.stdout.write(
-  `${JSON.stringify({ status: "PASS", nativeChatMigrationOrdering: true, oauthProxyScheme: "https", oauthClientIpBoundary: "caddy-client-ip" })}\n`,
+  `${JSON.stringify({ status: "PASS", nativeChatMigrationOrdering: true, oauthProxyScheme: "https", oauthClientIpBoundary: "caddy-client-ip", hstsMaxAge: 31536000, serverHeaderRemoved: true })}\n`,
 );
