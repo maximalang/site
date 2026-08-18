@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.2.0";
+const COMPILER_VERSION = "1.3.0";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -124,6 +124,7 @@ export function compileContextPack(
   const input: ContextCompilerInput = ContextCompilerInputSchema.parse(inputValue);
   const candidates = z.array(CandidateSchema).max(1_000).parse(candidateValues);
   const compiledAt = TimestampSchema.parse(compiledAtValue);
+  const compiledAtMs = Date.parse(compiledAt);
   for (const candidate of candidates) {
     if (candidate.item.projectId !== input.project.id) {
       throw new Error("Context candidate belongs to another Project");
@@ -147,8 +148,13 @@ export function compileContextPack(
   ]);
   truncateMandatory(sections, input.tokenBudget);
 
+  const eligible = candidates.filter(
+    (candidate) =>
+      candidate.item.validUntil === undefined ||
+      Date.parse(candidate.item.validUntil) > compiledAtMs,
+  );
   const unique = new Map<string, Candidate>();
-  for (const candidate of ranked(candidates)) {
+  for (const candidate of ranked(eligible)) {
     if (!unique.has(candidate.item.contentHash)) unique.set(candidate.item.contentHash, candidate);
   }
   const evidence: ContextPack["evidence"] = [];

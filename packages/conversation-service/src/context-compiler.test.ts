@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.2.0");
+    expect(first.compilerVersion).toBe("1.3.0");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -175,6 +175,31 @@ describe("compileContextPack", () => {
     expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([highRelevanceCold.id]);
     expect(pack.rendered).toContain(highRelevanceCold.content);
     expect(pack.rendered).not.toContain(lowRelevanceHot.content);
+  });
+
+  it("excludes expired context even when it would otherwise rank first", () => {
+    const expired = item("33333333", "MEMORY", "Expired but highly relevant memory.", {
+      temperature: "HOT",
+      importance: 1,
+      validUntil: "2026-08-14T20:30:00.000Z",
+    });
+    const active = item("44444444", "MEMORY", "Still valid canonical memory.", {
+      temperature: "COLD",
+      importance: 0.1,
+      validUntil: "2026-08-14T22:00:00.000Z",
+    });
+    const pack = compileContextPack(
+      input,
+      [
+        { item: expired, relevance: 1 },
+        { item: active, relevance: 0.1 },
+      ],
+      "2026-08-14T21:00:00.000Z",
+    );
+
+    expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([active.id]);
+    expect(pack.rendered).toContain(active.content);
+    expect(pack.rendered).not.toContain(expired.content);
   });
 
   it("fits only complete optional entries and deterministically truncates mandatory fields", () => {
