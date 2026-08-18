@@ -14,7 +14,7 @@
     "test:lifecycle": "node --test --test-concurrency=1 test/lifecycle.test.js"
   },
   "dependencies": {
-    "oidc-provider": "9.11.1",
+    "oidc-provider": "9.11.3",
     "pg": "8.23.0"
   }
 }
