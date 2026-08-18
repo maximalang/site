@@ -8,6 +8,7 @@ const ids = {
   project: "project_33333333-3333-3333-3333-333333333333",
   source: "context_item_44444444-4444-4444-4444-444444444444",
   memory: "context_item_55555555-5555-5555-5555-555555555555",
+  replacement: "context_item_88888888-8888-8888-8888-888888888888",
   event: "event_77777777-7777-7777-7777-777777777777",
 } as const;
 const now = "2026-08-15T00:00:00.000Z";
@@ -18,6 +19,19 @@ function poolFor(handler: (sql: string, params?: unknown[]) => { rows: unknown[]
     return handler(sql, params);
   });
   return { query, pool: { connect: vi.fn(async () => ({ query, release: vi.fn() })) } };
+}
+
+function pendingProposal() {
+  return {
+    id: ids.proposal,
+    project_id: ids.project,
+    source_context_item_id: ids.source,
+    content: "PostgreSQL owns canonical memory.",
+    content_sha256: "a".repeat(64),
+    estimated_tokens: 7,
+    importance: 0.9,
+    status: "PENDING",
+  };
 }
 
 describe("PostgresMemoryCurationStore", () => {
@@ -57,12 +71,7 @@ describe("PostgresMemoryCurationStore", () => {
       }
       if (sql.includes("FROM agent_world.memory_proposals"))
         return {
-          rows: [
-            {
-              id: ids.proposal,
-              request_sha256: requestHash,
-            },
-          ],
+          rows: [{ id: ids.proposal, request_sha256: requestHash }],
         };
       throw new Error(`Unexpected query: ${sql}`);
     });
@@ -86,20 +95,7 @@ describe("PostgresMemoryCurationStore", () => {
       if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
       if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
       if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
-        return {
-          rows: [
-            {
-              id: ids.proposal,
-              project_id: ids.project,
-              source_context_item_id: ids.source,
-              content: "PostgreSQL owns canonical memory.",
-              content_sha256: "a".repeat(64),
-              estimated_tokens: 7,
-              importance: 0.9,
-              status: "PENDING",
-            },
-          ],
-        };
+        return { rows: [pendingProposal()] };
       if (sql.includes("INSERT INTO agent_world.context_items"))
         return { rows: [{ id: ids.memory }] };
       if (sql.includes("INSERT INTO agent_world.memory_curation_decisions")) return { rows: [] };
@@ -126,5 +122,53 @@ describe("PostgresMemoryCurationStore", () => {
       materializedContextItemId: ids.memory,
     });
     expect(query.mock.calls.some(([sql]) => sql.includes("source.provenance_kind"))).toBe(true);
+  });
+
+  it("supersedes atomically by materializing replacement and expiring the active target", async () => {
+    const { pool, query } = poolFor((sql, params) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
+        return { rows: [pendingProposal()] };
+      if (sql.includes("SELECT id, created_at, valid_until"))
+        return {
+          rows: [{ id: ids.memory, created_at: "2026-08-14T00:00:00.000Z", valid_until: null }],
+        };
+      if (sql.includes("INSERT INTO agent_world.context_items"))
+        return { rows: [{ id: ids.replacement }] };
+      if (sql.includes("UPDATE agent_world.context_items")) {
+        expect(params).toEqual([ids.memory, ids.project, now]);
+        return { rows: [{ id: ids.memory }] };
+      }
+      if (sql.includes("INSERT INTO agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("UPDATE agent_world.memory_proposals")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) {
+        expect(params?.[5]).toBe(ids.memory);
+        expect(params?.[6]).toBe(ids.replacement);
+        expect(params?.[7]).toBe("SUPERSEDE");
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const result = await new PostgresMemoryCurationStore(pool as never, {
+      contextItemId: () => ids.replacement,
+      eventId: () => ids.event,
+    }).decide({
+      schemaVersion: 1,
+      id: ids.decision,
+      proposalId: ids.proposal,
+      projectId: ids.project,
+      action: "SUPERSEDE",
+      targetContextItemId: ids.memory,
+      idempotencyKey: "memory:supersede-1",
+      decidedAt: now,
+    });
+    expect(result).toEqual({
+      outcome: "CREATED",
+      proposalId: ids.proposal,
+      status: "SUPERSEDED",
+      materializedContextItemId: ids.replacement,
+    });
+    expect(query.mock.calls.some(([sql]) => sql.includes("SET valid_until = $3"))).toBe(true);
   });
 });
