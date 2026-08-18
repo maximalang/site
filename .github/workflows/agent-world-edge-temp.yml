@@ -1,0 +1,35 @@
+name: Agent World Edge Validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ops/agent-world-edge-upstream.txt
+      - .github/workflows/agent-world-edge-temp.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate-edge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate upstream URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(cat ops/agent-world-edge-upstream.txt | tr -d '\n\r')"
+          echo "Checking ${URL}"
+          test -n "${URL}"
+          [[ "${URL}" =~ ^https:// ]] || exit 1
+
+      - name: Check health endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(cat ops/agent-world-edge-upstream.txt | tr -d '\n\r')"
+          curl --fail --retry 5 --retry-delay 2 "${URL}/api/health/live"
+          curl --fail --retry 5 --retry-delay 2 "${URL}/api/health/ready"
