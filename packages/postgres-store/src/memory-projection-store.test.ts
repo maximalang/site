@@ -25,6 +25,7 @@ describe("memory graph projection", () => {
           proposal_id: event.proposalId,
           decision_id: null,
           source_context_item_id: event.sourceContextItemId,
+          target_context_item_id: null,
           materialized_context_item_id: null,
           action: null,
           content: event.content,
@@ -35,6 +36,33 @@ describe("memory graph projection", () => {
     const events = await new PostgresMemoryProjectionStore({ query } as never).readEvents(0, 50);
     expect(events).toEqual([event]);
     expect(query.mock.calls[0]?.[1]).toEqual([0, 50]);
+  });
+
+  it("preserves explicit supersession target and replacement identities", async () => {
+    const query = vi.fn(async () => ({
+      rows: [
+        {
+          sequence: 2,
+          id: "event_55555555-5555-5555-5555-555555555555",
+          event_type: "MEMORY_CURATED",
+          project_id: event.projectId,
+          proposal_id: event.proposalId,
+          decision_id: "memory_decision_66666666-6666-6666-6666-666666666666",
+          source_context_item_id: event.sourceContextItemId,
+          target_context_item_id: "context_item_77777777-7777-7777-7777-777777777777",
+          materialized_context_item_id: "context_item_88888888-8888-8888-8888-888888888888",
+          action: "SUPERSEDE",
+          content: "Replacement canonical memory.",
+          occurred_at: "2026-08-15T00:02:00.000Z",
+        },
+      ],
+    }));
+    const [projected] = await new PostgresMemoryProjectionStore({ query } as never).readEvents(1, 50);
+    expect(projected).toMatchObject({
+      action: "SUPERSEDE",
+      targetContextItemId: "context_item_77777777-7777-7777-7777-777777777777",
+      materializedContextItemId: "context_item_88888888-8888-8888-8888-888888888888",
+    });
   });
 
   it("advances a checkpoint only after the adapter applies the exact batch", async () => {
