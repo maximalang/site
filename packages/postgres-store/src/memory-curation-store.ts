@@ -224,15 +224,24 @@ export class PostgresMemoryCurationStore {
       let materializedContextItemId: string | null = null;
       let targetContextItemId: string | null = null;
       if (decision.action === "MERGE") {
-        const target = await client.query<{ id: string }>(
-          `SELECT id FROM agent_world.context_items
+        const target = await client.query<TargetRow>(
+          `SELECT id, created_at, valid_until
+             FROM agent_world.context_items
             WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
             FOR SHARE`,
           [decision.targetContextItemId, decision.projectId],
         );
-        if (!target.rows[0]) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
-        targetContextItemId = target.rows[0].id;
-        materializedContextItemId = target.rows[0].id;
+        const targetRow = target.rows[0];
+        if (!targetRow) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
+        const decidedAt = Date.parse(decision.decidedAt);
+        if (
+          timestamp(targetRow.created_at) >= decidedAt ||
+          (targetRow.valid_until !== null && timestamp(targetRow.valid_until) <= decidedAt)
+        ) {
+          throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
+        }
+        targetContextItemId = targetRow.id;
+        materializedContextItemId = targetRow.id;
       } else if (decision.action === "SUPERSEDE") {
         const target = await client.query<TargetRow>(
           `SELECT id, created_at, valid_until
