@@ -32,6 +32,12 @@ type DecisionRow = QueryResultRow & {
   request_sha256: string;
 };
 
+type TargetRow = QueryResultRow & {
+  id: string;
+  created_at: Date | string;
+  valid_until: Date | string | null;
+};
+
 export type MemoryProposalReceipt = {
   outcome: "CREATED" | "DEDUPLICATED";
   proposalId: string;
@@ -40,7 +46,7 @@ export type MemoryProposalReceipt = {
 export type MemoryDecisionReceipt = {
   outcome: "CREATED" | "REPLAYED";
   proposalId: string;
-  status: "ACCEPTED" | "MERGED" | "REJECTED";
+  status: "ACCEPTED" | "MERGED" | "SUPERSEDED" | "REJECTED";
   materializedContextItemId?: string;
 };
 
@@ -49,7 +55,8 @@ export type MemoryCurationStoreErrorCode =
   | "PROPOSAL_CONFLICT"
   | "PROPOSAL_NOT_FOUND"
   | "DECISION_CONFLICT"
-  | "TARGET_NOT_FOUND";
+  | "TARGET_NOT_FOUND"
+  | "TARGET_NOT_ACTIVE";
 
 export class MemoryCurationStoreError extends Error {
   constructor(readonly code: MemoryCurationStoreErrorCode) {
@@ -65,6 +72,7 @@ function sha256(value: unknown): string {
 function statusFor(action: MemoryCurationDecision["action"]): MemoryDecisionReceipt["status"] {
   if (action === "ACCEPT") return "ACCEPTED";
   if (action === "MERGE") return "MERGED";
+  if (action === "SUPERSEDE") return "SUPERSEDED";
   return "REJECTED";
 }
 
@@ -77,6 +85,10 @@ function receiptFromDecision(row: DecisionRow, outcome: "CREATED" | "REPLAYED") 
       ? {}
       : { materializedContextItemId: row.materialized_context_item_id }),
   } satisfies MemoryDecisionReceipt;
+}
+
+function timestamp(value: Date | string): number {
+  return value instanceof Date ? value.getTime() : Date.parse(value);
 }
 
 export class PostgresMemoryCurationStore {
@@ -221,7 +233,27 @@ export class PostgresMemoryCurationStore {
         if (!target.rows[0]) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
         targetContextItemId = target.rows[0].id;
         materializedContextItemId = target.rows[0].id;
-      } else if (decision.action === "ACCEPT") {
+      } else if (decision.action === "SUPERSEDE") {
+        const target = await client.query<TargetRow>(
+          `SELECT id, created_at, valid_until
+             FROM agent_world.context_items
+            WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
+            FOR UPDATE`,
+          [decision.targetContextItemId, decision.projectId],
+        );
+        const targetRow = target.rows[0];
+        if (!targetRow) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
+        const decidedAt = Date.parse(decision.decidedAt);
+        if (
+          timestamp(targetRow.created_at) >= decidedAt ||
+          (targetRow.valid_until !== null && timestamp(targetRow.valid_until) <= decidedAt)
+        ) {
+          throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
+        }
+        targetContextItemId = targetRow.id;
+      }
+
+      if (decision.action === "ACCEPT" || decision.action === "SUPERSEDE") {
         const nextContextId = this.identities.contextItemId?.();
         if (!nextContextId) throw new Error("A production memory ContextItem identity is required");
         const materialized = await client.query<{ id: string }>(
@@ -271,6 +303,22 @@ export class PostgresMemoryCurationStore {
         if (!materializedContextItemId) throw new MemoryCurationStoreError("PROPOSAL_CONFLICT");
       }
 
+      if (decision.action === "SUPERSEDE") {
+        if (materializedContextItemId === targetContextItemId) {
+          throw new MemoryCurationStoreError("PROPOSAL_CONFLICT");
+        }
+        const expired = await client.query<{ id: string }>(
+          `UPDATE agent_world.context_items
+              SET valid_until = $3
+            WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
+              AND created_at < $3
+              AND (valid_until IS NULL OR valid_until > $3)
+            RETURNING id`,
+          [targetContextItemId, decision.projectId, decision.decidedAt],
+        );
+        if (!expired.rows[0]) throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
+      }
+
       const status = statusFor(decision.action);
       await client.query(
         `INSERT INTO agent_world.memory_curation_decisions
@@ -304,15 +352,16 @@ export class PostgresMemoryCurationStore {
       await client.query(
         `INSERT INTO agent_world.memory_events
            (id, event_type, project_id, proposal_id, decision_id,
-            source_context_item_id, materialized_context_item_id, action,
+            source_context_item_id, target_context_item_id, materialized_context_item_id, action,
             content, payload_sha256, occurred_at)
-         VALUES ($1, 'MEMORY_CURATED', $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+         VALUES ($1, 'MEMORY_CURATED', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           eventId,
           decision.projectId,
           decision.proposalId,
           decision.id,
           proposal.source_context_item_id,
+          targetContextItemId,
           materializedContextItemId,
           decision.action,
           proposal.content,
@@ -320,6 +369,7 @@ export class PostgresMemoryCurationStore {
             eventType: "MEMORY_CURATED",
             decision,
             sourceContextItemId: proposal.source_context_item_id,
+            targetContextItemId,
             materializedContextItemId,
           }),
           decision.decidedAt,
