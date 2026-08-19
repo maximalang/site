@@ -63,7 +63,7 @@ function fakeStore() {
 }
 
 describe("PostgresRunContextPackProvider semantic RAG", () => {
-  it("adds a semantic RAG hit that lexical top-500 retrieval did not contain", async () => {
+  it("adds a positive-similarity RAG hit that lexical top-500 retrieval did not contain", async () => {
     const semanticContext = {
       id: contextId,
       project_id: projectId,
@@ -129,13 +129,55 @@ describe("PostgresRunContextPackProvider semantic RAG", () => {
             kind: "RAG_CHUNK",
             provenance: { kind: "DOCUMENT_CHUNK", documentChunkId: chunkId },
           }),
-          relevance: 0.9,
+          relevance: 0.8,
         }),
       ],
       compiledAt,
     );
     expect(fake.releases).toHaveLength(2);
     expect(fake.releases.every((release) => release.mock.calls.length === 1)).toBe(true);
+  });
+
+  it("does not materialize orthogonal or negative-similarity semantic hits", async () => {
+    const fake = fakePool([[scope], [], [], []]);
+    const semanticRag = vi.fn(async () => [
+      {
+        chunkId,
+        documentId,
+        projectId,
+        ordinal: 0,
+        content: "Unrelated evidence.",
+        contentHash: "c".repeat(64),
+        estimatedTokens: 4,
+        embeddingModel: "embedding-v1",
+        distance: 1,
+        createdAt: "2026-08-19T10:00:00.000Z",
+      } as never,
+      {
+        chunkId: "document_chunk_99999999-9999-9999-9999-999999999999",
+        documentId,
+        projectId,
+        ordinal: 1,
+        content: "Opposing evidence.",
+        contentHash: "d".repeat(64),
+        estimatedTokens: 4,
+        embeddingModel: "embedding-v1",
+        distance: 1.4,
+        createdAt: "2026-08-19T10:00:00.000Z",
+      } as never,
+    ]);
+
+    await new PostgresRunContextPackProvider(fake.value, {
+      store: fakeStore(),
+      packId: () => "context_pack_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      now: () => compiledAt,
+      semanticRag,
+    }).prepare(runId);
+
+    expect(semanticRag).toHaveBeenCalledOnce();
+    expect(fake.query).toHaveBeenCalledTimes(4);
+    expect(fake.releases).toHaveLength(1);
+    expect(vi.mocked(compileContextPack)).toHaveBeenCalledWith(expect.any(Object), [], compiledAt);
   });
 
   it("keeps lexical context compilation available when semantic retrieval fails", async () => {

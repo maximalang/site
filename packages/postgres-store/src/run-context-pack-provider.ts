@@ -87,7 +87,7 @@ function provenance(row: ContextRow): ContextItem["provenance"] {
 }
 
 function semanticRelevance(distance: number): number {
-  return Math.max(0, Math.min(1, 1 - distance / 2));
+  return Math.max(0, Math.min(1, 1 - distance));
 }
 
 export class PostgresRunContextPackProvider {
@@ -220,6 +220,7 @@ export class PostgresRunContextPackProvider {
         for (const hit of hits.slice(0, MAX_SEMANTIC_RAG_ITEMS)) {
           if (hit.projectId !== scope.project_id) continue;
           const score = semanticRelevance(hit.distance);
+          if (score <= 0) continue;
           scores.set(hit.chunkId, Math.max(score, scores.get(hit.chunkId) ?? 0));
         }
         if (scores.size > 0) {
