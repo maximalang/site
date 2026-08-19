@@ -160,7 +160,9 @@ describe("PostgresMemoryCurationStore", () => {
     ).rejects.toMatchObject({ name: "MemoryCurationStoreError", code: "TARGET_CONTENT_MISMATCH" });
     expect(query.mock.calls.some(([sql]) => sql === "ROLLBACK")).toBe(true);
     expect(
-      query.mock.calls.some(([sql]) => sql.includes("INSERT INTO agent_world.memory_curation_decisions")),
+      query.mock.calls.some(([sql]) =>
+        sql.includes("INSERT INTO agent_world.memory_curation_decisions"),
+      ),
     ).toBe(false);
   });
 
