@@ -1,16 +1,11 @@
 .hub-section-nav {
-  position: sticky;
-  top: 0;
-  z-index: 8;
   display: flex;
   gap: var(--space-1);
   overflow-x: auto;
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 8%);
+  background: color-mix(in srgb, var(--surface-raised) 72%, var(--surface));
   scrollbar-width: none;
-  backdrop-filter: blur(12px);
 }
 
 .hub-section-nav::-webkit-scrollbar {
@@ -49,7 +44,7 @@
 .hub-section-anchor {
   display: block;
   height: 0;
-  scroll-margin-top: 3.75rem;
+  scroll-margin-top: var(--space-4);
 }
 
 @media (max-width: 40rem) {
