@@ -218,18 +218,14 @@ describe("compileContextPack", () => {
 
   it("prioritizes relevance globally across semantic sections under budget pressure", () => {
     const constrained = { ...input, tokenBudget: 700 };
-    const lowRelevanceDecision = item(
-      "77777777",
-      "DECISION",
-      `low decision ${"x".repeat(1_600)}`,
-      { temperature: "HOT", importance: 1 },
-    );
-    const highRelevanceMemory = item(
-      "88888888",
-      "MEMORY",
-      `high memory ${"y".repeat(1_600)}`,
-      { temperature: "COLD", importance: 0 },
-    );
+    const lowRelevanceDecision = item("77777777", "DECISION", `low decision ${"x".repeat(1_600)}`, {
+      temperature: "HOT",
+      importance: 1,
+    });
+    const highRelevanceMemory = item("88888888", "MEMORY", `high memory ${"y".repeat(1_600)}`, {
+      temperature: "COLD",
+      importance: 0,
+    });
     const pack = compileContextPack(
       constrained,
       [
@@ -239,7 +235,9 @@ describe("compileContextPack", () => {
       "2026-08-14T21:00:00.000Z",
     );
 
-    expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([highRelevanceMemory.id]);
+    expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([
+      highRelevanceMemory.id,
+    ]);
     expect(pack.rendered).toContain(highRelevanceMemory.content);
     expect(pack.rendered).not.toContain(lowRelevanceDecision.content);
   });
