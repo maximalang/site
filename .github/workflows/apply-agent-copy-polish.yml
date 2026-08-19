@@ -1,0 +1,61 @@
+name: Apply agent copy polish once
+
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.ref == 'codex/mobile-agent-facts-polish'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: codex/mobile-agent-facts-polish
+      - name: Apply bounded presentation patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/components/control-center.tsx')
+          text = path.read_text()
+          status = '''const STATUS_COPY: Record<AgentProjectionCore["status"], string> = {
+            IDLE: "Свободен",
+            QUEUED: "В очереди",
+            RUNNING: "Выполняет",
+            WAITING_APPROVAL: "Ждёт подтверждения",
+            BLOCKED: "Заблокирован",
+            FAILED: "Ошибка",
+            OFFLINE: "Не в сети",
+          };
+          '''
+          approval = status + '''
+          type TaskApproval = NonNullable<AgentProjectionCore["currentTask"]>["approval"];
+          const APPROVAL_COPY: Record<TaskApproval, string> = {
+            REQUIRED: "Требуется",
+            NOT_REQUIRED: "Не требуется",
+            PENDING: "Ожидает решения",
+            APPROVED: "Подтверждено",
+            DENIED: "Отклонено",
+            REVOKED: "Отозвано",
+          };
+          '''
+          if text.count(status) != 1:
+              raise SystemExit('STATUS_COPY marker count is not exactly one')
+          old = '<dd>{agent.currentTask.approval}</dd>'
+          new = '<dd>{APPROVAL_COPY[agent.currentTask.approval]}</dd>'
+          if text.count(old) != 1:
+              raise SystemExit('approval rendering marker count is not exactly one')
+          path.write_text(text.replace(status, approval).replace(old, new))
+          PY
+      - run: npx biome format --write apps/web/src/components/control-center.tsx
+      - run: git rm .github/workflows/apply-agent-copy-polish.yml
+      - name: Commit presentation patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/components/control-center.tsx
+          git commit -m "Present task approval states in operator copy"
+          git push origin HEAD:codex/mobile-agent-facts-polish
