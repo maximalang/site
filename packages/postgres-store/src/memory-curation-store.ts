@@ -34,6 +34,8 @@ type DecisionRow = QueryResultRow & {
 
 type TargetRow = QueryResultRow & {
   id: string;
+  content: string;
+  content_sha256: string;
   created_at: Date | string;
   valid_until: Date | string | null;
 };
@@ -56,7 +58,8 @@ export type MemoryCurationStoreErrorCode =
   | "PROPOSAL_NOT_FOUND"
   | "DECISION_CONFLICT"
   | "TARGET_NOT_FOUND"
-  | "TARGET_NOT_ACTIVE";
+  | "TARGET_NOT_ACTIVE"
+  | "TARGET_CONTENT_MISMATCH";
 
 export class MemoryCurationStoreError extends Error {
   constructor(readonly code: MemoryCurationStoreErrorCode) {
@@ -225,7 +228,7 @@ export class PostgresMemoryCurationStore {
       let targetContextItemId: string | null = null;
       if (decision.action === "MERGE") {
         const target = await client.query<TargetRow>(
-          `SELECT id, created_at, valid_until
+          `SELECT id, content, content_sha256, created_at, valid_until
              FROM agent_world.context_items
             WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
             FOR SHARE`,
@@ -240,11 +243,17 @@ export class PostgresMemoryCurationStore {
         ) {
           throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
         }
+        if (
+          targetRow.content_sha256 !== proposal.content_sha256 ||
+          targetRow.content !== proposal.content
+        ) {
+          throw new MemoryCurationStoreError("TARGET_CONTENT_MISMATCH");
+        }
         targetContextItemId = targetRow.id;
         materializedContextItemId = targetRow.id;
       } else if (decision.action === "SUPERSEDE") {
         const target = await client.query<TargetRow>(
-          `SELECT id, created_at, valid_until
+          `SELECT id, content, content_sha256, created_at, valid_until
              FROM agent_world.context_items
             WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
             FOR UPDATE`,
