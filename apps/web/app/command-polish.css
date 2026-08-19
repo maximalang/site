@@ -1,0 +1,16 @@
+@media (max-width: 40rem) {
+  #command-panel + .inspector {
+    padding: var(--space-4);
+  }
+
+  #command-panel + .inspector .agent-role,
+  #command-panel + .inspector .agent-facts > div:not(:last-child),
+  #command-panel + .inspector .inspector-note,
+  #command-panel + .inspector .inspector-chat-button {
+    display: none;
+  }
+
+  #command-panel + .inspector .agent-facts {
+    margin-bottom: 0;
+  }
+}
