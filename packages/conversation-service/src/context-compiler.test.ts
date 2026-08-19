@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.3.4");
+    expect(first.compilerVersion).toBe("1.3.5");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -120,6 +120,40 @@ describe("compileContextPack", () => {
       "c".repeat(64),
     ]);
     expect(first.estimatedTokens).toBeLessThanOrEqual(first.tokenBudget);
+  });
+
+  it("preserves identical content across semantic sections while deduplicating within one section", () => {
+    const sharedHash = "f".repeat(64);
+    const decision = item("12345678", "DECISION", "Shared canonical fact.", {
+      contentHash: sharedHash,
+    });
+    const memory = item("23456789", "MEMORY", "Shared canonical fact.", {
+      contentHash: sharedHash,
+    });
+    const ragDuplicate = item("34567890", "RAG_CHUNK", "Shared canonical fact.", {
+      contentHash: sharedHash,
+    });
+    const pack = compileContextPack(
+      input,
+      [
+        { item: ragDuplicate, relevance: 0.7 },
+        { item: decision, relevance: 0.8 },
+        { item: memory, relevance: 0.9 },
+      ],
+      "2026-08-14T21:00:00.000Z",
+    );
+    const decisions =
+      pack.sections.find(({ name }) => name === "RELEVANT_DECISIONS")?.content ?? "";
+    const memories =
+      pack.sections.find(({ name }) => name === "RELEVANT_MEMORY")?.content ?? "";
+
+    expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([
+      decision.id,
+      memory.id,
+    ]);
+    expect(decisions).toContain('"kind":"DECISION"');
+    expect(memories).toContain('"kind":"MEMORY"');
+    expect(memories).not.toContain(ragDuplicate.id);
   });
 
   it("labels and escapes retrieved content so it cannot forge compiler delimiters", () => {
