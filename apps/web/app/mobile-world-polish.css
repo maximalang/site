@@ -1,0 +1,43 @@
+@media (max-width: 40rem) {
+  #world-panel + .inspector {
+    min-height: 0;
+    padding: var(--space-4);
+  }
+
+  #world-panel + .inspector .agent-role {
+    margin: var(--space-2) 0 var(--space-3);
+  }
+
+  #world-panel + .inspector .agent-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #world-panel + .inspector .agent-facts > div:first-child,
+  #world-panel + .inspector .inspector-note {
+    display: none;
+  }
+
+  #world-panel + .inspector .agent-facts > div {
+    min-width: 0;
+    padding-block: var(--space-2);
+  }
+
+  #world-panel + .inspector .agent-facts dd {
+    overflow-wrap: anywhere;
+  }
+
+  #world-panel + .inspector .inspector-chat-button {
+    display: inline-flex;
+    width: calc(50% - 0.3rem);
+    min-height: 3rem;
+    align-items: center;
+    justify-content: center;
+    margin-top: var(--space-4);
+    padding-inline: var(--space-2);
+    font-size: 0.86rem;
+  }
+
+  #world-panel + .inspector .secondary-button.inspector-chat-button {
+    margin-left: 0.6rem;
+  }
+}
