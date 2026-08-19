@@ -18,6 +18,7 @@ type ProposalRow = QueryResultRow & {
   estimated_tokens: number;
   importance: number;
   status: string;
+  created_at: Date | string;
   request_sha256?: string;
 };
 
@@ -244,7 +245,7 @@ export class PostgresMemoryCurationStore {
       }
       const proposalResult = await client.query<ProposalRow>(
         `SELECT id, project_id, source_context_item_id, content, content_sha256,
-                estimated_tokens, importance, status
+                estimated_tokens, importance, status, created_at
            FROM agent_world.memory_proposals
           WHERE id = $1 AND project_id = $2
           FOR UPDATE`,
@@ -253,6 +254,9 @@ export class PostgresMemoryCurationStore {
       const proposal = proposalResult.rows[0];
       if (!proposal) throw new MemoryCurationStoreError("PROPOSAL_NOT_FOUND");
       if (proposal.status !== "PENDING") throw new MemoryCurationStoreError("DECISION_CONFLICT");
+      if (timestamp(proposal.created_at) > Date.parse(decision.decidedAt)) {
+        throw new MemoryCurationStoreError("DECISION_CONFLICT");
+      }
 
       let materializedContextItemId: string | null = null;
       let targetContextItemId: string | null = null;
