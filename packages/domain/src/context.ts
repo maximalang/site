@@ -115,6 +115,7 @@ export type RagDocumentChunkWrite = z.infer<typeof RagDocumentChunkWriteSchema>;
 export const RagRetrievalRequestSchema = z.strictObject({
   schemaVersion: z.literal(1),
   projectId: ProjectIdSchema,
+  embeddingModel: z.string().trim().min(1).max(200),
   embedding: EmbeddingSchema,
   maxItems: z.number().int().min(1).max(100),
   maxDistance: z.number().min(0).max(2).optional(),
