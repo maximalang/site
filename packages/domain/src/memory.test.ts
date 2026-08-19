@@ -77,8 +77,9 @@ describe("memory curation contracts", () => {
         proposals: [
           {
             ...inbox.proposals[0],
-            curationCandidates: Array.from({ length: 6 }, () =>
-              inbox.proposals[0]?.curationCandidates[0],
+            curationCandidates: Array.from(
+              { length: 6 },
+              () => inbox.proposals[0]?.curationCandidates[0],
             ),
           },
         ],
