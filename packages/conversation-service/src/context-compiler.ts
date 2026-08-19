@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.3.1";
+const COMPILER_VERSION = "1.3.2";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -104,24 +104,23 @@ function truncateMandatory(
   sections: Map<ContextPackSectionName, string>,
   tokenBudget: number,
 ): void {
-  const mutable: ContextPackSectionName[] = [
-    "GOAL",
+  const truncationPriority: ContextPackSectionName[] = [
     "CURRENT_PROJECT_STATE",
     "EXPECTED_OUTPUT",
+    "GOAL",
     "HANDOFF_CONTRACT",
   ];
+  let priorityIndex = 0;
   while (estimatedTokens(renderSections(sections)) > tokenBudget) {
-    const largest = mutable.toSorted(
-      (left, right) => (sections.get(right)?.length ?? 0) - (sections.get(left)?.length ?? 0),
-    )[0];
-    if (!largest)
+    const currentSection = truncationPriority[priorityIndex];
+    if (!currentSection)
       throw new Error("Context token budget cannot contain the mandatory section skeleton");
-    const current = sections.get(largest) ?? "";
+    const current = sections.get(currentSection) ?? "";
     const withoutMarker = current.endsWith(TRUNCATION_MARKER)
       ? current.slice(0, -TRUNCATION_MARKER.length)
       : current;
     if (withoutMarker.length === 0) {
-      mutable.splice(mutable.indexOf(largest), 1);
+      priorityIndex += 1;
       continue;
     }
     const overageCharacters = Math.max(
@@ -129,7 +128,7 @@ function truncateMandatory(
       (estimatedTokens(renderSections(sections)) - tokenBudget) * 4,
     );
     const nextLength = Math.max(0, withoutMarker.length - overageCharacters);
-    sections.set(largest, `${withoutMarker.slice(0, nextLength)}${TRUNCATION_MARKER}`);
+    sections.set(currentSection, `${withoutMarker.slice(0, nextLength)}${TRUNCATION_MARKER}`);
   }
 }
 
