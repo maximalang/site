@@ -57,6 +57,7 @@ describe("discoverMigrations", () => {
       { version: 42, name: "0042_integration_tool_allowlist.sql" },
       { version: 43, name: "0043_integration_ssh_operation_allowlist.sql" },
       { version: 44, name: "0044_memory_supersession.sql" },
+      { version: 45, name: "0045_rag_embedding_projections.sql" },
     ]);
     expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(migrations[0]?.sql).toContain("CREATE TABLE agent_world.conversation_messages");
@@ -123,6 +124,13 @@ describe("discoverMigrations", () => {
     );
     expect(migrations[43]?.sql).toContain("'SUPERSEDE'");
     expect(migrations[43]?.sql).toContain("target_context_item_id");
+    expect(migrations[44]?.sql).toContain(
+      "CREATE TABLE agent_world.rag_document_chunk_embeddings",
+    );
+    expect(migrations[44]?.sql).toContain("PRIMARY KEY (document_chunk_id, embedding_model)");
+    expect(migrations[44]?.sql).toContain(
+      "INSERT INTO agent_world.rag_document_chunk_embeddings",
+    );
     expect(migrations[30]?.sql).toContain(
       "CREATE TABLE agent_world.structured_meeting_criterion_assessments",
     );
