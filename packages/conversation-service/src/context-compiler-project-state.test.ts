@@ -89,7 +89,7 @@ describe("ContextPack project state boundary", () => {
     const projectState =
       pack.sections.find(({ name }) => name === "CURRENT_PROJECT_STATE")?.content ?? "";
 
-    expect(pack.compilerVersion).toBe("1.3.6");
+    expect(pack.compilerVersion).toBe("1.3.7");
     expect(projectState).toBe("Project: AI World\nNewest canonical project state.");
     expect(projectState).not.toContain(staleProjectState.content);
     expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([memory.id]);

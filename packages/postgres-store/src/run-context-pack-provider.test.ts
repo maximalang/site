@@ -69,7 +69,9 @@ describe("PostgresRunContextPackProvider", () => {
       expect.stringContaining("RUN_CONTEXT_PROJECT_STATE"),
       ["project_33333333-3333-3333-3333-333333333333", compiledAt],
     );
-    expect(String(fake.query.mock.calls[1]?.[0])).toContain("ORDER BY created_at DESC, id DESC");
+    const projectStateQuery = String(fake.query.mock.calls[1]?.[0]);
+    expect(projectStateQuery).toContain("created_at <= $2");
+    expect(projectStateQuery).toContain("ORDER BY created_at DESC, id DESC");
     expect(fake.query).toHaveBeenNthCalledWith(
       3,
       expect.stringContaining("ORDER BY relevance DESC"),
@@ -79,7 +81,9 @@ describe("PostgresRunContextPackProvider", () => {
         "Investigate memory drift Use canonical state",
       ],
     );
-    expect(String(fake.query.mock.calls[2]?.[0])).toContain("kind <> 'PROJECT_STATE'");
+    const optionalContextQuery = String(fake.query.mock.calls[2]?.[0]);
+    expect(optionalContextQuery).toContain("kind <> 'PROJECT_STATE'");
+    expect(optionalContextQuery).toContain("created_at <= $2");
     expect(vi.mocked(compileContextPack)).toHaveBeenCalledWith(
       expect.objectContaining({
         project: expect.objectContaining({ state: "Newest canonical project state" }),
