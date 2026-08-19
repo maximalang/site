@@ -177,7 +177,12 @@ describe("PostgresRunContextPackProvider semantic RAG", () => {
     expect(semanticRag).toHaveBeenCalledOnce();
     expect(vi.mocked(compileContextPack)).toHaveBeenCalledWith(
       expect.any(Object),
-      [expect.objectContaining({ item: expect.objectContaining({ id: contextId }), relevance: 0.4 })],
+      [
+        expect.objectContaining({
+          item: expect.objectContaining({ id: contextId }),
+          relevance: 0.4,
+        }),
+      ],
       compiledAt,
     );
     expect(fake.query).toHaveBeenCalledTimes(4);
