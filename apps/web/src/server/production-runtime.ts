@@ -236,7 +236,6 @@ export async function createProductionRuntime(
       csrfSecret: environment.AGENT_WORLD_CSRF_SECRET,
       secureCookies: environment.NODE_ENV === "production",
     });
-
     const agentConversationReader = new PostgresAgentConversationReader(pool);
     const conversationReader = new PostgresConversationReader(pool);
     const conversationStore = new PostgresConversationStore(pool);
@@ -332,20 +331,55 @@ export async function createProductionRuntime(
         })
       : undefined;
     const ragEmbeddingRoute = environment.AGENT_WORLD_RAG_EMBEDDING_MODEL_ROUTE_ID?.trim();
-    const ragIngestion =
-      liteLlmConfig && ragEmbeddingRoute
-        ? new RagIngestionService({
-            embeddingGateway: new LiteLlmEmbeddingGateway({
-              baseUrl: liteLlmConfig.baseUrl,
-              credentialProvider: async () => liteLlmConfig.masterKey,
-              routeResolver: async (modelRouteId) => {
-                const route = await routeResolver.resolve(modelRouteId);
-                return { modelRouteId: route.modelRouteId, modelAlias: route.modelAlias };
-              },
-            }),
-            store: new PostgresSharedContextStore(pool),
-            embeddingModelRouteId: ModelRouteIdSchema.parse(ragEmbeddingRoute),
+    const ragEmbeddingModelRouteId =
+      liteLlmConfig && ragEmbeddingRoute ? ModelRouteIdSchema.parse(ragEmbeddingRoute) : undefined;
+    const ragEmbeddingGateway =
+      liteLlmConfig && ragEmbeddingModelRouteId
+        ? new LiteLlmEmbeddingGateway({
+            baseUrl: liteLlmConfig.baseUrl,
+            credentialProvider: async () => liteLlmConfig.masterKey,
+            routeResolver: async (modelRouteId) => {
+              const route = await routeResolver.resolve(modelRouteId);
+              return { modelRouteId: route.modelRouteId, modelAlias: route.modelAlias };
+            },
           })
+        : undefined;
+    const sharedContextStore = new PostgresSharedContextStore(pool);
+    const ragIngestion =
+      ragEmbeddingGateway && ragEmbeddingModelRouteId
+        ? new RagIngestionService({
+            embeddingGateway: ragEmbeddingGateway,
+            store: sharedContextStore,
+            embeddingModelRouteId: ragEmbeddingModelRouteId,
+          })
+        : undefined;
+    const semanticRag =
+      ragEmbeddingGateway && ragEmbeddingModelRouteId
+        ? async ({
+            projectId,
+            query,
+            maxItems,
+          }: {
+            projectId: string;
+            query: string;
+            maxItems: number;
+          }) => {
+            const embedded = await ragEmbeddingGateway.embed({
+              modelRouteId: ragEmbeddingModelRouteId,
+              texts: [query],
+              timeoutMs: 30_000,
+            });
+            if (embedded.vectors.length !== 1 || !embedded.vectors[0]) {
+              throw new Error("Semantic RAG query embedding result is invalid");
+            }
+            return sharedContextStore.retrieve({
+              schemaVersion: 1,
+              projectId,
+              embeddingModel: embedded.model,
+              embedding: embedded.vectors[0],
+              maxItems,
+            });
+          }
         : undefined;
     const projectionReconciler = liteLlmConfig
       ? new LiteLlmProjectionReconciler({
@@ -514,6 +548,7 @@ export async function createProductionRuntime(
       store: runDispatchStore,
       contextPacks: new PostgresRunContextPackProvider(pool, {
         packId: () => `context_pack_${randomUUID()}`,
+        ...(semanticRag === undefined ? {} : { semanticRag }),
       }),
       adapters: {
         resolve: (kind) => {
