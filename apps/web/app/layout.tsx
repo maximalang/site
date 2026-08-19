@@ -4,6 +4,7 @@ import "./globals.css";
 import "./visual-polish.css";
 import "./hub-navigation.css";
 import "./task-polish.css";
+import "./command-polish.css";
 
 export const metadata: Metadata = {
   title: "Agent World · Operating Environment",
