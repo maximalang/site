@@ -73,6 +73,8 @@ describe("PostgresSharedContextStore", () => {
     const { pool } = poolFor((sql) => {
       if (sql.includes("INSERT INTO agent_world.rag_document_chunks"))
         return { rows: [{ id: ids.chunk, inserted: true }], rowCount: 1 };
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunk_embeddings"))
+        return { rows: [], rowCount: 1 };
       if (sql.includes("INSERT INTO agent_world.context_items"))
         return { rows: [{ id: ids.context }], rowCount: 1 };
       throw new Error(`Unexpected query: ${sql}`);
@@ -100,6 +102,63 @@ describe("PostgresSharedContextStore", () => {
     });
   });
 
+  it("keeps one canonical chunk while indexing it in multiple embedding spaces", async () => {
+    const projectionModels: unknown[] = [];
+    let chunkWrites = 0;
+    const { pool } = poolFor((sql, params) => {
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunks")) {
+        chunkWrites += 1;
+        return {
+          rows: [{ id: ids.chunk, inserted: chunkWrites === 1 }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunk_embeddings")) {
+        projectionModels.push(params?.[2]);
+        expect(params?.[0]).toBe(ids.chunk);
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes("INSERT INTO agent_world.context_items"))
+        return { rows: [{ id: ids.context }], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const store = new PostgresSharedContextStore(pool as never);
+    const write = (
+      id: string,
+      contextItemId: string,
+      embeddingModel: string,
+      embeddingValue: number[],
+      createdAt: string,
+    ) =>
+      store.writeChunk({
+        schemaVersion: 1,
+        id,
+        contextItemId,
+        documentId: ids.document,
+        projectId: ids.project,
+        ordinal: 0,
+        content: "Canonical context evidence.",
+        contentHash: "b".repeat(64),
+        estimatedTokens: 6,
+        temperature: "WARM",
+        importance: 0.9,
+        embeddingModel,
+        embedding: embeddingValue,
+        createdAt,
+      });
+    const first = await write(ids.chunk, ids.context, "embedding-v1", embedding, now);
+    const second = await write(
+      "document_chunk_55555555-5555-5555-5555-555555555555",
+      "context_item_66666666-6666-6666-6666-666666666666",
+      "embedding-v2",
+      Array.from({ length: 1536 }, (_, index) => (index === 1 ? 1 : 0)),
+      "2026-08-14T20:00:01.000Z",
+    );
+    expect(first).toMatchObject({ outcome: "CREATED", chunkId: ids.chunk });
+    expect(second).toMatchObject({ outcome: "DEDUPLICATED", chunkId: ids.chunk });
+    expect(projectionModels).toEqual(["embedding-v1", "embedding-v2"]);
+  });
+
   it("commits a document and all provenance-linked chunks in one transaction", async () => {
     const secondChunk = "document_chunk_55555555-5555-5555-5555-555555555555";
     const secondContext = "context_item_66666666-6666-6666-6666-666666666666";
@@ -113,6 +172,8 @@ describe("PostgresSharedContextStore", () => {
           rows: [{ id: params?.[3] === 0 ? ids.chunk : secondChunk, inserted: true }],
           rowCount: 1,
         };
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunk_embeddings"))
+        return { rows: [], rowCount: 1 };
       if (sql.includes("INSERT INTO agent_world.context_items"))
         return { rows: [{ id: params?.[0] }], rowCount: 1 };
       throw new Error(`Unexpected query: ${sql}`);
@@ -209,7 +270,9 @@ describe("PostgresSharedContextStore", () => {
     const retrieval = query.mock.calls.find(([sql]) =>
       String(sql).includes("FROM agent_world.rag_document_chunks"),
     );
-    expect(retrieval?.[0]).toContain("WHERE project_id = $1 AND embedding_model = $5");
+    expect(retrieval?.[0]).toContain(
+      "WHERE projection.project_id = $1 AND projection.embedding_model = $5",
+    );
     expect(retrieval?.[1]?.[0]).toBe(ids.project);
     expect(retrieval?.[1]?.[1]).toMatch(/^\[1,0,0,/);
     expect(retrieval?.[1]?.[4]).toBe("text-embedding-3-small");

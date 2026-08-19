@@ -153,6 +153,24 @@ export class PostgresSharedContextStore {
         canonical = raced.rows[0];
       }
       if (!canonical) throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+      if (input.embedding && input.embeddingModel) {
+        await client.query(
+          `INSERT INTO agent_world.rag_document_chunk_embeddings
+             (document_chunk_id, project_id, embedding_model, embedding, created_at)
+           VALUES ($1, $2, $3, $4::vector, $5)
+           ON CONFLICT (document_chunk_id, embedding_model) DO UPDATE
+             SET embedding = EXCLUDED.embedding,
+                 created_at = EXCLUDED.created_at
+           WHERE EXCLUDED.created_at > agent_world.rag_document_chunk_embeddings.created_at`,
+          [
+            canonical.id,
+            input.projectId,
+            input.embeddingModel,
+            vectorLiteral(input.embedding),
+            input.createdAt,
+          ],
+        );
+      }
       const contextResult = await client.query<{ id: string }>(
         `WITH inserted AS (
            INSERT INTO agent_world.context_items
@@ -328,6 +346,24 @@ export class PostgresSharedContextStore {
           canonicalChunk = raced.rows[0];
         }
         if (!canonicalChunk) throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+        if (chunk.embedding && chunk.embeddingModel) {
+          await client.query(
+            `INSERT INTO agent_world.rag_document_chunk_embeddings
+               (document_chunk_id, project_id, embedding_model, embedding, created_at)
+             VALUES ($1, $2, $3, $4::vector, $5)
+             ON CONFLICT (document_chunk_id, embedding_model) DO UPDATE
+               SET embedding = EXCLUDED.embedding,
+                   created_at = EXCLUDED.created_at
+             WHERE EXCLUDED.created_at > agent_world.rag_document_chunk_embeddings.created_at`,
+            [
+              canonicalChunk.id,
+              chunk.projectId,
+              chunk.embeddingModel,
+              vectorLiteral(chunk.embedding),
+              chunk.createdAt,
+            ],
+          );
+        }
         created ||= canonicalChunk.inserted;
         const contextResult = await client.query<{ id: string }>(
           `WITH inserted AS (
@@ -395,13 +431,16 @@ export class PostgresSharedContextStore {
       await client.query("BEGIN");
       await client.query("SET LOCAL hnsw.iterative_scan = strict_order");
       const result = await client.query<RetrievalRow>(
-        `SELECT id, document_id, project_id, ordinal, content, content_sha256,
-                estimated_tokens, embedding_model, embedding <=> $2::vector AS distance,
-                created_at
-           FROM agent_world.rag_document_chunks
-          WHERE project_id = $1 AND embedding_model = $5 AND embedding IS NOT NULL
-            AND ($4::double precision IS NULL OR (embedding <=> $2::vector) <= $4)
-          ORDER BY embedding <=> $2::vector, id
+        `SELECT chunk.id, chunk.document_id, chunk.project_id, chunk.ordinal, chunk.content,
+                chunk.content_sha256, chunk.estimated_tokens, projection.embedding_model,
+                projection.embedding <=> $2::vector AS distance, chunk.created_at
+           FROM agent_world.rag_document_chunks AS chunk
+           JOIN agent_world.rag_document_chunk_embeddings AS projection
+             ON projection.document_chunk_id = chunk.id
+            AND projection.project_id = chunk.project_id
+          WHERE projection.project_id = $1 AND projection.embedding_model = $5
+            AND ($4::double precision IS NULL OR (projection.embedding <=> $2::vector) <= $4)
+          ORDER BY projection.embedding <=> $2::vector, chunk.id
           LIMIT $3`,
         [
           input.projectId,
