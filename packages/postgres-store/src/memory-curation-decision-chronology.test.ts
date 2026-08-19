@@ -58,7 +58,9 @@ describe("PostgresMemoryCurationStore decision chronology", () => {
       ),
     ).toBe(false);
     expect(
-      query.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO agent_world.memory_events")),
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes("INSERT INTO agent_world.memory_events"),
+      ),
     ).toBe(false);
   });
 });
