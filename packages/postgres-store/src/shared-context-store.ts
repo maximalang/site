@@ -544,7 +544,10 @@ export class PostgresSharedContextStore {
           estimatedTokens: row.estimated_tokens,
           embeddingModel: row.embedding_model,
           distance: row.distance,
-          occurrences: row.occurrences,
+          occurrences: row.occurrences.map((occurrence) => ({
+            ...occurrence,
+            createdAt: TimestampSchema.parse(new Date(occurrence.createdAt).toISOString()),
+          })),
           occurrenceCount: row.occurrence_count,
           createdAt: TimestampSchema.parse(
             row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
