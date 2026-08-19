@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.3.0";
+const COMPILER_VERSION = "1.3.1";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -83,6 +83,23 @@ function ranked(candidates: Candidate[]): Candidate[] {
   });
 }
 
+function truncateSupportingTools(
+  sections: Map<ContextPackSectionName, string>,
+  tokenBudget: number,
+): void {
+  const original = sections.get("AVAILABLE_TOOLS") ?? "";
+  if (original.length === 0 || estimatedTokens(renderSections(sections)) <= tokenBudget) return;
+
+  const tools = original.split("\n");
+  while (tools.length > 0 && estimatedTokens(renderSections(sections)) > tokenBudget) {
+    tools.pop();
+    sections.set(
+      "AVAILABLE_TOOLS",
+      tools.length === 0 ? "[TRUNCATED]" : `${tools.join("\n")}${TRUNCATION_MARKER}`,
+    );
+  }
+}
+
 function truncateMandatory(
   sections: Map<ContextPackSectionName, string>,
   tokenBudget: number,
@@ -146,6 +163,7 @@ export function compileContextPack(
     ["EXPECTED_OUTPUT", input.expectedOutput],
     ["HANDOFF_CONTRACT", input.handoffContract],
   ]);
+  truncateSupportingTools(sections, input.tokenBudget);
   truncateMandatory(sections, input.tokenBudget);
 
   const eligible = candidates.filter(
