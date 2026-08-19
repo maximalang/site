@@ -18,6 +18,7 @@ type ProposalRow = QueryResultRow & {
   estimated_tokens: number;
   importance: number;
   status: string;
+  created_at: Date | string;
   request_sha256?: string;
 };
 
@@ -58,6 +59,7 @@ export type MemoryDecisionReceipt = {
 
 export type MemoryCurationStoreErrorCode =
   | "SOURCE_NOT_FOUND"
+  | "SOURCE_NOT_ACTIVE"
   | "PROPOSAL_CONFLICT"
   | "PROPOSAL_NOT_FOUND"
   | "DECISION_CONFLICT"
@@ -130,6 +132,8 @@ export class PostgresMemoryCurationStore {
          SELECT $1, $2, source.id, $4, $5, $6, $7, 'PENDING', $8, $9
            FROM agent_world.context_items source
           WHERE source.id = $3 AND source.project_id = $2
+            AND source.created_at <= $9
+            AND (source.valid_until IS NULL OR source.valid_until > $9)
          ON CONFLICT DO NOTHING
          RETURNING id`,
         [
@@ -185,11 +189,21 @@ export class PostgresMemoryCurationStore {
         await client.query("COMMIT");
         return { outcome: "DEDUPLICATED", proposalId: existing.rows[0].id };
       }
-      const source = await client.query(
-        "SELECT 1 FROM agent_world.context_items WHERE id = $1 AND project_id = $2",
+      const source = await client.query<TargetRow>(
+        `SELECT id, created_at, valid_until
+           FROM agent_world.context_items
+          WHERE id = $1 AND project_id = $2`,
         [canonicalProposal.sourceContextItemId, canonicalProposal.projectId],
       );
-      if (source.rows.length === 0) throw new MemoryCurationStoreError("SOURCE_NOT_FOUND");
+      const sourceRow = source.rows[0];
+      if (!sourceRow) throw new MemoryCurationStoreError("SOURCE_NOT_FOUND");
+      const proposedAt = Date.parse(canonicalProposal.createdAt);
+      if (
+        timestamp(sourceRow.created_at) > proposedAt ||
+        (sourceRow.valid_until !== null && timestamp(sourceRow.valid_until) <= proposedAt)
+      ) {
+        throw new MemoryCurationStoreError("SOURCE_NOT_ACTIVE");
+      }
       throw new MemoryCurationStoreError("PROPOSAL_CONFLICT");
     } catch (error) {
       await client.query("ROLLBACK");
@@ -231,7 +245,7 @@ export class PostgresMemoryCurationStore {
       }
       const proposalResult = await client.query<ProposalRow>(
         `SELECT id, project_id, source_context_item_id, content, content_sha256,
-                estimated_tokens, importance, status
+                estimated_tokens, importance, status, created_at
            FROM agent_world.memory_proposals
           WHERE id = $1 AND project_id = $2
           FOR UPDATE`,
@@ -240,6 +254,9 @@ export class PostgresMemoryCurationStore {
       const proposal = proposalResult.rows[0];
       if (!proposal) throw new MemoryCurationStoreError("PROPOSAL_NOT_FOUND");
       if (proposal.status !== "PENDING") throw new MemoryCurationStoreError("DECISION_CONFLICT");
+      if (timestamp(proposal.created_at) > Date.parse(decision.decidedAt)) {
+        throw new MemoryCurationStoreError("DECISION_CONFLICT");
+      }
 
       let materializedContextItemId: string | null = null;
       let targetContextItemId: string | null = null;
