@@ -24,7 +24,7 @@ const ids = {
 } as const;
 
 describe("shared context contracts", () => {
-  it("accepts bounded provenance-aware RAG writes and exact 1536-dimensional retrieval", () => {
+  it("accepts bounded provenance-aware RAG writes and model-bound 1536-dimensional retrieval", () => {
     const document = RagDocumentIngestSchema.parse({
       schemaVersion: 1,
       id: ids.document,
@@ -59,14 +59,23 @@ describe("shared context contracts", () => {
     });
     expect(document.source.kind).toBe("PROJECT_FILE");
     expect(chunk.embedding).toHaveLength(1536);
-    expect(
+    const retrieval = RagRetrievalRequestSchema.parse({
+      schemaVersion: 1,
+      projectId: ids.project,
+      embeddingModel: "text-embedding-3-small",
+      embedding,
+      maxItems: 10,
+    });
+    expect(retrieval.maxItems).toBe(10);
+    expect(retrieval.embeddingModel).toBe("text-embedding-3-small");
+    expect(() =>
       RagRetrievalRequestSchema.parse({
         schemaVersion: 1,
         projectId: ids.project,
         embedding,
         maxItems: 10,
-      }).maxItems,
-    ).toBe(10);
+      }),
+    ).toThrow();
     expect(() => RagDocumentChunkWriteSchema.parse({ ...chunk, embedding: [1, 0] })).toThrow();
     expect(() =>
       RagDocumentChunkWriteSchema.parse({

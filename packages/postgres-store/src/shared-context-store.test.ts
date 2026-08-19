@@ -157,7 +157,20 @@ describe("PostgresSharedContextStore", () => {
     expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(1);
   });
 
-  it("serializes validated vectors as a parameter and filters retrieval by project", async () => {
+  it("rejects model-less RAG retrieval before opening a database transaction", async () => {
+    const connect = vi.fn();
+    await expect(
+      new PostgresSharedContextStore({ connect } as never).retrieve({
+        schemaVersion: 1,
+        projectId: ids.project,
+        embedding,
+        maxItems: 5,
+      }),
+    ).rejects.toThrow();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("serializes validated vectors and filters retrieval by project and embedding model", async () => {
     const { pool, query } = poolFor((sql) => {
       if (sql.startsWith("SET LOCAL")) return { rows: [], rowCount: 0 };
       if (sql.includes("FROM agent_world.rag_document_chunks"))
@@ -183,19 +196,22 @@ describe("PostgresSharedContextStore", () => {
     const result = await new PostgresSharedContextStore(pool as never).retrieve({
       schemaVersion: 1,
       projectId: ids.project,
+      embeddingModel: "text-embedding-3-small",
       embedding,
       maxItems: 5,
     });
     expect(result[0]).toMatchObject({
       chunkId: ids.chunk,
       projectId: ids.project,
+      embeddingModel: "text-embedding-3-small",
       distance: 0.125,
     });
     const retrieval = query.mock.calls.find(([sql]) =>
       String(sql).includes("FROM agent_world.rag_document_chunks"),
     );
-    expect(retrieval?.[0]).toContain("WHERE project_id = $1");
+    expect(retrieval?.[0]).toContain("WHERE project_id = $1 AND embedding_model = $5");
     expect(retrieval?.[1]?.[0]).toBe(ids.project);
     expect(retrieval?.[1]?.[1]).toMatch(/^\[1,0,0,/);
+    expect(retrieval?.[1]?.[4]).toBe("text-embedding-3-small");
   });
 });

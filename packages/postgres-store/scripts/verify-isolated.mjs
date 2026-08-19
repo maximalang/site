@@ -618,6 +618,7 @@ try {
   const retrievedContext = await contextStore.retrieve({
     schemaVersion: 1,
     projectId: ids.project,
+    embeddingModel: "isolated-1536",
     embedding: vectorB,
     maxItems: 5,
   });
