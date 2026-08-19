@@ -144,8 +144,7 @@ describe("compileContextPack", () => {
     );
     const decisions =
       pack.sections.find(({ name }) => name === "RELEVANT_DECISIONS")?.content ?? "";
-    const memories =
-      pack.sections.find(({ name }) => name === "RELEVANT_MEMORY")?.content ?? "";
+    const memories = pack.sections.find(({ name }) => name === "RELEVANT_MEMORY")?.content ?? "";
 
     expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([
       decision.id,
