@@ -147,6 +147,7 @@ export class PostgresRunContextPackProvider {
            FROM agent_world.context_items
           WHERE project_id = $1
             AND kind = 'PROJECT_STATE'
+            AND created_at <= $2
             AND (valid_until IS NULL OR valid_until > $2)
           ORDER BY created_at DESC, id DESC
           LIMIT 1`,
@@ -170,6 +171,7 @@ export class PostgresRunContextPackProvider {
            FROM agent_world.context_items
           WHERE project_id = $1
             AND kind <> 'PROJECT_STATE'
+            AND created_at <= $2
             AND (valid_until IS NULL OR valid_until > $2)
           ORDER BY relevance DESC, importance DESC, created_at DESC, id
           LIMIT 500`,
