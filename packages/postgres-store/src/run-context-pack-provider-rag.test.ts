@@ -177,11 +177,7 @@ describe("PostgresRunContextPackProvider semantic RAG", () => {
     expect(semanticRag).toHaveBeenCalledOnce();
     expect(fake.query).toHaveBeenCalledTimes(4);
     expect(fake.releases).toHaveLength(1);
-    expect(vi.mocked(compileContextPack)).toHaveBeenCalledWith(
-      expect.any(Object),
-      [],
-      compiledAt,
-    );
+    expect(vi.mocked(compileContextPack)).toHaveBeenCalledWith(expect.any(Object), [], compiledAt);
   });
 
   it("keeps lexical context compilation available when semantic retrieval fails", async () => {
