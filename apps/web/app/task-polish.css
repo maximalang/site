@@ -1,3 +1,7 @@
+.task-form {
+  scrollbar-gutter: stable;
+}
+
 .task-form:has(.task-decision-panel) > .composer-footer {
   display: none;
 }
