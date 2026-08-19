@@ -1,0 +1,39 @@
+name: Patch RAG embedding model caller
+
+on:
+  pull_request:
+    branches:
+      - codex/phase-1-contracts
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'codex/rag-embedding-model-boundary'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Patch exact isolated retrieval call
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/postgres-store/scripts/verify-isolated.mjs')
+          text = path.read_text()
+          old = '''  const retrievedContext = await contextStore.retrieve({\n    schemaVersion: 1,\n    projectId: ids.project,\n    embedding: vectorB,\n    maxItems: 5,\n  });'''
+          new = '''  const retrievedContext = await contextStore.retrieve({\n    schemaVersion: 1,\n    projectId: ids.project,\n    embeddingModel: "isolated-1536",\n    embedding: vectorB,\n    maxItems: 5,\n  });'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one isolated retrieval call, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+      - name: Remove temporary workflow
+        run: rm .github/workflows/patch-rag-embedding-model.yml
+      - name: Commit exact patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/postgres-store/scripts/verify-isolated.mjs .github/workflows/patch-rag-embedding-model.yml
+          git commit -m "Bind isolated RAG retrieval to embedding model"
+          git push origin HEAD:${{ github.head_ref }}
