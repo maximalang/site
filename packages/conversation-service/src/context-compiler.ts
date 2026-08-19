@@ -177,6 +177,8 @@ export function compileContextPack(
 
   const acceptedPerSection = new Map<ContextPackSectionName, number>();
   const evidence: ContextPack["evidence"] = [];
+  let renderedBytes = Buffer.byteLength(renderSections(sections), "utf8");
+  const budgetBytes = input.tokenBudget * 4;
   for (const candidate of unique.values()) {
     const section = SECTION_BY_KIND[candidate.item.kind];
     const accepted = acceptedPerSection.get(section) ?? 0;
@@ -184,12 +186,11 @@ export function compileContextPack(
 
     const previous = sections.get(section) ?? "";
     const block = candidateBlock(candidate);
-    sections.set(section, previous.length === 0 ? block : `${previous}\n\n${block}`);
-    if (estimatedTokens(renderSections(sections)) > input.tokenBudget) {
-      sections.set(section, previous);
-      continue;
-    }
+    const addedBytes = Buffer.byteLength(block, "utf8") + (previous.length === 0 ? 0 : 2);
+    if (renderedBytes + addedBytes > budgetBytes) continue;
 
+    sections.set(section, previous.length === 0 ? block : `${previous}\n\n${block}`);
+    renderedBytes += addedBytes;
     evidence.push({
       contextItemId: candidate.item.id,
       section,
