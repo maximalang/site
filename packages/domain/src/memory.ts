@@ -145,10 +145,25 @@ export const MemoryProjectionEventSchema = z
   });
 export type MemoryProjectionEvent = z.infer<typeof MemoryProjectionEventSchema>;
 
+export const MemoryCurationCandidateSchema = z.strictObject({
+  contextItemId: ContextItemIdSchema,
+  matchKind: z.literal("EXACT_CONTENT"),
+  suggestedAction: z.literal("MERGE"),
+  content: z.string().trim().min(1).max(20_000),
+  importance: z.number().min(0).max(1),
+  createdAt: TimestampSchema,
+});
+export type MemoryCurationCandidate = z.infer<typeof MemoryCurationCandidateSchema>;
+
+export const MemoryInboxProposalSchema = MemoryProposalSchema.extend({
+  curationCandidates: z.array(MemoryCurationCandidateSchema).max(5).default([]),
+});
+export type MemoryInboxProposal = z.infer<typeof MemoryInboxProposalSchema>;
+
 export const MemoryInboxSchema = z.strictObject({
   schemaVersion: z.literal(1),
   projectId: ProjectIdSchema,
-  proposals: z.array(MemoryProposalSchema).max(500),
+  proposals: z.array(MemoryInboxProposalSchema).max(500),
 });
 export type MemoryInbox = z.infer<typeof MemoryInboxSchema>;
 

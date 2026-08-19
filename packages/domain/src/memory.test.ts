@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MemoryCurationDecisionSchema,
+  MemoryInboxSchema,
   MemoryNetworkSchema,
   MemoryProjectionEventSchema,
   MemoryProposalSchema,
@@ -34,6 +35,56 @@ describe("memory curation contracts", () => {
         createdAt: now,
       }).status,
     ).toBe("PENDING");
+  });
+
+  it("exposes bounded exact-content candidates without deciding for the curator", () => {
+    const inbox = MemoryInboxSchema.parse({
+      schemaVersion: 1,
+      projectId: ids.project,
+      proposals: [
+        {
+          schemaVersion: 1,
+          id: ids.proposal,
+          projectId: ids.project,
+          sourceContextItemId: ids.source,
+          content: "PostgreSQL owns canonical system memory.",
+          contentHash: "a".repeat(64),
+          estimatedTokens: 8,
+          importance: 0.9,
+          status: "PENDING",
+          createdAt: now,
+          curationCandidates: [
+            {
+              contextItemId: ids.target,
+              matchKind: "EXACT_CONTENT",
+              suggestedAction: "MERGE",
+              content: "PostgreSQL owns canonical system memory.",
+              importance: 1,
+              createdAt: now,
+            },
+          ],
+        },
+      ],
+    });
+    expect(inbox.proposals[0]?.curationCandidates[0]).toMatchObject({
+      contextItemId: ids.target,
+      matchKind: "EXACT_CONTENT",
+      suggestedAction: "MERGE",
+    });
+    expect(() =>
+      MemoryInboxSchema.parse({
+        ...inbox,
+        proposals: [
+          {
+            ...inbox.proposals[0],
+            curationCandidates: Array.from(
+              { length: 6 },
+              () => inbox.proposals[0]?.curationCandidates[0],
+            ),
+          },
+        ],
+      }),
+    ).toThrow();
   });
 
   it("defines bounded replay and Memory Center projection contracts", () => {

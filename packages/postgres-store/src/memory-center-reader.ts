@@ -26,6 +26,14 @@ type ProposalRow = QueryResultRow & {
   created_at: Date | string;
 };
 
+type CandidateRow = QueryResultRow & {
+  proposal_id: string;
+  context_item_id: string;
+  content: string;
+  importance: number;
+  created_at: Date | string;
+};
+
 type TimelineRow = QueryResultRow & {
   decision_id: string;
   proposal_id: string;
@@ -80,6 +88,39 @@ export class PostgresMemoryCenterReader {
         LIMIT $2`,
       [projectId, limit],
     );
+    const proposalIds = result.rows.map((row) => row.id);
+    const candidates =
+      proposalIds.length === 0
+        ? { rows: [] as CandidateRow[] }
+        : await this.pool.query<CandidateRow>(
+            `/* MEMORY_INBOX_CANDIDATES */
+             SELECT proposal.id AS proposal_id, memory.id AS context_item_id,
+                    memory.content, memory.importance, memory.created_at
+               FROM agent_world.memory_proposals proposal
+               JOIN LATERAL (
+                 SELECT item.id, item.content, item.importance, item.created_at
+                   FROM agent_world.context_items item
+                  WHERE item.project_id = proposal.project_id
+                    AND item.kind = 'MEMORY'
+                    AND item.content_sha256 = proposal.content_sha256
+                    AND item.created_at < CURRENT_TIMESTAMP
+                    AND (item.valid_until IS NULL OR item.valid_until > CURRENT_TIMESTAMP)
+                  ORDER BY item.importance DESC, item.created_at DESC, item.id
+                  LIMIT 5
+               ) memory ON TRUE
+              WHERE proposal.project_id = $1
+                AND proposal.status = 'PENDING'
+                AND proposal.id = ANY($2::text[])
+              ORDER BY proposal.id, memory.importance DESC, memory.created_at DESC,
+                       memory.id`,
+            [projectId, proposalIds],
+          );
+    const candidatesByProposal = new Map<string, CandidateRow[]>();
+    for (const candidate of candidates.rows) {
+      const entries = candidatesByProposal.get(candidate.proposal_id) ?? [];
+      entries.push(candidate);
+      candidatesByProposal.set(candidate.proposal_id, entries);
+    }
     return MemoryInboxSchema.parse({
       schemaVersion: 1,
       projectId,
@@ -94,6 +135,14 @@ export class PostgresMemoryCenterReader {
         importance: row.importance,
         status: row.status,
         createdAt: iso(row.created_at),
+        curationCandidates: (candidatesByProposal.get(row.id) ?? []).map((candidate) => ({
+          contextItemId: candidate.context_item_id,
+          matchKind: "EXACT_CONTENT" as const,
+          suggestedAction: "MERGE" as const,
+          content: candidate.content,
+          importance: candidate.importance,
+          createdAt: iso(candidate.created_at),
+        })),
       })),
     });
   }
