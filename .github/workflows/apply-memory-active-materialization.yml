@@ -1,0 +1,43 @@
+name: Apply memory active materialization patch
+
+on:
+  push:
+    branches:
+      - codex/memory-active-materialization-v2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: codex/memory-active-materialization-v2
+      - name: Apply fail-safe fallback filter
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("packages/postgres-store/src/memory-curation-store.ts")
+          text = path.read_text()
+          old = """            WHERE proposal.id = $2 AND proposal.project_id = $4
+              AND NOT EXISTS (SELECT 1 FROM inserted)
+           LIMIT 1`,"""
+          new = """            WHERE proposal.id = $2 AND proposal.project_id = $4
+              AND memory.created_at <= $3
+              AND (memory.valid_until IS NULL OR memory.valid_until > $3)
+              AND NOT EXISTS (SELECT 1 FROM inserted)
+           LIMIT 1`,"""
+          if text.count(old) != 1:
+              raise SystemExit("expected exactly one materialization fallback marker")
+          path.write_text(text.replace(old, new))
+          PY
+          rm .github/workflows/apply-memory-active-materialization.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/postgres-store/src/memory-curation-store.ts .github/workflows/apply-memory-active-materialization.yml
+          git commit -m "Require active fallback memory materialization"
+          git push origin HEAD:codex/memory-active-materialization-v2
