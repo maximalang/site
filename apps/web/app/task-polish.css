@@ -6,13 +6,6 @@
   display: none;
 }
 
-.task-form:has(.task-decision-panel) > label,
-.task-form:has(.task-decision-panel) > input,
-.task-form:has(.task-decision-panel) > select,
-.task-form:has(.task-decision-panel) > textarea {
-  opacity: 0.68;
-}
-
 .task-decision-panel {
   margin-top: var(--space-3);
   padding: var(--space-4);
@@ -39,6 +32,13 @@
 .task-decision-panel textarea {
   min-height: 5rem;
   background: var(--surface-raised);
+}
+
+.task-form:has(.task-decision-panel) > label,
+.task-form:has(.task-decision-panel) > input,
+.task-form:has(.task-decision-panel) > select,
+.task-form:has(.task-decision-panel) > textarea {
+  opacity: 0.68;
 }
 
 .task-decision-actions {
