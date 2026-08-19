@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   type RagDocumentChunkWrite,
   RagDocumentChunkWriteSchema,
@@ -42,6 +43,10 @@ export class SharedContextConflictError extends Error {
 
 function vectorLiteral(embedding: readonly number[]): string {
   return `[${embedding.join(",")}]`;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 export class PostgresSharedContextStore {
@@ -110,6 +115,7 @@ export class PostgresSharedContextStore {
 
   async writeChunk(value: unknown): Promise<SharedContextWriteReceipt> {
     const input: RagDocumentChunkWrite = RagDocumentChunkWriteSchema.parse(value);
+    const contentHash = sha256(input.content);
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -135,7 +141,7 @@ export class PostgresSharedContextStore {
           input.projectId,
           input.ordinal,
           input.content,
-          input.contentHash,
+          contentHash,
           input.estimatedTokens,
           input.embeddingModel ?? null,
           input.embedding ? vectorLiteral(input.embedding) : null,
@@ -148,7 +154,7 @@ export class PostgresSharedContextStore {
           `SELECT id, false AS inserted
              FROM agent_world.rag_document_chunks
             WHERE project_id = $1 AND content_sha256 = $2`,
-          [input.projectId, input.contentHash],
+          [input.projectId, contentHash],
         );
         canonical = raced.rows[0];
       }
@@ -193,7 +199,7 @@ export class PostgresSharedContextStore {
           input.projectId,
           input.temperature,
           input.content,
-          input.contentHash,
+          contentHash,
           input.estimatedTokens,
           input.importance,
           canonical.id,
@@ -207,7 +213,7 @@ export class PostgresSharedContextStore {
              FROM agent_world.context_items
             WHERE project_id = $1 AND kind = 'RAG_CHUNK' AND content_sha256 = $2
               AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $3`,
-          [input.projectId, input.contentHash, canonical.id],
+          [input.projectId, contentHash, canonical.id],
         );
         contextItemId = racedContext.rows[0]?.id;
       }
@@ -306,6 +312,7 @@ export class PostgresSharedContextStore {
       const contextItemIds: string[] = [];
       let created = canonicalDocument.inserted;
       for (const chunk of chunks) {
+        const contentHash = sha256(chunk.content);
         const result = await client.query<CanonicalRow>(
           `WITH inserted AS (
              INSERT INTO agent_world.rag_document_chunks
@@ -328,7 +335,7 @@ export class PostgresSharedContextStore {
             chunk.projectId,
             chunk.ordinal,
             chunk.content,
-            chunk.contentHash,
+            contentHash,
             chunk.estimatedTokens,
             chunk.embeddingModel ?? null,
             chunk.embedding ? vectorLiteral(chunk.embedding) : null,
@@ -341,7 +348,7 @@ export class PostgresSharedContextStore {
             `SELECT id, false AS inserted
                FROM agent_world.rag_document_chunks
               WHERE project_id = $1 AND content_sha256 = $2`,
-            [chunk.projectId, chunk.contentHash],
+            [chunk.projectId, contentHash],
           );
           canonicalChunk = raced.rows[0];
         }
@@ -387,7 +394,7 @@ export class PostgresSharedContextStore {
             chunk.projectId,
             chunk.temperature,
             chunk.content,
-            chunk.contentHash,
+            contentHash,
             chunk.estimatedTokens,
             chunk.importance,
             canonicalChunk.id,
@@ -401,7 +408,7 @@ export class PostgresSharedContextStore {
                FROM agent_world.context_items
               WHERE project_id = $1 AND kind = 'RAG_CHUNK' AND content_sha256 = $2
                 AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $3`,
-            [chunk.projectId, chunk.contentHash, canonicalChunk.id],
+            [chunk.projectId, contentHash, canonicalChunk.id],
           );
           contextItemId = racedContext.rows[0]?.id;
         }
