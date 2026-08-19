@@ -124,6 +124,46 @@ jobs:
       - name: Verify preinstalled Google Chrome
         run: google-chrome --version
       - run: npm run test:e2e
+      - name: Verify local laptop preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          node apps/web/scripts/local-preview.mjs --no-open >"$RUNNER_TEMP/local-preview.log" 2>&1 &
+          preview_pid=$!
+          cleanup() {
+            kill "$preview_pid" 2>/dev/null || true
+            wait "$preview_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node <<'NODE'
+          const base = "http://127.0.0.1:3210";
+          for (let attempt = 0; attempt < 180; attempt += 1) {
+            try {
+              const response = await fetch(base, { signal: AbortSignal.timeout(750) });
+              if (response.ok) break;
+            } catch {}
+            if (attempt === 179) throw new Error("Local preview did not become ready");
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          const session = await fetch(`${base}/api/auth/session`);
+          if (!session.ok || session.headers.get("x-agent-world-preview") !== "contract-fixture") {
+            throw new Error("Local preview session fixture is unavailable");
+          }
+          const worldResponse = await fetch(`${base}/api/world`);
+          const world = await worldResponse.json();
+          if (!worldResponse.ok || world.source !== "CONTRACT_FIXTURE") {
+            throw new Error("Local preview World fixture is invalid");
+          }
+          const hubResponse = await fetch(`${base}/api/hub`);
+          const hub = await hubResponse.json();
+          if (!hubResponse.ok || hub.schemaVersion !== 1 || hub.projects?.length !== 1) {
+            throw new Error("Local preview Hub fixture is invalid");
+          }
+          const mutation = await fetch(`${base}/api/tasks`, { method: "POST" });
+          if (mutation.status !== 409) {
+            throw new Error("Local preview must fail closed for mutations");
+          }
+          NODE
       - name: Upload browser visual evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
