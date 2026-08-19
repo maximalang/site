@@ -293,7 +293,8 @@ describe("PostgresSharedContextStore", () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
-  it("serializes validated vectors and filters retrieval by project and embedding model", async () => {
+  it("serializes vectors and returns bounded occurrence provenance for each semantic hit", async () => {
+    const secondDocument = "document_77777777-7777-7777-7777-777777777777";
     const { pool, query } = poolFor((sql) => {
       if (sql.startsWith("SET LOCAL")) return { rows: [], rowCount: 0 };
       if (sql.includes("FROM agent_world.rag_document_chunks"))
@@ -309,6 +310,11 @@ describe("PostgresSharedContextStore", () => {
               estimated_tokens: 4,
               embedding_model: "text-embedding-3-small",
               distance: 0.125,
+              occurrences: [
+                { documentId: ids.document, ordinal: 0, createdAt: now },
+                { documentId: secondDocument, ordinal: 7, createdAt: now },
+              ],
+              occurrence_count: 2,
               created_at: now,
             },
           ],
@@ -328,6 +334,11 @@ describe("PostgresSharedContextStore", () => {
       projectId: ids.project,
       embeddingModel: "text-embedding-3-small",
       distance: 0.125,
+      occurrences: [
+        { documentId: ids.document, ordinal: 0, createdAt: now },
+        { documentId: secondDocument, ordinal: 7, createdAt: now },
+      ],
+      occurrenceCount: 2,
     });
     const retrieval = query.mock.calls.find(([sql]) =>
       String(sql).includes("FROM agent_world.rag_document_chunks"),
@@ -335,6 +346,8 @@ describe("PostgresSharedContextStore", () => {
     expect(retrieval?.[0]).toContain(
       "WHERE projection.project_id = $1 AND projection.embedding_model = $5",
     );
+    expect(retrieval?.[0]).toContain("FROM agent_world.rag_document_chunk_occurrences");
+    expect(retrieval?.[0]).toContain("LIMIT 100");
     expect(retrieval?.[1]?.[0]).toBe(ids.project);
     expect(retrieval?.[1]?.[1]).toMatch(/^\[1,0,0,/);
     expect(retrieval?.[1]?.[4]).toBe("text-embedding-3-small");
