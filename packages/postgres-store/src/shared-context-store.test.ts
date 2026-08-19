@@ -157,6 +157,19 @@ describe("PostgresSharedContextStore", () => {
     expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(1);
   });
 
+  it("rejects model-less RAG retrieval before opening a database transaction", async () => {
+    const connect = vi.fn();
+    await expect(
+      new PostgresSharedContextStore({ connect } as never).retrieve({
+        schemaVersion: 1,
+        projectId: ids.project,
+        embedding,
+        maxItems: 5,
+      }),
+    ).rejects.toThrow();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it("serializes validated vectors and filters retrieval by project and embedding model", async () => {
     const { pool, query } = poolFor((sql) => {
       if (sql.startsWith("SET LOCAL")) return { rows: [], rowCount: 0 };
