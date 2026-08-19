@@ -24,6 +24,15 @@ import { type ScheduleClient, SchedulePanel } from "./schedule-panel";
 type LoadHub = (attempt: number) => Promise<HubReadModel>;
 const defaultLoadHub: LoadHub = () => loadHubReadModel();
 
+const HUB_SECTIONS = [
+  { id: "hub-registry", label: "Реестр" },
+  { id: "hub-setup", label: "Настройка" },
+  { id: "hub-runtime", label: "Runtime" },
+  { id: "hub-memory", label: "Memory" },
+  { id: "hub-automation", label: "Автоматизация" },
+  { id: "hub-routing", label: "Маршруты" },
+] as const;
+
 export function HubPanel({
   load = defaultLoadHub,
   onSelectAgent,
@@ -97,7 +106,16 @@ export function HubPanel({
         </div>
         <p>Agent, Account и Model остаются разными физическими сущностями.</p>
       </div>
+      <nav aria-label="Разделы Hub" className="hub-section-nav">
+        {HUB_SECTIONS.map((section) => (
+          <a href={`#${section.id}`} key={section.id}>
+            {section.label}
+          </a>
+        ))}
+      </nav>
+      <span aria-hidden="true" className="hub-section-anchor" id="hub-registry" />
       <HubRegistry model={model} onSelectAgent={onSelectAgent} />
+      <span aria-hidden="true" className="hub-section-anchor" id="hub-setup" />
       <ChatGptAccountPanel
         accounts={model.accounts}
         csrfToken={csrfToken}
@@ -120,13 +138,16 @@ export function HubPanel({
         model={model}
         onProvisioned={() => setAttempt((value) => value + 1)}
       />
+      <span aria-hidden="true" className="hub-section-anchor" id="hub-runtime" />
       <OperationsPanel />
       <IntegrationPanel csrfToken={csrfToken} />
+      <span aria-hidden="true" className="hub-section-anchor" id="hub-memory" />
       <MemoryCenter
         {...(memoryClient ? { client: memoryClient } : {})}
         csrfToken={csrfToken}
         projects={model.projects}
       />
+      <span aria-hidden="true" className="hub-section-anchor" id="hub-automation" />
       <NativeChatProfilePanel
         {...(nativeChatProfileClient ? { client: nativeChatProfileClient } : {})}
         csrfToken={csrfToken}
@@ -138,6 +159,7 @@ export function HubPanel({
         hub={model}
         {...(provisionedAgentId ? { focusAgentId: provisionedAgentId } : {})}
       />
+      <span aria-hidden="true" className="hub-section-anchor" id="hub-routing" />
       <ProviderCredentialForm csrfToken={csrfToken} model={model} />
       <ModelRouteCheckPanel csrfToken={csrfToken} model={model} />
       <ExecutionPreferencesPanel
