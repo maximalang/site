@@ -9,8 +9,7 @@
 .task-form:has(.task-decision-panel) > label,
 .task-form:has(.task-decision-panel) > input,
 .task-form:has(.task-decision-panel) > select,
-.task-form:has(.task-decision-panel) > textarea,
-.task-form:has(.task-decision-panel) > .task-policy-note {
+.task-form:has(.task-decision-panel) > textarea {
   opacity: 0.68;
 }
 
