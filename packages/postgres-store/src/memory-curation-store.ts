@@ -357,6 +357,8 @@ export class PostgresMemoryCurationStore {
               AND memory.artifact_id IS NOT DISTINCT FROM source.artifact_id
               AND memory.document_chunk_id IS NOT DISTINCT FROM source.document_chunk_id
             WHERE proposal.id = $2 AND proposal.project_id = $4
+              AND memory.created_at <= $3
+              AND (memory.valid_until IS NULL OR memory.valid_until > $3)
               AND NOT EXISTS (SELECT 1 FROM inserted)
            LIMIT 1`,
           [nextContextId, decision.proposalId, decision.decidedAt, decision.projectId],
