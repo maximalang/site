@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.3.2");
+    expect(first.compilerVersion).toBe("1.3.3");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -211,8 +211,33 @@ describe("compileContextPack", () => {
     );
 
     expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([highRelevanceCold.id]);
+    expect(pack.evidence[0]?.score).toBe(950);
     expect(pack.rendered).toContain(highRelevanceCold.content);
     expect(pack.rendered).not.toContain(lowRelevanceHot.content);
+  });
+
+  it("reports evidence scores using the same primary relevance signal as selection", () => {
+    const highRelevanceCold = item("55555555", "DECISION", "High relevance cold decision.", {
+      temperature: "COLD",
+      importance: 0,
+    });
+    const lowRelevanceHot = item("66666666", "FINDING", "Low relevance hot finding.", {
+      temperature: "HOT",
+      importance: 1,
+    });
+    const pack = compileContextPack(
+      input,
+      [
+        { item: lowRelevanceHot, relevance: 0.05 },
+        { item: highRelevanceCold, relevance: 0.95 },
+      ],
+      "2026-08-14T21:00:00.000Z",
+    );
+    const scores = new Map(pack.evidence.map((evidence) => [evidence.contextItemId, evidence.score]));
+
+    expect(scores.get(highRelevanceCold.id)).toBe(950);
+    expect(scores.get(lowRelevanceHot.id)).toBe(50);
+    expect(scores.get(highRelevanceCold.id)).toBeGreaterThan(scores.get(lowRelevanceHot.id) ?? 0);
   });
 
   it("excludes expired context even when it would otherwise rank first", () => {
