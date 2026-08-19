@@ -63,8 +63,7 @@ export type MemoryCurationStoreErrorCode =
   | "DECISION_CONFLICT"
   | "TARGET_NOT_FOUND"
   | "TARGET_NOT_ACTIVE"
-  | "TARGET_RELATION_MISMATCH"
-  | "CONTENT_HASH_MISMATCH";
+  | "TARGET_RELATION_MISMATCH";
 
 export class MemoryCurationStoreError extends Error {
   constructor(readonly code: MemoryCurationStoreErrorCode) {
@@ -112,11 +111,12 @@ export class PostgresMemoryCurationStore {
   async propose(value: unknown): Promise<MemoryProposalReceipt> {
     const proposal: MemoryProposal = MemoryProposalSchema.parse(value);
     if (proposal.status !== "PENDING") throw new MemoryCurationStoreError("PROPOSAL_CONFLICT");
-    if (proposal.contentHash !== contentSha256(proposal.content)) {
-      throw new MemoryCurationStoreError("CONTENT_HASH_MISMATCH");
-    }
-    const { id: _requestedId, ...canonicalProposal } = proposal;
-    const requestHash = sha256(canonicalProposal);
+    const canonicalProposal: MemoryProposal = {
+      ...proposal,
+      contentHash: contentSha256(proposal.content),
+    };
+    const { id: _requestedId, ...canonicalRequest } = canonicalProposal;
+    const requestHash = sha256(canonicalRequest);
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -133,15 +133,15 @@ export class PostgresMemoryCurationStore {
          ON CONFLICT DO NOTHING
          RETURNING id`,
         [
-          proposal.id,
-          proposal.projectId,
-          proposal.sourceContextItemId,
-          proposal.content,
-          proposal.contentHash,
-          proposal.estimatedTokens,
-          proposal.importance,
+          canonicalProposal.id,
+          canonicalProposal.projectId,
+          canonicalProposal.sourceContextItemId,
+          canonicalProposal.content,
+          canonicalProposal.contentHash,
+          canonicalProposal.estimatedTokens,
+          canonicalProposal.importance,
           requestHash,
-          proposal.createdAt,
+          canonicalProposal.createdAt,
         ],
       );
       if (inserted.rows[0]) {
@@ -158,12 +158,12 @@ export class PostgresMemoryCurationStore {
            VALUES ($1, 'MEMORY_PROPOSED', $2, $3, $4, $5, $6, $7)`,
           [
             eventId,
-            proposal.projectId,
-            proposal.id,
-            proposal.sourceContextItemId,
-            proposal.content,
-            sha256({ eventType: "MEMORY_PROPOSED", proposal }),
-            proposal.createdAt,
+            canonicalProposal.projectId,
+            canonicalProposal.id,
+            canonicalProposal.sourceContextItemId,
+            canonicalProposal.content,
+            sha256({ eventType: "MEMORY_PROPOSED", proposal: canonicalProposal }),
+            canonicalProposal.createdAt,
           ],
         );
         await client.query("COMMIT");
@@ -174,7 +174,12 @@ export class PostgresMemoryCurationStore {
            FROM agent_world.memory_proposals
           WHERE id = $1 OR
                 (project_id = $2 AND source_context_item_id = $3 AND content_sha256 = $4)`,
-        [proposal.id, proposal.projectId, proposal.sourceContextItemId, proposal.contentHash],
+        [
+          canonicalProposal.id,
+          canonicalProposal.projectId,
+          canonicalProposal.sourceContextItemId,
+          canonicalProposal.contentHash,
+        ],
       );
       if (existing.rows.length === 1 && existing.rows[0]?.request_sha256 === requestHash) {
         await client.query("COMMIT");
@@ -182,7 +187,7 @@ export class PostgresMemoryCurationStore {
       }
       const source = await client.query(
         "SELECT 1 FROM agent_world.context_items WHERE id = $1 AND project_id = $2",
-        [proposal.sourceContextItemId, proposal.projectId],
+        [canonicalProposal.sourceContextItemId, canonicalProposal.projectId],
       );
       if (source.rows.length === 0) throw new MemoryCurationStoreError("SOURCE_NOT_FOUND");
       throw new MemoryCurationStoreError("PROPOSAL_CONFLICT");
