@@ -124,13 +124,9 @@ describe("discoverMigrations", () => {
     );
     expect(migrations[43]?.sql).toContain("'SUPERSEDE'");
     expect(migrations[43]?.sql).toContain("target_context_item_id");
-    expect(migrations[44]?.sql).toContain(
-      "CREATE TABLE agent_world.rag_document_chunk_embeddings",
-    );
+    expect(migrations[44]?.sql).toContain("CREATE TABLE agent_world.rag_document_chunk_embeddings");
     expect(migrations[44]?.sql).toContain("PRIMARY KEY (document_chunk_id, embedding_model)");
-    expect(migrations[44]?.sql).toContain(
-      "INSERT INTO agent_world.rag_document_chunk_embeddings",
-    );
+    expect(migrations[44]?.sql).toContain("INSERT INTO agent_world.rag_document_chunk_embeddings");
     expect(migrations[30]?.sql).toContain(
       "CREATE TABLE agent_world.structured_meeting_criterion_assessments",
     );
