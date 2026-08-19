@@ -37,24 +37,36 @@ function pendingProposal() {
 }
 
 describe("PostgresMemoryCurationStore", () => {
-  it("rejects a proposal whose claimed content hash does not match canonical content", async () => {
-    const connect = vi.fn();
-    const store = new PostgresMemoryCurationStore({ connect } as never);
-    await expect(
-      store.propose({
-        schemaVersion: 1,
-        id: ids.proposal,
-        projectId: ids.project,
-        sourceContextItemId: ids.source,
-        content: proposalContent,
-        contentHash: "a".repeat(64),
-        estimatedTokens: 7,
-        importance: 0.9,
-        status: "PENDING",
-        createdAt: now,
-      }),
-    ).rejects.toMatchObject({ name: "MemoryCurationStoreError", code: "CONTENT_HASH_MISMATCH" });
-    expect(connect).not.toHaveBeenCalled();
+  it("derives canonical content hash instead of trusting the caller hash", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_proposals"))
+        return { rows: [{ id: ids.proposal }] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) return { rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const proposal = await new PostgresMemoryCurationStore(pool as never, {
+      eventId: () => ids.event,
+    }).propose({
+      schemaVersion: 1,
+      id: ids.proposal,
+      projectId: ids.project,
+      sourceContextItemId: ids.source,
+      content: proposalContent,
+      contentHash: "a".repeat(64),
+      estimatedTokens: 7,
+      importance: 0.9,
+      status: "PENDING",
+      createdAt: now,
+    });
+    expect(proposal).toEqual({ outcome: "CREATED", proposalId: ids.proposal });
+    expect(
+      query.mock.calls.some(
+        ([sql, params]) =>
+          sql.includes("INSERT INTO agent_world.memory_proposals") &&
+          params?.[4] === proposalContentHash,
+      ),
+    ).toBe(true);
   });
 
   it("creates a proposal only through same-project canonical provenance", async () => {
