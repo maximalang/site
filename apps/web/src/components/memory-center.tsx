@@ -102,10 +102,14 @@ function MemoryDrawer({
     };
   }, [advanced, client, network, projectId]);
 
-  const decide = async (proposalId: string, action: "ACCEPT" | "MERGE" | "REJECT") => {
+  const decide = async (
+    proposalId: string,
+    action: "ACCEPT" | "MERGE" | "REJECT",
+    targetOverride?: string,
+  ) => {
     if (pendingProposalId) return;
     const id = decisionId();
-    const targetContextItemId = mergeTargets[proposalId];
+    const targetContextItemId = targetOverride ?? mergeTargets[proposalId];
     if (action === "MERGE" && !targetContextItemId) return;
     const input = {
       schemaVersion: 1 as const,
@@ -206,67 +210,84 @@ function MemoryDrawer({
       {!loading && inbox ? (
         <ul className="memory-inbox-list">
           {inbox.proposals.length === 0 ? <li className="hub-empty">Inbox пуст.</li> : null}
-          {inbox.proposals.map((proposal) => (
-            <li key={proposal.id}>
-              <p>{proposal.content}</p>
-              {advanced ? (
-                <dl className="memory-provenance">
-                  <div>
-                    <dt>Source</dt>
-                    <dd>{proposal.sourceContextItemId}</dd>
-                  </div>
-                  <div>
-                    <dt>Importance</dt>
-                    <dd>{proposal.importance}</dd>
-                  </div>
-                </dl>
-              ) : null}
-              <div className="memory-actions">
-                <button
-                  disabled={pendingProposalId === proposal.id}
-                  onClick={() => void decide(proposal.id, "ACCEPT")}
-                  type="button"
-                >
-                  Accept
-                </button>
-                <button
-                  disabled={pendingProposalId === proposal.id}
-                  onClick={() => void decide(proposal.id, "REJECT")}
-                  type="button"
-                >
-                  Reject
-                </button>
+          {inbox.proposals.map((proposal) => {
+            const exactCandidate = proposal.curationCandidates[0];
+            return (
+              <li key={proposal.id}>
+                <p>{proposal.content}</p>
+                {exactCandidate ? (
+                  <p className="panel-note">Exact canonical match найден — Merge не создаст дубль.</p>
+                ) : null}
                 {advanced ? (
-                  <>
-                    <select
-                      aria-label={`Цель Merge для ${proposal.content}`}
-                      onChange={(event) =>
-                        setMergeTargets((current) => ({
-                          ...current,
-                          [proposal.id]: event.target.value,
-                        }))
-                      }
-                      value={mergeTargets[proposal.id] ?? ""}
-                    >
-                      <option value="">Выберите память</option>
-                      {network?.nodes.map((node) => (
-                        <option key={node.contextItemId} value={node.contextItemId}>
-                          {node.content}
-                        </option>
-                      ))}
-                    </select>
+                  <dl className="memory-provenance">
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{proposal.sourceContextItemId}</dd>
+                    </div>
+                    <div>
+                      <dt>Importance</dt>
+                      <dd>{proposal.importance}</dd>
+                    </div>
+                  </dl>
+                ) : null}
+                <div className="memory-actions">
+                  <button
+                    disabled={pendingProposalId === proposal.id}
+                    onClick={() => void decide(proposal.id, "ACCEPT")}
+                    type="button"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    disabled={pendingProposalId === proposal.id}
+                    onClick={() => void decide(proposal.id, "REJECT")}
+                    type="button"
+                  >
+                    Reject
+                  </button>
+                  {exactCandidate ? (
                     <button
-                      disabled={pendingProposalId === proposal.id || !mergeTargets[proposal.id]}
-                      onClick={() => void decide(proposal.id, "MERGE")}
+                      disabled={pendingProposalId === proposal.id}
+                      onClick={() =>
+                        void decide(proposal.id, "MERGE", exactCandidate.contextItemId)
+                      }
                       type="button"
                     >
-                      Merge
+                      Merge exact
                     </button>
-                  </>
-                ) : null}
-              </div>
-            </li>
-          ))}
+                  ) : null}
+                  {advanced ? (
+                    <>
+                      <select
+                        aria-label={`Цель Merge для ${proposal.content}`}
+                        onChange={(event) =>
+                          setMergeTargets((current) => ({
+                            ...current,
+                            [proposal.id]: event.target.value,
+                          }))
+                        }
+                        value={mergeTargets[proposal.id] ?? ""}
+                      >
+                        <option value="">Выберите память</option>
+                        {network?.nodes.map((node) => (
+                          <option key={node.contextItemId} value={node.contextItemId}>
+                            {node.content}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={pendingProposalId === proposal.id || !mergeTargets[proposal.id]}
+                        onClick={() => void decide(proposal.id, "MERGE")}
+                        type="button"
+                      >
+                        Merge
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {!loading && timeline ? (
