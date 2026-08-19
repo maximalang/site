@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.3.3";
+const COMPILER_VERSION = "1.3.4";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -174,31 +174,40 @@ export function compileContextPack(
   for (const candidate of ranked(eligible)) {
     if (!unique.has(candidate.item.contentHash)) unique.set(candidate.item.contentHash, candidate);
   }
+
+  const acceptedPerSection = new Map<ContextPackSectionName, number>();
   const evidence: ContextPack["evidence"] = [];
-  for (const section of CONTEXT_PACK_SECTION_ORDER) {
-    const matching = [...unique.values()].filter(
-      (candidate) => SECTION_BY_KIND[candidate.item.kind] === section,
-    );
-    let accepted = 0;
-    for (const candidate of matching) {
-      if (accepted >= MAX_ITEMS_PER_SECTION) break;
-      const previous = sections.get(section) ?? "";
-      const block = candidateBlock(candidate);
-      sections.set(section, previous.length === 0 ? block : `${previous}\n\n${block}`);
-      if (estimatedTokens(renderSections(sections)) > input.tokenBudget) {
-        sections.set(section, previous);
-        continue;
-      }
-      evidence.push({
-        contextItemId: candidate.item.id,
-        section,
-        contentHash: candidate.item.contentHash,
-        score: candidate.relevance * 1_000,
-        provenance: candidate.item.provenance,
-      });
-      accepted += 1;
+  for (const candidate of unique.values()) {
+    const section = SECTION_BY_KIND[candidate.item.kind];
+    const accepted = acceptedPerSection.get(section) ?? 0;
+    if (accepted >= MAX_ITEMS_PER_SECTION) continue;
+
+    const previous = sections.get(section) ?? "";
+    const block = candidateBlock(candidate);
+    sections.set(section, previous.length === 0 ? block : `${previous}\n\n${block}`);
+    if (estimatedTokens(renderSections(sections)) > input.tokenBudget) {
+      sections.set(section, previous);
+      continue;
     }
+
+    evidence.push({
+      contextItemId: candidate.item.id,
+      section,
+      contentHash: candidate.item.contentHash,
+      score: candidate.relevance * 1_000,
+      provenance: candidate.item.provenance,
+    });
+    acceptedPerSection.set(section, accepted + 1);
   }
+
+  const sectionOrder = new Map(
+    CONTEXT_PACK_SECTION_ORDER.map((section, index) => [section, index] as const),
+  );
+  evidence.sort(
+    (left, right) =>
+      (sectionOrder.get(left.section) ?? Number.MAX_SAFE_INTEGER) -
+      (sectionOrder.get(right.section) ?? Number.MAX_SAFE_INTEGER),
+  );
 
   const rendered = renderSections(sections);
   return ContextPackSchema.parse({
