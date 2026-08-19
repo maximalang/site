@@ -6,6 +6,7 @@ const ids = {
   decision: "memory_decision_22222222-2222-2222-2222-222222222222",
   project: "project_33333333-3333-3333-3333-333333333333",
   source: "context_item_44444444-4444-4444-4444-444444444444",
+  event: "event_55555555-5555-5555-5555-555555555555",
 } as const;
 
 const proposedAt = "2026-08-15T00:00:01.000Z";
@@ -62,5 +63,35 @@ describe("PostgresMemoryCurationStore decision chronology", () => {
         String(sql).includes("INSERT INTO agent_world.memory_events"),
       ),
     ).toBe(false);
+  });
+
+  it("allows a decision at the exact proposal timestamp", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return { rows: [] };
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE")) {
+        return { rows: [pendingProposal()] };
+      }
+      if (sql.includes("INSERT INTO agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("UPDATE agent_world.memory_proposals")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) return { rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const pool = { connect: vi.fn(async () => ({ query, release: vi.fn() })) };
+
+    await expect(
+      new PostgresMemoryCurationStore(pool as never, { eventId: () => ids.event }).decide({
+        schemaVersion: 1,
+        id: ids.decision,
+        proposalId: ids.proposal,
+        projectId: ids.project,
+        action: "REJECT",
+        idempotencyKey: "memory:chronology-boundary",
+        decidedAt: proposedAt,
+      }),
+    ).resolves.toMatchObject({ outcome: "CREATED", status: "REJECTED" });
+
+    expect(query.mock.calls.some(([sql]) => sql === "COMMIT")).toBe(true);
   });
 });
