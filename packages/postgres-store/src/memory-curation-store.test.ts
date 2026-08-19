@@ -124,6 +124,101 @@ describe("PostgresMemoryCurationStore", () => {
     expect(query.mock.calls.some(([sql]) => sql.includes("source.provenance_kind"))).toBe(true);
   });
 
+  it("rejects MERGE when the target is neither exact content nor the same provenance", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
+        return { rows: [pendingProposal()] };
+      if (sql.includes("AS shares_source_provenance")) {
+        return {
+          rows: [
+            {
+              id: ids.memory,
+              content: "A different active memory.",
+              content_sha256: "b".repeat(64),
+              shares_source_provenance: false,
+              created_at: "2026-08-14T00:00:00.000Z",
+              valid_until: null,
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const store = new PostgresMemoryCurationStore(pool as never);
+    await expect(
+      store.decide({
+        schemaVersion: 1,
+        id: ids.decision,
+        proposalId: ids.proposal,
+        projectId: ids.project,
+        action: "MERGE",
+        targetContextItemId: ids.memory,
+        idempotencyKey: "memory:merge-mismatch-1",
+        decidedAt: now,
+      }),
+    ).rejects.toMatchObject({ name: "MemoryCurationStoreError", code: "TARGET_RELATION_MISMATCH" });
+    expect(query.mock.calls.some(([sql]) => sql === "ROLLBACK")).toBe(true);
+    expect(
+      query.mock.calls.some(([sql]) =>
+        sql.includes("INSERT INTO agent_world.memory_curation_decisions"),
+      ),
+    ).toBe(false);
+  });
+
+  it("allows a human MERGE reformulation only when it shares canonical source provenance", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
+        return { rows: [pendingProposal()] };
+      if (sql.includes("AS shares_source_provenance")) {
+        return {
+          rows: [
+            {
+              id: ids.memory,
+              content: "Existing wording from the same evidence.",
+              content_sha256: "b".repeat(64),
+              shares_source_provenance: true,
+              created_at: "2026-08-14T00:00:00.000Z",
+              valid_until: null,
+            },
+          ],
+        };
+      }
+      if (sql.includes("INSERT INTO agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("UPDATE agent_world.memory_proposals")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) return { rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const result = await new PostgresMemoryCurationStore(pool as never, {
+      eventId: () => ids.event,
+    }).decide({
+      schemaVersion: 1,
+      id: ids.decision,
+      proposalId: ids.proposal,
+      projectId: ids.project,
+      action: "MERGE",
+      targetContextItemId: ids.memory,
+      idempotencyKey: "memory:merge-same-provenance-1",
+      decidedAt: now,
+    });
+    expect(result).toEqual({
+      outcome: "CREATED",
+      proposalId: ids.proposal,
+      status: "MERGED",
+      materializedContextItemId: ids.memory,
+    });
+    expect(
+      query.mock.calls.some(
+        ([sql, params]) =>
+          sql.includes("AS shares_source_provenance") &&
+          JSON.stringify(params) === JSON.stringify([ids.memory, ids.project, ids.source]),
+      ),
+    ).toBe(true);
+  });
+
   it("supersedes atomically by materializing replacement and expiring the active target", async () => {
     const { pool, query } = poolFor((sql, params) => {
       if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };

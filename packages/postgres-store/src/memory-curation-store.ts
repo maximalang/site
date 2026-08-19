@@ -38,6 +38,12 @@ type TargetRow = QueryResultRow & {
   valid_until: Date | string | null;
 };
 
+type MergeTargetRow = TargetRow & {
+  content: string;
+  content_sha256: string;
+  shares_source_provenance: boolean;
+};
+
 export type MemoryProposalReceipt = {
   outcome: "CREATED" | "DEDUPLICATED";
   proposalId: string;
@@ -56,7 +62,8 @@ export type MemoryCurationStoreErrorCode =
   | "PROPOSAL_NOT_FOUND"
   | "DECISION_CONFLICT"
   | "TARGET_NOT_FOUND"
-  | "TARGET_NOT_ACTIVE";
+  | "TARGET_NOT_ACTIVE"
+  | "TARGET_RELATION_MISMATCH";
 
 export class MemoryCurationStoreError extends Error {
   constructor(readonly code: MemoryCurationStoreErrorCode) {
@@ -224,12 +231,22 @@ export class PostgresMemoryCurationStore {
       let materializedContextItemId: string | null = null;
       let targetContextItemId: string | null = null;
       if (decision.action === "MERGE") {
-        const target = await client.query<TargetRow>(
-          `SELECT id, created_at, valid_until
-             FROM agent_world.context_items
-            WHERE id = $1 AND project_id = $2 AND kind = 'MEMORY'
-            FOR SHARE`,
-          [decision.targetContextItemId, decision.projectId],
+        const target = await client.query<MergeTargetRow>(
+          `SELECT target.id, target.content, target.content_sha256,
+                  target.created_at, target.valid_until,
+                  (target.provenance_kind = source.provenance_kind
+                   AND target.event_id IS NOT DISTINCT FROM source.event_id
+                   AND target.message_id IS NOT DISTINCT FROM source.message_id
+                   AND target.run_id IS NOT DISTINCT FROM source.run_id
+                   AND target.artifact_id IS NOT DISTINCT FROM source.artifact_id
+                   AND target.document_chunk_id IS NOT DISTINCT FROM source.document_chunk_id)
+                    AS shares_source_provenance
+             FROM agent_world.context_items target
+             JOIN agent_world.context_items source
+               ON source.id = $3 AND source.project_id = target.project_id
+            WHERE target.id = $1 AND target.project_id = $2 AND target.kind = 'MEMORY'
+            FOR SHARE OF target`,
+          [decision.targetContextItemId, decision.projectId, proposal.source_context_item_id],
         );
         const targetRow = target.rows[0];
         if (!targetRow) throw new MemoryCurationStoreError("TARGET_NOT_FOUND");
@@ -239,6 +256,12 @@ export class PostgresMemoryCurationStore {
           (targetRow.valid_until !== null && timestamp(targetRow.valid_until) <= decidedAt)
         ) {
           throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
+        }
+        const exactContent =
+          targetRow.content_sha256 === proposal.content_sha256 &&
+          targetRow.content === proposal.content;
+        if (!exactContent && targetRow.shares_source_provenance !== true) {
+          throw new MemoryCurationStoreError("TARGET_RELATION_MISMATCH");
         }
         targetContextItemId = targetRow.id;
         materializedContextItemId = targetRow.id;
