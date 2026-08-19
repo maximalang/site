@@ -122,18 +122,32 @@ export const RagRetrievalRequestSchema = z.strictObject({
 });
 export type RagRetrievalRequest = z.infer<typeof RagRetrievalRequestSchema>;
 
-export const RagRetrievalResultSchema = z.strictObject({
-  chunkId: DocumentChunkIdSchema,
+export const RagChunkOccurrenceSchema = z.strictObject({
   documentId: DocumentIdSchema,
-  projectId: ProjectIdSchema,
-  ordinal: z.number().int().nonnegative(),
-  content: z.string().min(1).max(200_000),
-  contentHash: ContentHashSchema,
-  estimatedTokens: z.number().int().positive().max(100_000),
-  embeddingModel: z.string().trim().min(1).max(200),
-  distance: z.number().min(0).max(2),
+  ordinal: z.number().int().nonnegative().max(1_000_000),
   createdAt: TimestampSchema,
 });
+export type RagChunkOccurrence = z.infer<typeof RagChunkOccurrenceSchema>;
+
+export const RagRetrievalResultSchema = z
+  .strictObject({
+    chunkId: DocumentChunkIdSchema,
+    documentId: DocumentIdSchema,
+    projectId: ProjectIdSchema,
+    ordinal: z.number().int().nonnegative(),
+    content: z.string().min(1).max(200_000),
+    contentHash: ContentHashSchema,
+    estimatedTokens: z.number().int().positive().max(100_000),
+    embeddingModel: z.string().trim().min(1).max(200),
+    distance: z.number().min(0).max(2),
+    occurrences: z.array(RagChunkOccurrenceSchema).min(1).max(100),
+    occurrenceCount: z.number().int().positive().max(2_147_483_647),
+    createdAt: TimestampSchema,
+  })
+  .refine((value) => value.occurrenceCount >= value.occurrences.length, {
+    message: "RAG occurrence count cannot be smaller than the returned occurrence window",
+    path: ["occurrenceCount"],
+  });
 export type RagRetrievalResult = z.infer<typeof RagRetrievalResultSchema>;
 
 export const ContextKindSchema = z.enum([
