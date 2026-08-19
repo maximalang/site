@@ -25,6 +25,8 @@ type RetrievalRow = QueryResultRow & {
   estimated_tokens: number;
   embedding_model: string;
   distance: number;
+  occurrences: Array<{ documentId: string; ordinal: number; createdAt: string }>;
+  occurrence_count: number;
   created_at: Date | string;
 };
 
@@ -487,7 +489,33 @@ export class PostgresSharedContextStore {
       const result = await client.query<RetrievalRow>(
         `SELECT chunk.id, chunk.document_id, chunk.project_id, chunk.ordinal, chunk.content,
                 chunk.content_sha256, chunk.estimated_tokens, projection.embedding_model,
-                projection.embedding <=> $2::vector AS distance, chunk.created_at
+                projection.embedding <=> $2::vector AS distance,
+                COALESCE(
+                  (
+                    SELECT jsonb_agg(
+                             jsonb_build_object(
+                               'documentId', occurrence.document_id,
+                               'ordinal', occurrence.ordinal,
+                               'createdAt', occurrence.created_at
+                             )
+                             ORDER BY occurrence.document_id, occurrence.ordinal
+                           )
+                      FROM (
+                        SELECT document_id, ordinal, created_at
+                          FROM agent_world.rag_document_chunk_occurrences
+                         WHERE document_chunk_id = chunk.id
+                         ORDER BY document_id, ordinal
+                         LIMIT 100
+                      ) AS occurrence
+                  ),
+                  '[]'::jsonb
+                ) AS occurrences,
+                (
+                  SELECT count(*)::integer
+                    FROM agent_world.rag_document_chunk_occurrences AS occurrence_count
+                   WHERE occurrence_count.document_chunk_id = chunk.id
+                ) AS occurrence_count,
+                chunk.created_at
            FROM agent_world.rag_document_chunks AS chunk
            JOIN agent_world.rag_document_chunk_embeddings AS projection
              ON projection.document_chunk_id = chunk.id
@@ -516,6 +544,8 @@ export class PostgresSharedContextStore {
           estimatedTokens: row.estimated_tokens,
           embeddingModel: row.embedding_model,
           distance: row.distance,
+          occurrences: row.occurrences,
+          occurrenceCount: row.occurrence_count,
           createdAt: TimestampSchema.parse(
             row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
           ),
