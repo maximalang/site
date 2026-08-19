@@ -216,7 +216,9 @@ function MemoryDrawer({
               <li key={proposal.id}>
                 <p>{proposal.content}</p>
                 {exactCandidate ? (
-                  <p className="panel-note">Exact canonical match найден — Merge не создаст дубль.</p>
+                  <p className="panel-note">
+                    Exact canonical match найден — Merge не создаст дубль.
+                  </p>
                 ) : null}
                 {advanced ? (
                   <dl className="memory-provenance">
