@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.3.4";
+const COMPILER_VERSION = "1.3.5";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -172,7 +172,8 @@ export function compileContextPack(
   );
   const unique = new Map<string, Candidate>();
   for (const candidate of ranked(eligible)) {
-    if (!unique.has(candidate.item.contentHash)) unique.set(candidate.item.contentHash, candidate);
+    const semanticKey = `${SECTION_BY_KIND[candidate.item.kind]}:${candidate.item.contentHash}`;
+    if (!unique.has(semanticKey)) unique.set(semanticKey, candidate);
   }
 
   const acceptedPerSection = new Map<ContextPackSectionName, number>();
