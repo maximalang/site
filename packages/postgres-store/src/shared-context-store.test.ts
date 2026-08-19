@@ -146,13 +146,7 @@ describe("PostgresSharedContextStore", () => {
         embedding: embeddingValue,
         createdAt,
       });
-    const first = await write(
-      ids.chunk,
-      ids.context,
-      "embedding-v1",
-      embedding,
-      now,
-    );
+    const first = await write(ids.chunk, ids.context, "embedding-v1", embedding, now);
     const second = await write(
       "document_chunk_55555555-5555-5555-5555-555555555555",
       "context_item_66666666-6666-6666-6666-666666666666",
