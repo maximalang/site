@@ -75,13 +75,7 @@ async function persistChunkOccurrence(
       WHERE document_id = $1 AND ordinal = $3
         AND NOT EXISTS (SELECT 1 FROM inserted)
      LIMIT 1`,
-    [
-      input.documentId,
-      input.projectId,
-      input.ordinal,
-      input.documentChunkId,
-      input.createdAt,
-    ],
+    [input.documentId, input.projectId, input.ordinal, input.documentChunkId, input.createdAt],
   );
   if (result.rows[0]?.document_chunk_id !== input.documentChunkId) {
     throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
