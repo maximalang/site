@@ -258,7 +258,8 @@ export class PostgresMemoryCurationStore {
           throw new MemoryCurationStoreError("TARGET_NOT_ACTIVE");
         }
         const exactContent =
-          targetRow.content_sha256 === proposal.content_sha256 && targetRow.content === proposal.content;
+          targetRow.content_sha256 === proposal.content_sha256 &&
+          targetRow.content === proposal.content;
         if (!exactContent && targetRow.shares_source_provenance !== true) {
           throw new MemoryCurationStoreError("TARGET_RELATION_MISMATCH");
         }
