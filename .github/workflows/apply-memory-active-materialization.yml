@@ -41,3 +41,5 @@ jobs:
           git add packages/postgres-store/src/memory-curation-store.ts .github/workflows/apply-memory-active-materialization.yml
           git commit -m "Require active fallback memory materialization"
           git push origin HEAD:codex/memory-active-materialization-v2
+
+# Trigger this workflow after it already exists on the branch.
