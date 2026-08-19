@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const browserChannel =
+  process.env.AGENT_WORLD_PLAYWRIGHT_CHANNEL === "chrome" ? "chrome" : undefined;
+
 export default defineConfig({
   testDir: "./tests-production",
   fullyParallel: false,
@@ -9,6 +12,7 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:3211",
     trace: "retain-on-failure",
+    ...(browserChannel ? { channel: browserChannel } : {}),
   },
   projects: [
     {
