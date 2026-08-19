@@ -30,8 +30,18 @@ function poolWithTarget(target: { created_at: string; valid_until: string | null
     if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE")) {
       return { rows: [pendingProposal()] };
     }
-    if (sql.includes("SELECT id, created_at, valid_until")) {
-      return { rows: [{ id: ids.target, ...target }] };
+    if (sql.includes("AS shares_source_provenance")) {
+      return {
+        rows: [
+          {
+            id: ids.target,
+            content: "Canonical memory candidate.",
+            content_sha256: "a".repeat(64),
+            shares_source_provenance: false,
+            ...target,
+          },
+        ],
+      };
     }
     throw new Error(`Unexpected query: ${sql}`);
   });
