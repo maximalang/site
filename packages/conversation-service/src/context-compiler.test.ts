@@ -233,7 +233,9 @@ describe("compileContextPack", () => {
       ],
       "2026-08-14T21:00:00.000Z",
     );
-    const scores = new Map(pack.evidence.map((evidence) => [evidence.contextItemId, evidence.score]));
+    const scores = new Map(
+      pack.evidence.map((evidence) => [evidence.contextItemId, evidence.score]),
+    );
 
     expect(scores.get(highRelevanceCold.id)).toBe(950);
     expect(scores.get(lowRelevanceHot.id)).toBe(50);
