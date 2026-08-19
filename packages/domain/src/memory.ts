@@ -156,7 +156,7 @@ export const MemoryCurationCandidateSchema = z.strictObject({
 export type MemoryCurationCandidate = z.infer<typeof MemoryCurationCandidateSchema>;
 
 export const MemoryInboxProposalSchema = MemoryProposalSchema.extend({
-  curationCandidates: z.array(MemoryCurationCandidateSchema).max(5),
+  curationCandidates: z.array(MemoryCurationCandidateSchema).max(5).default([]),
 });
 export type MemoryInboxProposal = z.infer<typeof MemoryInboxProposalSchema>;
 
