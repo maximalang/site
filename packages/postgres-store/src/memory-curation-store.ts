@@ -63,7 +63,8 @@ export type MemoryCurationStoreErrorCode =
   | "DECISION_CONFLICT"
   | "TARGET_NOT_FOUND"
   | "TARGET_NOT_ACTIVE"
-  | "TARGET_RELATION_MISMATCH";
+  | "TARGET_RELATION_MISMATCH"
+  | "CONTENT_HASH_MISMATCH";
 
 export class MemoryCurationStoreError extends Error {
   constructor(readonly code: MemoryCurationStoreErrorCode) {
@@ -74,6 +75,10 @@ export class MemoryCurationStoreError extends Error {
 
 function sha256(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
+}
+
+function contentSha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 function statusFor(action: MemoryCurationDecision["action"]): MemoryDecisionReceipt["status"] {
@@ -107,6 +112,9 @@ export class PostgresMemoryCurationStore {
   async propose(value: unknown): Promise<MemoryProposalReceipt> {
     const proposal: MemoryProposal = MemoryProposalSchema.parse(value);
     if (proposal.status !== "PENDING") throw new MemoryCurationStoreError("PROPOSAL_CONFLICT");
+    if (proposal.contentHash !== contentSha256(proposal.content)) {
+      throw new MemoryCurationStoreError("CONTENT_HASH_MISMATCH");
+    }
     const { id: _requestedId, ...canonicalProposal } = proposal;
     const requestHash = sha256(canonicalProposal);
     const client = await this.pool.connect();
