@@ -157,8 +157,9 @@ describe("compileContextPack", () => {
     const constrained = {
       ...input,
       tokenBudget: 256,
-      availableTools: Array.from({ length: 100 }, (_, index) =>
-        `tool-${index.toString().padStart(3, "0")}-${"x".repeat(80)}`,
+      availableTools: Array.from(
+        { length: 100 },
+        (_, index) => `tool-${index.toString().padStart(3, "0")}-${"x".repeat(80)}`,
       ),
     };
     const pack = compileContextPack(constrained, [], "2026-08-14T21:00:00.000Z");
