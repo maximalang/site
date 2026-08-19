@@ -128,7 +128,9 @@ describe("discoverMigrations", () => {
     expect(migrations[44]?.sql).toContain("CREATE TABLE agent_world.rag_document_chunk_embeddings");
     expect(migrations[44]?.sql).toContain("PRIMARY KEY (document_chunk_id, embedding_model)");
     expect(migrations[44]?.sql).toContain("INSERT INTO agent_world.rag_document_chunk_embeddings");
-    expect(migrations[45]?.sql).toContain("CREATE TABLE agent_world.rag_document_chunk_occurrences");
+    expect(migrations[45]?.sql).toContain(
+      "CREATE TABLE agent_world.rag_document_chunk_occurrences",
+    );
     expect(migrations[45]?.sql).toContain("PRIMARY KEY (document_id, ordinal)");
     expect(migrations[45]?.sql).toContain("INSERT INTO agent_world.rag_document_chunk_occurrences");
     expect(migrations[30]?.sql).toContain(
