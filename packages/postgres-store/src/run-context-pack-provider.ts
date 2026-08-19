@@ -2,6 +2,7 @@ import { compileContextPack } from "@agent-world/conversation-service";
 import {
   type ContextItem,
   ContextItemSchema,
+  type RagRetrievalResult,
   RunIdSchema,
   TimestampSchema,
 } from "@agent-world/domain";
@@ -59,6 +60,14 @@ type ContextRow = QueryResultRow & {
 type ProjectStateRow = QueryResultRow & { content: string };
 type ToolRow = QueryResultRow & { slug: string };
 
+export type SemanticRagQuery = (input: {
+  projectId: string;
+  query: string;
+  maxItems: number;
+}) => Promise<RagRetrievalResult[]>;
+
+const MAX_SEMANTIC_RAG_ITEMS = 50;
+
 function iso(value: Date | string): string {
   return TimestampSchema.parse(value instanceof Date ? value.toISOString() : value);
 }
@@ -77,11 +86,16 @@ function provenance(row: ContextRow): ContextItem["provenance"] {
   throw new Error("Canonical context provenance is invalid");
 }
 
+function semanticRelevance(distance: number): number {
+  return Math.max(0, Math.min(1, 1 - distance / 2));
+}
+
 export class PostgresRunContextPackProvider {
   private readonly packs: PostgresContextPackStore;
   private readonly packId: () => string;
   private readonly now: () => string;
   private readonly tokenBudget: number;
+  private readonly semanticRag: SemanticRagQuery | undefined;
 
   constructor(
     private readonly pool: TransactionPool,
@@ -90,6 +104,7 @@ export class PostgresRunContextPackProvider {
       now?: () => string;
       tokenBudget?: number;
       store?: PostgresContextPackStore;
+      semanticRag?: SemanticRagQuery;
     } = {},
   ) {
     this.packs = options.store ?? new PostgresContextPackStore(pool);
@@ -100,6 +115,7 @@ export class PostgresRunContextPackProvider {
       });
     this.now = options.now ?? (() => new Date().toISOString());
     this.tokenBudget = options.tokenBudget ?? 10_000;
+    this.semanticRag = options.semanticRag;
   }
 
   async prepare(runIdValue: unknown) {
@@ -116,6 +132,7 @@ export class PostgresRunContextPackProvider {
     let projectState: string | undefined;
     let contexts: ContextRow[];
     let tools: ToolRow[];
+    let taskQuery: string;
     try {
       const scopeResult = await client.query<ScopeRow>(
         `SELECT r.id AS run_id, t.id AS task_id, t.assignee_agent_id AS agent_id,
@@ -154,7 +171,7 @@ export class PostgresRunContextPackProvider {
         [scope.project_id, compiledAt],
       );
       projectState = projectStateResult.rows[0]?.content;
-      const taskQuery = `${scope.task_title} ${scope.task_description ?? ""}`.trim();
+      taskQuery = `${scope.task_title} ${scope.task_description ?? ""}`.trim();
       const contextResult = await client.query<ContextRow>(
         `SELECT id, project_id, kind, temperature, content, summary, content_sha256,
                 estimated_tokens, importance, provenance_kind, event_id, message_id,
@@ -190,6 +207,62 @@ export class PostgresRunContextPackProvider {
       tools = toolResult.rows;
     } finally {
       client.release();
+    }
+
+    if (this.semanticRag) {
+      try {
+        const hits = await this.semanticRag({
+          projectId: scope.project_id,
+          query: taskQuery,
+          maxItems: MAX_SEMANTIC_RAG_ITEMS,
+        });
+        const scores = new Map<string, number>();
+        for (const hit of hits.slice(0, MAX_SEMANTIC_RAG_ITEMS)) {
+          if (hit.projectId !== scope.project_id) continue;
+          const score = semanticRelevance(hit.distance);
+          scores.set(hit.chunkId, Math.max(score, scores.get(hit.chunkId) ?? 0));
+        }
+        if (scores.size > 0) {
+          const existingByChunk = new Map<string, ContextRow>();
+          for (const row of contexts) {
+            if (!row.document_chunk_id) continue;
+            existingByChunk.set(row.document_chunk_id, row);
+            const score = scores.get(row.document_chunk_id);
+            if (score !== undefined) row.relevance = Math.max(row.relevance, score);
+          }
+          const missingChunkIds = [...scores.keys()].filter((id) => !existingByChunk.has(id));
+          if (missingChunkIds.length > 0) {
+            const semanticClient = await this.pool.connect();
+            try {
+              const semanticContextResult = await semanticClient.query<ContextRow>(
+                `SELECT id, project_id, kind, temperature, content, summary, content_sha256,
+                        estimated_tokens, importance, provenance_kind, event_id, message_id,
+                        run_id, artifact_id, document_chunk_id, agent_id, task_id, skill_id,
+                        created_at, valid_until, 0::double precision AS relevance
+                   FROM agent_world.context_items
+                  WHERE project_id = $1
+                    AND kind = 'RAG_CHUNK'
+                    AND document_chunk_id = ANY($3::text[])
+                    AND created_at <= $2
+                    AND (valid_until IS NULL OR valid_until > $2)
+                  ORDER BY id`,
+                [scope.project_id, compiledAt, missingChunkIds],
+              );
+              for (const row of semanticContextResult.rows) {
+                if (!row.document_chunk_id) continue;
+                const score = scores.get(row.document_chunk_id);
+                if (score === undefined) continue;
+                row.relevance = Math.max(row.relevance, score);
+                contexts.push(row);
+              }
+            } finally {
+              semanticClient.release();
+            }
+          }
+        }
+      } catch {
+        // Lexical relevance remains a bounded fallback when semantic retrieval is unavailable.
+      }
     }
 
     const contextItems = contexts.map((row) =>
