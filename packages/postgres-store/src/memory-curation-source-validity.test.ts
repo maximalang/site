@@ -49,9 +49,9 @@ describe("PostgresMemoryCurationStore proposal source validity", () => {
       valid_until: null,
     });
 
-    await expect(new PostgresMemoryCurationStore(pool as never).propose(proposal())).rejects.toMatchObject(
-      { name: "MemoryCurationStoreError", code: "SOURCE_NOT_ACTIVE" },
-    );
+    await expect(
+      new PostgresMemoryCurationStore(pool as never).propose(proposal()),
+    ).rejects.toMatchObject({ name: "MemoryCurationStoreError", code: "SOURCE_NOT_ACTIVE" });
     expect(query.mock.calls.some(([sql]) => sql === "ROLLBACK")).toBe(true);
   });
 
@@ -61,9 +61,9 @@ describe("PostgresMemoryCurationStore proposal source validity", () => {
       valid_until: proposedAt,
     });
 
-    await expect(new PostgresMemoryCurationStore(pool as never).propose(proposal())).rejects.toMatchObject(
-      { name: "MemoryCurationStoreError", code: "SOURCE_NOT_ACTIVE" },
-    );
+    await expect(
+      new PostgresMemoryCurationStore(pool as never).propose(proposal()),
+    ).rejects.toMatchObject({ name: "MemoryCurationStoreError", code: "SOURCE_NOT_ACTIVE" });
     expect(query.mock.calls.some(([sql]) => sql === "ROLLBACK")).toBe(true);
   });
 });
