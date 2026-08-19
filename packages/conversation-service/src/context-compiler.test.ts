@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.3.3");
+    expect(first.compilerVersion).toBe("1.3.4");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -214,6 +214,34 @@ describe("compileContextPack", () => {
     expect(pack.evidence[0]?.score).toBe(950);
     expect(pack.rendered).toContain(highRelevanceCold.content);
     expect(pack.rendered).not.toContain(lowRelevanceHot.content);
+  });
+
+  it("prioritizes relevance globally across semantic sections under budget pressure", () => {
+    const constrained = { ...input, tokenBudget: 700 };
+    const lowRelevanceDecision = item(
+      "77777777",
+      "DECISION",
+      `low decision ${"x".repeat(1_600)}`,
+      { temperature: "HOT", importance: 1 },
+    );
+    const highRelevanceMemory = item(
+      "88888888",
+      "MEMORY",
+      `high memory ${"y".repeat(1_600)}`,
+      { temperature: "COLD", importance: 0 },
+    );
+    const pack = compileContextPack(
+      constrained,
+      [
+        { item: lowRelevanceDecision, relevance: 0.05 },
+        { item: highRelevanceMemory, relevance: 0.95 },
+      ],
+      "2026-08-14T21:00:00.000Z",
+    );
+
+    expect(pack.evidence.map(({ contextItemId }) => contextItemId)).toEqual([highRelevanceMemory.id]);
+    expect(pack.rendered).toContain(highRelevanceMemory.content);
+    expect(pack.rendered).not.toContain(lowRelevanceDecision.content);
   });
 
   it("reports evidence scores using the same primary relevance signal as selection", () => {
