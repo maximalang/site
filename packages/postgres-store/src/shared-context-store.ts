@@ -11,9 +11,10 @@ import {
   TimestampSchema,
 } from "@agent-world/domain";
 import type { QueryResultRow } from "pg";
-import type { TransactionPool } from "./conversation-store.js";
+import type { TransactionClient, TransactionPool } from "./conversation-store.js";
 
 type CanonicalRow = QueryResultRow & { id: string; inserted: boolean };
+type ChunkOccurrenceRow = QueryResultRow & { document_chunk_id: string };
 type RetrievalRow = QueryResultRow & {
   id: string;
   document_id: string;
@@ -47,6 +48,38 @@ function vectorLiteral(embedding: readonly number[]): string {
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+async function persistChunkOccurrence(
+  client: TransactionClient,
+  input: {
+    documentId: string;
+    projectId: string;
+    ordinal: number;
+    documentChunkId: string;
+    createdAt: string;
+  },
+): Promise<void> {
+  const result = await client.query<ChunkOccurrenceRow>(
+    `WITH inserted AS (
+       INSERT INTO agent_world.rag_document_chunk_occurrences
+         (document_id, project_id, ordinal, document_chunk_id, created_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (document_id, ordinal) DO NOTHING
+       RETURNING document_chunk_id
+     )
+     SELECT document_chunk_id FROM inserted
+     UNION ALL
+     SELECT document_chunk_id
+       FROM agent_world.rag_document_chunk_occurrences
+      WHERE document_id = $1 AND ordinal = $3
+        AND NOT EXISTS (SELECT 1 FROM inserted)
+     LIMIT 1`,
+    [input.documentId, input.projectId, input.ordinal, input.documentChunkId, input.createdAt],
+  );
+  if (result.rows[0]?.document_chunk_id !== input.documentChunkId) {
+    throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+  }
 }
 
 export class PostgresSharedContextStore {
@@ -159,6 +192,13 @@ export class PostgresSharedContextStore {
         canonical = raced.rows[0];
       }
       if (!canonical) throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+      await persistChunkOccurrence(client, {
+        documentId: input.documentId,
+        projectId: input.projectId,
+        ordinal: input.ordinal,
+        documentChunkId: canonical.id,
+        createdAt: input.createdAt,
+      });
       if (input.embedding && input.embeddingModel) {
         await client.query(
           `INSERT INTO agent_world.rag_document_chunk_embeddings
@@ -353,6 +393,13 @@ export class PostgresSharedContextStore {
           canonicalChunk = raced.rows[0];
         }
         if (!canonicalChunk) throw new SharedContextConflictError("DOCUMENT_ORDINAL_CONFLICT");
+        await persistChunkOccurrence(client, {
+          documentId: canonicalDocument.id,
+          projectId: chunk.projectId,
+          ordinal: chunk.ordinal,
+          documentChunkId: canonicalChunk.id,
+          createdAt: chunk.createdAt,
+        });
         if (chunk.embedding && chunk.embeddingModel) {
           await client.query(
             `INSERT INTO agent_world.rag_document_chunk_embeddings

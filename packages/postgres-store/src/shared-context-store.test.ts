@@ -20,6 +20,9 @@ function poolFor(
 ) {
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
     if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return { rows: [], rowCount: 0 };
+    if (sql.includes("INSERT INTO agent_world.rag_document_chunk_occurrences")) {
+      return { rows: [{ document_chunk_id: params?.[3] }], rowCount: 1 };
+    }
     return handler(sql, params);
   });
   return { query, pool: { connect: vi.fn(async () => ({ query, release: vi.fn() })) } };
@@ -172,6 +175,40 @@ describe("PostgresSharedContextStore", () => {
     expect(first).toMatchObject({ outcome: "CREATED", chunkId: ids.chunk });
     expect(second).toMatchObject({ outcome: "DEDUPLICATED", chunkId: ids.chunk });
     expect(projectionModels).toEqual(["embedding-v1", "embedding-v2"]);
+  });
+
+  it("preserves each document occurrence of a deduplicated canonical chunk", async () => {
+    const secondDocument = "document_77777777-7777-7777-7777-777777777777";
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunks"))
+        return { rows: [{ id: ids.chunk, inserted: false }], rowCount: 1 };
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunk_embeddings"))
+        return { rows: [], rowCount: 1 };
+      if (sql.includes("INSERT INTO agent_world.context_items"))
+        return { rows: [{ id: ids.context }], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const receipt = await new PostgresSharedContextStore(pool as never).writeChunk({
+      schemaVersion: 1,
+      id: "document_chunk_77777777-7777-7777-7777-777777777777",
+      contextItemId: "context_item_77777777-7777-7777-7777-777777777777",
+      documentId: secondDocument,
+      projectId: ids.project,
+      ordinal: 7,
+      content: "Canonical context evidence.",
+      contentHash: "0".repeat(64),
+      estimatedTokens: 6,
+      temperature: "COLD",
+      importance: 0.5,
+      embeddingModel: "embedding-v1",
+      embedding,
+      createdAt: now,
+    });
+    expect(receipt).toMatchObject({ outcome: "DEDUPLICATED", chunkId: ids.chunk });
+    const occurrence = query.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO agent_world.rag_document_chunk_occurrences"),
+    );
+    expect(occurrence?.[1]).toEqual([secondDocument, ids.project, 7, ids.chunk, now]);
   });
 
   it("derives canonical chunk hashes during atomic document ingestion", async () => {
