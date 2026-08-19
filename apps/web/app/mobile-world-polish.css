@@ -9,7 +9,7 @@
   }
 
   #world-panel + .inspector .agent-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   #world-panel + .inspector .agent-facts > div:first-child,
