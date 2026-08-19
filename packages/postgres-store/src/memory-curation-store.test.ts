@@ -12,6 +12,8 @@ const ids = {
   event: "event_77777777-7777-7777-7777-777777777777",
 } as const;
 const now = "2026-08-15T00:00:00.000Z";
+const proposalContent = "PostgreSQL owns canonical memory.";
+const proposalContentHash = "9a956031d2a8ea72e08a892298f00ac7292e47b8ce8deb3cfc435a34618d9956";
 
 function poolFor(handler: (sql: string, params?: unknown[]) => { rows: unknown[] }) {
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
@@ -26,8 +28,8 @@ function pendingProposal() {
     id: ids.proposal,
     project_id: ids.project,
     source_context_item_id: ids.source,
-    content: "PostgreSQL owns canonical memory.",
-    content_sha256: "a".repeat(64),
+    content: proposalContent,
+    content_sha256: proposalContentHash,
     estimated_tokens: 7,
     importance: 0.9,
     status: "PENDING",
@@ -35,6 +37,38 @@ function pendingProposal() {
 }
 
 describe("PostgresMemoryCurationStore", () => {
+  it("derives canonical content hash instead of trusting the caller hash", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("INSERT INTO agent_world.memory_proposals"))
+        return { rows: [{ id: ids.proposal }] };
+      if (sql.includes("INSERT INTO agent_world.memory_events")) return { rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const proposal = await new PostgresMemoryCurationStore(pool as never, {
+      eventId: () => ids.event,
+    }).propose({
+      schemaVersion: 1,
+      id: ids.proposal,
+      projectId: ids.project,
+      sourceContextItemId: ids.source,
+      content: proposalContent,
+      contentHash: "a".repeat(64),
+      estimatedTokens: 7,
+      importance: 0.9,
+      status: "PENDING",
+      createdAt: now,
+    });
+    expect(proposal).toEqual({ outcome: "CREATED", proposalId: ids.proposal });
+    expect(
+      query.mock.calls.some(
+        ([sql, params]) =>
+          sql.includes("INSERT INTO agent_world.memory_proposals") &&
+          params?.[4] === proposalContentHash,
+      ),
+    ).toBe(true);
+  });
+
   it("creates a proposal only through same-project canonical provenance", async () => {
     const { pool, query } = poolFor((sql) => {
       if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
@@ -50,8 +84,8 @@ describe("PostgresMemoryCurationStore", () => {
       id: ids.proposal,
       projectId: ids.project,
       sourceContextItemId: ids.source,
-      content: "PostgreSQL owns canonical memory.",
-      contentHash: "a".repeat(64),
+      content: proposalContent,
+      contentHash: proposalContentHash,
       estimatedTokens: 7,
       importance: 0.9,
       status: "PENDING",
@@ -80,8 +114,8 @@ describe("PostgresMemoryCurationStore", () => {
       id: ids.duplicateProposal,
       projectId: ids.project,
       sourceContextItemId: ids.source,
-      content: "PostgreSQL owns canonical memory.",
-      contentHash: "a".repeat(64),
+      content: proposalContent,
+      contentHash: proposalContentHash,
       estimatedTokens: 7,
       importance: 0.9,
       status: "PENDING",
