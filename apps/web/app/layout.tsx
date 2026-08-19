@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./visual-polish.css";
 
 export const metadata: Metadata = {
   title: "Agent World · Operating Environment",
