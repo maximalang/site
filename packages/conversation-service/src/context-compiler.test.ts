@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.3.0");
+    expect(first.compilerVersion).toBe("1.3.1");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -151,6 +151,25 @@ describe("compileContextPack", () => {
     expect(pack.estimatedTokens).toBeLessThanOrEqual(256);
     expect(goal).toContain("Canonical instructions: Preserve canonical state.");
     expect(goal).toContain("[TRUNCATED]");
+  });
+
+  it("drops supporting tool names before truncating canonical run instructions", () => {
+    const constrained = {
+      ...input,
+      tokenBudget: 256,
+      availableTools: Array.from({ length: 100 }, (_, index) =>
+        `tool-${index.toString().padStart(3, "0")}-${"x".repeat(80)}`,
+      ),
+    };
+    const pack = compileContextPack(constrained, [], "2026-08-14T21:00:00.000Z");
+    const goal = pack.sections.find(({ name }) => name === "GOAL")?.content ?? "";
+    const tools = pack.sections.find(({ name }) => name === "AVAILABLE_TOOLS")?.content ?? "";
+
+    expect(pack.estimatedTokens).toBeLessThanOrEqual(256);
+    expect(goal).toContain("Canonical instructions: Preserve canonical state.");
+    expect(goal).not.toContain("[TRUNCATED]");
+    expect(tools).toContain("[TRUNCATED]");
+    expect(tools).not.toContain("tool-099");
   });
 
   it("prioritizes task relevance over memory temperature under budget pressure", () => {
