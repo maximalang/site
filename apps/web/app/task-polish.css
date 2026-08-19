@@ -1,0 +1,64 @@
+.task-form:has(.task-decision-panel) > .composer-footer {
+  display: none;
+}
+
+.task-form:has(.task-decision-panel) > label,
+.task-form:has(.task-decision-panel) > input,
+.task-form:has(.task-decision-panel) > select,
+.task-form:has(.task-decision-panel) > textarea,
+.task-form:has(.task-decision-panel) > .task-policy-note {
+  opacity: 0.68;
+}
+
+.task-decision-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--accent) 5%, var(--surface-raised)),
+    var(--surface) 72%
+  );
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 52%, transparent);
+}
+
+.task-decision-panel .task-success {
+  margin: 0 0 var(--space-2);
+  font-size: 0.84rem;
+  font-weight: 680;
+}
+
+.task-decision-panel > label {
+  margin-top: var(--space-2);
+}
+
+.task-decision-panel textarea {
+  min-height: 5rem;
+  background: var(--surface-raised);
+}
+
+.task-decision-actions {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.task-execution-provenance div {
+  background: color-mix(in srgb, var(--surface-muted) 82%, var(--surface));
+}
+
+@media (max-width: 40rem) {
+  .task-decision-panel {
+    padding: var(--space-3);
+  }
+
+  .task-decision-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-decision-actions button {
+    width: 100%;
+  }
+}
