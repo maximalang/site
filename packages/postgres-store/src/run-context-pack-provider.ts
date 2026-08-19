@@ -168,7 +168,9 @@ export class PostgresRunContextPackProvider {
                      ))::double precision
                 END AS relevance
            FROM agent_world.context_items
-          WHERE project_id = $1 AND (valid_until IS NULL OR valid_until > $2)
+          WHERE project_id = $1
+            AND kind <> 'PROJECT_STATE'
+            AND (valid_until IS NULL OR valid_until > $2)
           ORDER BY relevance DESC, importance DESC, created_at DESC, id
           LIMIT 500`,
         [scope.project_id, compiledAt, taskQuery],

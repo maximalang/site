@@ -79,6 +79,7 @@ describe("PostgresRunContextPackProvider", () => {
         "Investigate memory drift Use canonical state",
       ],
     );
+    expect(String(fake.query.mock.calls[2]?.[0])).toContain("kind <> 'PROJECT_STATE'");
     expect(vi.mocked(compileContextPack)).toHaveBeenCalledWith(
       expect.objectContaining({
         project: expect.objectContaining({ state: "Newest canonical project state" }),
