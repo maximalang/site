@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.3.2";
+const COMPILER_VERSION = "1.3.3";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -193,10 +193,7 @@ export function compileContextPack(
         contextItemId: candidate.item.id,
         section,
         contentHash: candidate.item.contentHash,
-        score:
-          TEMPERATURE_RANK[candidate.item.temperature] * 100 +
-          candidate.relevance * 10 +
-          candidate.item.importance,
+        score: candidate.relevance * 1_000,
         provenance: candidate.item.provenance,
       });
       accepted += 1;
