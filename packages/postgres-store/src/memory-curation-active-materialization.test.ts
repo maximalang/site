@@ -35,7 +35,10 @@ describe("PostgresMemoryCurationStore active materialization fallback", () => {
           ],
         };
       }
-      if (sql.includes("WITH inserted AS") && sql.includes("INSERT INTO agent_world.context_items")) {
+      if (
+        sql.includes("WITH inserted AS") &&
+        sql.includes("INSERT INTO agent_world.context_items")
+      ) {
         expect(sql).toContain("memory.created_at <= $3");
         expect(sql).toContain("memory.valid_until IS NULL OR memory.valid_until > $3");
         return { rows: [] };
