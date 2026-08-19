@@ -37,6 +37,16 @@ const STATUS_COPY: Record<AgentProjectionCore["status"], string> = {
   OFFLINE: "Не в сети",
 };
 
+type TaskApproval = NonNullable<AgentProjectionCore["currentTask"]>["approval"];
+const APPROVAL_COPY: Record<TaskApproval, string> = {
+  REQUIRED: "Требуется",
+  NOT_REQUIRED: "Не требуется",
+  PENDING: "Ожидает решения",
+  APPROVED: "Подтверждено",
+  DENIED: "Отклонено",
+  REVOKED: "Отозвано",
+};
+
 function StatusBadge({ status }: { status: AgentProjectionCore["status"] }) {
   return (
     <span className="status-badge" data-status={status}>
@@ -87,7 +97,7 @@ function AgentInspector({
         {agent.currentTask ? (
           <div>
             <dt>Подтверждение</dt>
-            <dd>{agent.currentTask.approval}</dd>
+            <dd>{APPROVAL_COPY[agent.currentTask.approval]}</dd>
           </div>
         ) : null}
       </dl>
