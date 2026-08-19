@@ -56,6 +56,7 @@ type ContextRow = QueryResultRow & {
   relevance: number;
 };
 
+type ProjectStateRow = QueryResultRow & { content: string };
 type ToolRow = QueryResultRow & { slug: string };
 
 function iso(value: Date | string): string {
@@ -109,8 +110,10 @@ export class PostgresRunContextPackProvider {
       if (!(error instanceof ContextPackStoreError) || error.code !== "NOT_FOUND") throw error;
     }
 
+    const compiledAt = this.now();
     const client = await this.pool.connect();
     let scope: ScopeRow;
+    let projectState: string | undefined;
     let contexts: ContextRow[];
     let tools: ToolRow[];
     try {
@@ -138,6 +141,18 @@ export class PostgresRunContextPackProvider {
         throw new Error("Run is not eligible for ContextPack compilation");
       }
       scope = scopeResult.rows[0];
+      const projectStateResult = await client.query<ProjectStateRow>(
+        `/* RUN_CONTEXT_PROJECT_STATE */
+         SELECT content
+           FROM agent_world.context_items
+          WHERE project_id = $1
+            AND kind = 'PROJECT_STATE'
+            AND (valid_until IS NULL OR valid_until > $2)
+          ORDER BY created_at DESC, id DESC
+          LIMIT 1`,
+        [scope.project_id, compiledAt],
+      );
+      projectState = projectStateResult.rows[0]?.content;
       const taskQuery = `${scope.task_title} ${scope.task_description ?? ""}`.trim();
       const contextResult = await client.query<ContextRow>(
         `SELECT id, project_id, kind, temperature, content, summary, content_sha256,
@@ -156,7 +171,7 @@ export class PostgresRunContextPackProvider {
           WHERE project_id = $1 AND (valid_until IS NULL OR valid_until > $2)
           ORDER BY relevance DESC, importance DESC, created_at DESC, id
           LIMIT 500`,
-        [scope.project_id, this.now(), taskQuery],
+        [scope.project_id, compiledAt, taskQuery],
       );
       contexts = contextResult.rows;
       const toolResult = await client.query<ToolRow>(
@@ -193,8 +208,6 @@ export class PostgresRunContextPackProvider {
         ...(row.valid_until === null ? {} : { validUntil: iso(row.valid_until) }),
       }),
     );
-    const explicitState = contextItems.find((item) => item.kind === "PROJECT_STATE");
-    const compiledAt = this.now();
     const pack = compileContextPack(
       {
         schemaVersion: 1,
@@ -223,7 +236,7 @@ export class PostgresRunContextPackProvider {
         project: {
           id: scope.project_id,
           name: scope.project_name,
-          state: explicitState?.content ?? "No explicit canonical project state has been recorded.",
+          state: projectState ?? "No explicit canonical project state has been recorded.",
         },
         route: {
           schemaVersion: 1,
