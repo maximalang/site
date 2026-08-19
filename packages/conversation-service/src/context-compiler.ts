@@ -12,7 +12,7 @@ import {
 } from "@agent-world/domain";
 import * as z from "zod";
 
-const COMPILER_VERSION = "1.3.6";
+const COMPILER_VERSION = "1.3.7";
 const MAX_ITEMS_PER_SECTION = 10;
 const TRUNCATION_MARKER = "\n[TRUNCATED]";
 
@@ -168,6 +168,7 @@ export function compileContextPack(
   const eligible = candidates.filter(
     (candidate) =>
       candidate.item.kind !== "PROJECT_STATE" &&
+      Date.parse(candidate.item.createdAt) <= compiledAtMs &&
       (candidate.item.validUntil === undefined ||
         Date.parse(candidate.item.validUntil) > compiledAtMs),
   );
