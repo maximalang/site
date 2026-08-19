@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { PostgresSharedContextStore } from "./shared-context-store.js";
 
@@ -9,6 +10,10 @@ const ids = {
 } as const;
 const now = "2026-08-14T20:00:00.000Z";
 const embedding = Array.from({ length: 1536 }, (_, index) => (index === 0 ? 1 : 0));
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
 
 function poolFor(
   handler: (sql: string, params?: unknown[]) => { rows: unknown[]; rowCount: number },
@@ -69,14 +74,22 @@ describe("PostgresSharedContextStore", () => {
     expect(result).toEqual({ outcome: "DEDUPLICATED", documentId: ids.document });
   });
 
-  it("materializes every canonical RAG chunk as provenance-linked shared context", async () => {
-    const { pool } = poolFor((sql) => {
-      if (sql.includes("INSERT INTO agent_world.rag_document_chunks"))
+  it("derives the canonical RAG chunk hash from parsed content", async () => {
+    const content = "Canonical context evidence.";
+    const falseCallerHash = "b".repeat(64);
+    const derivedHash = sha256(content);
+    const observedHashes: unknown[] = [];
+    const { pool } = poolFor((sql, params) => {
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunks")) {
+        observedHashes.push(params?.[5]);
         return { rows: [{ id: ids.chunk, inserted: true }], rowCount: 1 };
+      }
       if (sql.includes("INSERT INTO agent_world.rag_document_chunk_embeddings"))
         return { rows: [], rowCount: 1 };
-      if (sql.includes("INSERT INTO agent_world.context_items"))
+      if (sql.includes("INSERT INTO agent_world.context_items")) {
+        observedHashes.push(params?.[4]);
         return { rows: [{ id: ids.context }], rowCount: 1 };
+      }
       throw new Error(`Unexpected query: ${sql}`);
     });
     const receipt = await new PostgresSharedContextStore(pool as never).writeChunk({
@@ -86,8 +99,8 @@ describe("PostgresSharedContextStore", () => {
       documentId: ids.document,
       projectId: ids.project,
       ordinal: 0,
-      content: "Canonical context evidence.",
-      contentHash: "b".repeat(64),
+      content,
+      contentHash: falseCallerHash,
       estimatedTokens: 6,
       temperature: "WARM",
       importance: 0.9,
@@ -100,6 +113,8 @@ describe("PostgresSharedContextStore", () => {
       chunkId: ids.chunk,
       contextItemId: ids.context,
     });
+    expect(derivedHash).not.toBe(falseCallerHash);
+    expect(observedHashes).toEqual([derivedHash, derivedHash]);
   });
 
   it("keeps one canonical chunk while indexing it in multiple embedding spaces", async () => {
@@ -159,23 +174,29 @@ describe("PostgresSharedContextStore", () => {
     expect(projectionModels).toEqual(["embedding-v1", "embedding-v2"]);
   });
 
-  it("commits a document and all provenance-linked chunks in one transaction", async () => {
+  it("derives canonical chunk hashes during atomic document ingestion", async () => {
     const secondChunk = "document_chunk_55555555-5555-5555-5555-555555555555";
     const secondContext = "context_item_66666666-6666-6666-6666-666666666666";
+    const observedHashes: unknown[] = [];
     const { pool, query } = poolFor((sql, params) => {
       if (sql.includes("INSERT INTO agent_world.rag_documents"))
         return { rows: [{ id: ids.document, inserted: true }], rowCount: 1 };
       if (sql.includes("INSERT INTO agent_world.rag_document_sources"))
         return { rows: [], rowCount: 1 };
-      if (sql.includes("INSERT INTO agent_world.rag_document_chunks"))
+      if (sql.includes("INSERT INTO agent_world.rag_document_chunks")) {
+        expect(params?.[5]).toBe(sha256(String(params?.[4])));
+        observedHashes.push(params?.[5]);
         return {
           rows: [{ id: params?.[3] === 0 ? ids.chunk : secondChunk, inserted: true }],
           rowCount: 1,
         };
+      }
       if (sql.includes("INSERT INTO agent_world.rag_document_chunk_embeddings"))
         return { rows: [], rowCount: 1 };
-      if (sql.includes("INSERT INTO agent_world.context_items"))
+      if (sql.includes("INSERT INTO agent_world.context_items")) {
+        expect(params?.[4]).toBe(sha256(String(params?.[3])));
         return { rows: [{ id: params?.[0] }], rowCount: 1 };
+      }
       throw new Error(`Unexpected query: ${sql}`);
     });
     const chunk = (id: string, contextItemId: string, ordinal: number) => ({
@@ -214,6 +235,10 @@ describe("PostgresSharedContextStore", () => {
       chunkIds: [ids.chunk, secondChunk],
       contextItemIds: [ids.context, secondContext],
     });
+    expect(observedHashes).toEqual([
+      sha256("Canonical context evidence 0."),
+      sha256("Canonical context evidence 1."),
+    ]);
     expect(query.mock.calls.filter(([sql]) => sql === "BEGIN")).toHaveLength(1);
     expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(1);
   });
