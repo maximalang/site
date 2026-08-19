@@ -124,15 +124,63 @@ describe("PostgresMemoryCurationStore", () => {
     expect(query.mock.calls.some(([sql]) => sql.includes("source.provenance_kind"))).toBe(true);
   });
 
+  it("rejects MERGE when the active target is not the exact proposal content", async () => {
+    const { pool, query } = poolFor((sql) => {
+      if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
+      if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
+        return { rows: [pendingProposal()] };
+      if (sql.includes("SELECT id, content, content_sha256, created_at, valid_until")) {
+        return {
+          rows: [
+            {
+              id: ids.memory,
+              content: "A different active memory.",
+              content_sha256: "b".repeat(64),
+              created_at: "2026-08-14T00:00:00.000Z",
+              valid_until: null,
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const store = new PostgresMemoryCurationStore(pool as never);
+    await expect(
+      store.decide({
+        schemaVersion: 1,
+        id: ids.decision,
+        proposalId: ids.proposal,
+        projectId: ids.project,
+        action: "MERGE",
+        targetContextItemId: ids.memory,
+        idempotencyKey: "memory:merge-mismatch-1",
+        decidedAt: now,
+      }),
+    ).rejects.toMatchObject({ name: "MemoryCurationStoreError", code: "TARGET_CONTENT_MISMATCH" });
+    expect(query.mock.calls.some(([sql]) => sql === "ROLLBACK")).toBe(true);
+    expect(
+      query.mock.calls.some(([sql]) => sql.includes("INSERT INTO agent_world.memory_curation_decisions")),
+    ).toBe(false);
+  });
+
   it("supersedes atomically by materializing replacement and expiring the active target", async () => {
     const { pool, query } = poolFor((sql, params) => {
       if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
       if (sql.includes("FROM agent_world.memory_curation_decisions")) return { rows: [] };
       if (sql.includes("FROM agent_world.memory_proposals") && sql.includes("FOR UPDATE"))
         return { rows: [pendingProposal()] };
-      if (sql.includes("SELECT id, created_at, valid_until"))
+      if (sql.includes("SELECT id, content, content_sha256, created_at, valid_until"))
         return {
-          rows: [{ id: ids.memory, created_at: "2026-08-14T00:00:00.000Z", valid_until: null }],
+          rows: [
+            {
+              id: ids.memory,
+              content: "Old canonical memory.",
+              content_sha256: "c".repeat(64),
+              created_at: "2026-08-14T00:00:00.000Z",
+              valid_until: null,
+            },
+          ],
         };
       if (sql.includes("INSERT INTO agent_world.context_items"))
         return { rows: [{ id: ids.replacement }] };
