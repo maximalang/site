@@ -111,7 +111,7 @@ describe("compileContextPack", () => {
       "EXPECTED_OUTPUT",
       "HANDOFF_CONTRACT",
     ]);
-    expect(first.compilerVersion).toBe("1.3.1");
+    expect(first.compilerVersion).toBe("1.3.2");
     expect(first.contentHash).toBe(second.contentHash);
     expect(first.rendered).toBe(second.rendered);
     expect(first.evidence.map(({ contentHash }) => contentHash)).toEqual([
@@ -171,6 +171,24 @@ describe("compileContextPack", () => {
     expect(goal).not.toContain("[TRUNCATED]");
     expect(tools).toContain("[TRUNCATED]");
     expect(tools).not.toContain("tool-099");
+  });
+
+  it("truncates lower-priority project state before the handoff contract", () => {
+    const constrained = {
+      ...input,
+      tokenBudget: 700,
+      project: { ...input.project, state: `project-state ${"p".repeat(2_000)}` },
+      handoffContract: `handoff-critical ${"h".repeat(2_200)}`,
+    };
+    const pack = compileContextPack(constrained, [], "2026-08-14T21:00:00.000Z");
+    const projectState =
+      pack.sections.find(({ name }) => name === "CURRENT_PROJECT_STATE")?.content ?? "";
+    const handoff = pack.sections.find(({ name }) => name === "HANDOFF_CONTRACT")?.content ?? "";
+
+    expect(pack.estimatedTokens).toBeLessThanOrEqual(700);
+    expect(projectState).toContain("[TRUNCATED]");
+    expect(handoff).toBe(constrained.handoffContract);
+    expect(handoff).not.toContain("[TRUNCATED]");
   });
 
   it("prioritizes task relevance over memory temperature under budget pressure", () => {
