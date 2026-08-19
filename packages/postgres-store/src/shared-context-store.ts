@@ -360,14 +360,14 @@ export class PostgresSharedContextStore {
         );
         let contextItemId = contextResult.rows[0]?.id;
         if (!contextItemId) {
-          const raced = await client.query<{ id: string }>(
+          const racedContext = await client.query<{ id: string }>(
             `SELECT id
                FROM agent_world.context_items
               WHERE project_id = $1 AND kind = 'RAG_CHUNK' AND content_sha256 = $2
                 AND provenance_kind = 'DOCUMENT_CHUNK' AND document_chunk_id = $3`,
             [chunk.projectId, chunk.contentHash, canonicalChunk.id],
           );
-          contextItemId = raced.rows[0]?.id;
+          contextItemId = racedContext.rows[0]?.id;
         }
         if (!contextItemId) throw new Error("Canonical RAG context item was not persisted");
         chunkIds.push(canonicalChunk.id);
@@ -399,7 +399,7 @@ export class PostgresSharedContextStore {
                 estimated_tokens, embedding_model, embedding <=> $2::vector AS distance,
                 created_at
            FROM agent_world.rag_document_chunks
-          WHERE project_id = $1 AND embedding IS NOT NULL
+          WHERE project_id = $1 AND embedding_model = $5 AND embedding IS NOT NULL
             AND ($4::double precision IS NULL OR (embedding <=> $2::vector) <= $4)
           ORDER BY embedding <=> $2::vector, id
           LIMIT $3`,
@@ -408,6 +408,7 @@ export class PostgresSharedContextStore {
           vectorLiteral(input.embedding),
           input.maxItems,
           input.maxDistance ?? null,
+          input.embeddingModel,
         ],
       );
       await client.query("COMMIT");
