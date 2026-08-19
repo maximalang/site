@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Agent World</title>
+  <rect width="64" height="64" rx="14" fill="#101a17"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#425a52" stroke-width="2"/>
+  <path d="M17 44 27.5 18h9L47 44h-8l-2-5.5H27L25 44h-8Zm12.5-12h5L32 25l-2.5 7Z" fill="#e8ca8a"/>
+</svg>
