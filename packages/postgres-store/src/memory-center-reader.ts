@@ -112,7 +112,7 @@ export class PostgresMemoryCenterReader {
                 AND proposal.status = 'PENDING'
                 AND proposal.id = ANY($2::text[])
               ORDER BY proposal.id, memory.importance DESC, memory.created_at DESC,
-                       memory.context_item_id`,
+                       memory.id`,
             [projectId, proposalIds],
           );
     const candidatesByProposal = new Map<string, CandidateRow[]>();
