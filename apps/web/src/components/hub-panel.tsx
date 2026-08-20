@@ -64,7 +64,7 @@ export function HubPanel({
   const [provisionedAgentId, setProvisionedAgentId] = useState<string>();
   const [activeSection, setActiveSection] = useState<HubSection>("registry");
   const navigationId = useId();
-  const requestRef = useRef<HubRequest>();
+  const requestRef = useRef<HubRequest | undefined>(undefined);
   const tabRefs = useRef<Record<HubSection, HTMLButtonElement | null>>({
     registry: null,
     setup: null,
