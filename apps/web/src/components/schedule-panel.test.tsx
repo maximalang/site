@@ -77,11 +77,11 @@ describe("SchedulePanel", () => {
       />,
     );
     await waitFor(() =>
-      expect((screen.getByLabelText("Agent") as HTMLSelectElement).value).toBe(newAgentId),
+      expect((screen.getByLabelText("Агент") as HTMLSelectElement).value).toBe(newAgentId),
     );
   });
 
-  it("creates a transport-neutral schedule in Simple mode and renders it", async () => {
+  it("creates a transport-neutral schedule in basic mode and renders it", async () => {
     const user = userEvent.setup();
     const create = vi.fn(async (_input: CreateScheduleInput, _csrfToken: string) => created);
     render(<SchedulePanel client={{ load: async () => [], create }} csrfToken="csrf" hub={hub} />);
@@ -101,7 +101,7 @@ describe("SchedulePanel", () => {
     expect(screen.getByText(/0 9 \* \* \*/)).not.toBeNull();
   });
 
-  it("reveals cron and timezone only in Advanced mode and reports load failure", async () => {
+  it("reveals cron and timezone only in advanced mode and reports load failure", async () => {
     const user = userEvent.setup();
     render(
       <SchedulePanel
@@ -116,9 +116,9 @@ describe("SchedulePanel", () => {
       />,
     );
     expect(screen.queryByLabelText("Cron (5 полей)")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await user.click(screen.getByRole("button", { name: "Расширенное" }));
     expect(screen.getByLabelText("Cron (5 полей)")).not.toBeNull();
-    expect(screen.getByLabelText("Timezone")).not.toBeNull();
+    expect(screen.getByLabelText("Часовой пояс")).not.toBeNull();
     expect(await screen.findByText("Не удалось загрузить или создать расписание")).not.toBeNull();
   });
 });
