@@ -22,7 +22,7 @@ const SMALL_CELL_WIDTH = 120;
 const CELL_HEIGHT = 124;
 const DEFAULT_CANVAS_PADDING = 40;
 const SMALL_CANVAS_PADDING = 20;
-const LABEL_LINE_LENGTH = 20;
+const LABEL_LINE_LENGTH = 18;
 const LABEL_MAX_LINES = 2;
 
 function clipLabelLine(value: string): string {
