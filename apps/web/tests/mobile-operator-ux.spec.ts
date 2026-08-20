@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { buildContractFixture } from "../src/test-fixtures";
 
 const csrfToken = "m".repeat(43);
@@ -194,7 +194,9 @@ test("Command and Task expose compact mobile operator decisions without changing
   const inspector = page.getByRole("region", { name: "Research Lead" });
   if (viewportWidth <= 640) {
     await expect(inspector).toBeHidden();
-    await expect(researchRow.getByText("Подтверждение: Не требуется", { exact: true })).toBeVisible();
+    await expect(
+      researchRow.getByText("Подтверждение: Не требуется", { exact: true }),
+    ).toBeVisible();
   } else {
     await expect(inspector).toBeVisible();
     await expect(inspector.getByText("Не требуется", { exact: true })).toBeVisible();
@@ -210,7 +212,9 @@ test("Command and Task expose compact mobile operator decisions without changing
   }
   expect(routes.worldRequests()).toBe(1);
   expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
   ).toBe(true);
 
   const commandAccessibility = await new AxeBuilder({ page }).analyze();
@@ -283,7 +287,9 @@ test("Command and Task expose compact mobile operator decisions without changing
   });
 
   expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
   ).toBe(true);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
