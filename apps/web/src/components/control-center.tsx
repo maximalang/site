@@ -540,7 +540,9 @@ export function ControlCenter({
                     <p className="eyebrow">Рабочая среда</p>
                     <h1>World</h1>
                   </div>
-                  <p>Карта отражает реальные статусы агентов и не генерирует декоративную активность.</p>
+                  <p>
+                    Карта отражает реальные статусы агентов и не генерирует декоративную активность.
+                  </p>
                 </div>
                 <div className="world-grid">
                   <div className="canvas-frame">
