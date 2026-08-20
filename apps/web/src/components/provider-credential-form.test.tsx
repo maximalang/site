@@ -27,7 +27,7 @@ const model = {
 describe("ProviderCredentialForm", () => {
   it("clears the key after a successful write and never renders it again", async () => {
     render(<ProviderCredentialForm csrfToken="csrf" model={model} />);
-    const input = screen.getByLabelText("API key") as HTMLInputElement;
+    const input = screen.getByLabelText("API-ключ") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "provider-super-secret" } });
     fireEvent.click(screen.getByRole("button", { name: "Сохранить ключ" }));
     await screen.findByRole("status");
