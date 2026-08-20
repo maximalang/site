@@ -190,13 +190,23 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await installReadRoutes(page);
   await page.goto("/");
 
-  const skinSelector = page.getByLabel("Map / skin");
+  const skinSelector = page.getByLabel("Вид карты");
   await expect(skinSelector).toHaveValue("openclaw-office-open-floor-v1");
-  await skinSelector.selectOption("space-station-v1");
+  await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Research Lead.*Открыть карточку агента/ }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 
+  await skinSelector.selectOption("space-station-v1");
   const spaceStation = page.locator('[data-skin="space-station-v1"]');
   await expect(spaceStation).toBeVisible();
   await expect(spaceStation.getByRole("button", { name: /Research Lead/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Сбросить" })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBe(
     "space-station-v1",
   );
@@ -207,8 +217,9 @@ test("World skin preference and Memory Network remain canonical in the browser",
     path: testInfo.outputPath(`${testInfo.project.name}-world-space-station.png`),
   });
 
-  await page.getByRole("button", { name: "Project / system default" }).click();
+  await page.getByRole("button", { name: "Сбросить" }).click();
   await expect(page.locator('[data-skin="openclaw-office-open-floor-v1"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBeNull();
 
   await page.getByRole("tab", { name: "Hub" }).click();
@@ -219,11 +230,31 @@ test("World skin preference and Memory Network remain canonical in the browser",
   const memoryDialog = page.getByRole("dialog", { name: "Memory Center · AI World" });
   await memoryDialog.getByRole("tab", { name: "Network" }).click();
 
-  await expect(memoryDialog.getByTestId("memory-network-graph")).toBeVisible();
+  const graph = memoryDialog.getByTestId("memory-network-graph");
+  await expect(graph).toBeVisible();
   await expect(memoryDialog.locator("[data-relation='ACCEPTED_FROM']")).toHaveCount(1);
   await expect(memoryDialog.locator("[data-relation='MERGED_INTO']")).toHaveCount(1);
   await expect(memoryDialog.locator("[data-memory-kind='memory']")).toHaveCount(2);
   await expect(memoryDialog.locator("[data-memory-kind='reference']")).toHaveCount(1);
+  const legend = memoryDialog.getByLabel("Легенда Memory Network");
+  await expect(legend.getByText("Canonical memory", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Provenance context", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Accepted from", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Merged into", { exact: true })).toBeVisible();
+  expect(Number(await graph.getAttribute("height"))).toBeLessThanOrEqual(360);
+
+  const graphRegion = memoryDialog.getByRole("region", {
+    name: "Прокручиваемая схема Memory Network",
+  });
+  await expect(graphRegion).toHaveAttribute("tabindex", "0");
+  await graphRegion.focus();
+  await expect(graphRegion).toBeFocused();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+
   const accessibility = await new AxeBuilder({ page }).include("dialog").analyze();
   expect(accessibility.violations).toEqual([]);
   await memoryDialog.screenshot({

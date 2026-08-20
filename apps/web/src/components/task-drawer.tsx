@@ -11,6 +11,8 @@ import { loadAgentConversations } from "../client/conversation-api";
 import { assignTask } from "../client/task-api";
 
 type AgentIdentity = { agentId: string; displayName: string };
+type DecisionMode = "DENY" | "REVOKE";
+type DecisionRetry = { decisionId: string; signature: string };
 
 export type TaskClient = {
   loadIndex(agentId: string): Promise<AgentConversationList>;
@@ -39,6 +41,8 @@ const defaultTaskClient: TaskClient = {
       ? decideApproval({ ...input, decision: "APPROVE" })
       : decideApproval({ ...input, decision: input.decision, reason: input.reason ?? "" }),
 };
+
+const DESCRIPTION_PREVIEW_LENGTH = 240;
 
 function newTaskId() {
   return `task_${crypto.randomUUID()}`;
@@ -69,18 +73,24 @@ export function TaskDrawer({
   const [submitError, setSubmitError] = useState(false);
   const [assigned, setAssigned] = useState<TaskAssignmentResponse>();
   const [decision, setDecision] = useState<ApprovalDecisionResponse>();
+  const [decisionMode, setDecisionMode] = useState<DecisionMode>();
   const [decisionReason, setDecisionReason] = useState("");
   const [deciding, setDeciding] = useState(false);
   const [decisionError, setDecisionError] = useState(false);
-  const [decisionRetry, setDecisionRetry] = useState<{
-    decisionId: string;
-    signature: string;
-  }>();
+  const [decisionRetry, setDecisionRetry] = useState<DecisionRetry>();
+  const [negativeDecisionRetry, setNegativeDecisionRetry] = useState<DecisionRetry>();
   const [retry, setRetry] = useState<{ taskId: string; signature: string }>();
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const rejectRef = useRef<HTMLButtonElement>(null);
+  const revokeRef = useRef<HTMLButtonElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
   const taskConversations =
     index?.conversations.filter((conversation) => conversation.taskAssignmentAvailable) ?? [];
+  const assignedConversation = taskConversations.find(
+    (conversation) => conversation.conversationId === conversationId,
+  );
+  const cleanDescription = description.trim();
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -90,6 +100,10 @@ export function TaskDrawer({
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    if (decisionMode) reasonRef.current?.focus();
+  }, [decisionMode]);
 
   useEffect(() => {
     let active = true;
@@ -141,9 +155,9 @@ export function TaskDrawer({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const cleanTitle = title.trim();
-    const cleanDescription = description.trim();
+    const nextDescription = description.trim();
     if (!conversationId || !cleanTitle || submitting) return;
-    const signature = JSON.stringify([conversationId, cleanTitle, cleanDescription]);
+    const signature = JSON.stringify([conversationId, cleanTitle, nextDescription]);
     const attempt = retry?.signature === signature ? retry : { taskId: newTaskId(), signature };
     setRetry(attempt);
     setSubmitting(true);
@@ -154,7 +168,7 @@ export function TaskDrawer({
         conversationId,
         agentId: agent.agentId,
         title: cleanTitle,
-        ...(cleanDescription ? { description: cleanDescription } : {}),
+        ...(nextDescription ? { description: nextDescription } : {}),
         csrfToken,
       });
       setAssigned(result);
@@ -172,11 +186,13 @@ export function TaskDrawer({
     const reason = decisionReason.trim();
     if (kind !== "APPROVE" && !reason) return;
     const signature = JSON.stringify([assigned.task.id, kind, reason]);
+    const previousAttempt = kind === "APPROVE" ? decisionRetry : negativeDecisionRetry;
     const attempt =
-      decisionRetry?.signature === signature
-        ? decisionRetry
+      previousAttempt?.signature === signature
+        ? previousAttempt
         : { decisionId: crypto.randomUUID(), signature };
-    setDecisionRetry(attempt);
+    if (kind === "APPROVE") setDecisionRetry(attempt);
+    else setNegativeDecisionRetry(attempt);
     setDeciding(true);
     setDecisionError(false);
     try {
@@ -188,7 +204,13 @@ export function TaskDrawer({
         csrfToken,
       });
       setDecision(result);
-      setDecisionRetry(kind === "APPROVE" && result.dispatch === "PENDING" ? attempt : undefined);
+      if (kind === "APPROVE") {
+        setDecisionRetry(result.dispatch === "PENDING" ? attempt : undefined);
+      } else {
+        setNegativeDecisionRetry(undefined);
+      }
+      setDecisionMode(undefined);
+      setDecisionReason("");
       onDecided?.(result);
     } catch {
       setDecisionError(true);
@@ -196,6 +218,33 @@ export function TaskDrawer({
       setDeciding(false);
     }
   };
+
+  const openDecisionMode = (mode: DecisionMode) => {
+    setDecisionMode(mode);
+    setDecisionReason("");
+    setDecisionError(false);
+  };
+
+  const cancelDecisionMode = () => {
+    const returnFocus = decisionMode === "REVOKE" ? revokeRef : rejectRef;
+    setDecisionMode(undefined);
+    setDecisionReason("");
+    setDecisionError(false);
+    window.requestAnimationFrame(() => returnFocus.current?.focus());
+  };
+
+  const decisionStatus = decision
+    ? decision.approval.type === "APPROVED"
+      ? decision.dispatch === "PENDING"
+        ? "Задача подтверждена и ожидает доступный runtime."
+        : "Задача подтверждена и передана в runtime."
+      : decision.approval.type === "DENIED"
+        ? "Выполнение задачи отклонено."
+        : decision.approval.type === "REVOKED"
+          ? "Разрешение на выполнение отозвано."
+          : "Задача назначена. Статус: требует подтверждения; запуск не выполнен."
+    : "Задача назначена. Статус: требует подтверждения; запуск не выполнен.";
+  const canRevoke = decision?.approval.type === "APPROVED" && decision.dispatch === "PENDING";
 
   return (
     <div className="drawer-backdrop">
@@ -235,12 +284,12 @@ export function TaskDrawer({
         {!loading && !loadError && index && taskConversations.length === 0 ? (
           <p className="drawer-state">Сначала создайте активный канонический диалог для агента.</p>
         ) : null}
-        {!loading && index && taskConversations.length > 0 ? (
+        {!loading && index && taskConversations.length > 0 && !assigned ? (
           <form className="composer task-form" onSubmit={submit}>
             <label htmlFor="task-conversation">Рабочий диалог</label>
             <select
               id="task-conversation"
-              disabled={submitting || Boolean(assigned)}
+              disabled={submitting}
               onChange={(event) => {
                 setConversationId(event.target.value);
                 setRetry(undefined);
@@ -257,7 +306,7 @@ export function TaskDrawer({
             <label htmlFor="task-name">Название</label>
             <input
               id="task-name"
-              disabled={submitting || Boolean(assigned)}
+              disabled={submitting}
               maxLength={200}
               onChange={(event) => {
                 setTitle(event.target.value);
@@ -270,7 +319,7 @@ export function TaskDrawer({
             <label htmlFor="task-description">Описание</label>
             <textarea
               id="task-description"
-              disabled={submitting || Boolean(assigned)}
+              disabled={submitting}
               maxLength={20_000}
               onChange={(event) => {
                 setDescription(event.target.value);
@@ -289,106 +338,168 @@ export function TaskDrawer({
                 Задача не назначена. Проверьте активную сессию и повторите без изменения полей.
               </p>
             ) : null}
-            {assigned ? (
-              <div className="task-decision-panel">
-                <p className="task-success" role="status">
-                  {decision?.approval.type === "APPROVED"
-                    ? decision.dispatch === "PENDING"
-                      ? "Задача подтверждена и ожидает доступный runtime."
-                      : "Задача подтверждена и передана в runtime."
-                    : decision?.approval.type === "DENIED"
-                      ? "Выполнение задачи отклонено."
-                      : "Задача назначена. Статус: требует подтверждения; запуск не выполнен."}
-                </p>
-                {decision?.execution ? (
-                  <dl className="task-execution-provenance" aria-label="Execution provenance">
-                    <div>
-                      <dt>Account</dt>
-                      <dd>{decision.execution.accountId ?? "—"}</dd>
-                    </div>
-                    <div>
-                      <dt>Model</dt>
-                      <dd>{decision.execution.remoteModelId ?? "—"}</dd>
-                    </div>
-                    <div>
-                      <dt>Mode</dt>
-                      <dd>{decision.execution.mode}</dd>
-                    </div>
-                    <div>
-                      <dt>Adapter</dt>
-                      <dd>{decision.execution.adapterKind}</dd>
-                    </div>
-                  </dl>
-                ) : null}
-                {!decision || decision.approval.type === "APPROVED" ? (
-                  <>
-                    <label htmlFor="task-decision-reason">
-                      Причина {decision?.dispatch === "PENDING" ? "отзыва" : "отклонения"}
-                    </label>
-                    <textarea
-                      id="task-decision-reason"
-                      disabled={deciding}
-                      maxLength={1_000}
-                      onChange={(event) => {
-                        setDecisionReason(event.target.value);
-                        setDecisionRetry(undefined);
-                        setDecisionError(false);
-                      }}
-                      rows={3}
-                      value={decisionReason}
-                    />
-                    <div className="task-decision-actions">
-                      {!decision ? (
-                        <button
-                          className="primary-button"
-                          disabled={deciding}
-                          onClick={() => void submitDecision("APPROVE")}
-                          type="button"
-                        >
-                          {deciding ? "Сохраняем…" : "Подтвердить и запустить"}
-                        </button>
-                      ) : null}
-                      {decision?.dispatch === "PENDING" ? (
-                        <button
-                          className="primary-button"
-                          disabled={deciding}
-                          onClick={() => void submitDecision("APPROVE")}
-                          type="button"
-                        >
-                          {deciding ? "Отправляем…" : "Повторить отправку"}
-                        </button>
-                      ) : null}
-                      <button
-                        className="secondary-button"
-                        disabled={deciding || !decisionReason.trim()}
-                        onClick={() =>
-                          void submitDecision(decision?.dispatch === "PENDING" ? "REVOKE" : "DENY")
-                        }
-                        type="button"
-                      >
-                        {decision?.dispatch === "PENDING" ? "Отозвать разрешение" : "Отклонить"}
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-                {decisionError ? (
-                  <p className="composer-error" role="alert">
-                    Решение не сохранено. Повторите без изменения полей.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
             <div className="composer-footer">
               <span>{title.length} / 200</span>
               <button
                 className="primary-button"
-                disabled={submitting || Boolean(assigned) || !conversationId || !title.trim()}
+                disabled={submitting || !conversationId || !title.trim()}
                 type="submit"
               >
                 {submitting ? "Назначаем…" : retry ? "Повторить назначение" : "Назначить задачу"}
               </button>
             </div>
           </form>
+        ) : null}
+        {!loading && index && taskConversations.length > 0 && assigned ? (
+          <div className="task-assigned-surface">
+            <section
+              className="task-assignment-summary"
+              aria-labelledby="task-assignment-summary-title"
+            >
+              <p className="eyebrow">Task</p>
+              <h3 id="task-assignment-summary-title">Задача назначена</h3>
+              <dl>
+                <div>
+                  <dt>Диалог</dt>
+                  <dd>{assignedConversation?.title ?? conversationId}</dd>
+                </div>
+                <div>
+                  <dt>Задача</dt>
+                  <dd>{title.trim()}</dd>
+                </div>
+                {cleanDescription ? (
+                  <div>
+                    <dt>Описание</dt>
+                    <dd>
+                      {cleanDescription.length > DESCRIPTION_PREVIEW_LENGTH ? (
+                        <details className="task-summary-description">
+                          <summary>
+                            {cleanDescription.slice(0, DESCRIPTION_PREVIEW_LENGTH).trimEnd()}…
+                          </summary>
+                          <p>{cleanDescription}</p>
+                        </details>
+                      ) : (
+                        cleanDescription
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </section>
+            <div className="task-decision-panel">
+              <p className="task-success" role="status">
+                {decisionStatus}
+              </p>
+              {decision?.execution ? (
+                <dl className="task-execution-provenance" aria-label="Execution provenance">
+                  <div>
+                    <dt>Account</dt>
+                    <dd>{decision.execution.accountId ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Model</dt>
+                    <dd>{decision.execution.remoteModelId ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Mode</dt>
+                    <dd>{decision.execution.mode}</dd>
+                  </div>
+                  <div>
+                    <dt>Adapter</dt>
+                    <dd>{decision.execution.adapterKind}</dd>
+                  </div>
+                </dl>
+              ) : null}
+
+              {decisionMode ? (
+                <div className="task-decision-reason-mode">
+                  <label htmlFor="task-decision-reason">
+                    Причина {decisionMode === "REVOKE" ? "отзыва" : "отклонения"}
+                  </label>
+                  <textarea
+                    ref={reasonRef}
+                    id="task-decision-reason"
+                    disabled={deciding}
+                    maxLength={1_000}
+                    onChange={(event) => {
+                      setDecisionReason(event.target.value);
+                      setDecisionError(false);
+                    }}
+                    rows={3}
+                    value={decisionReason}
+                  />
+                  <div className="task-decision-actions">
+                    <button
+                      className="secondary-button"
+                      disabled={deciding}
+                      onClick={cancelDecisionMode}
+                      type="button"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      className="primary-button"
+                      disabled={deciding || !decisionReason.trim()}
+                      onClick={() => void submitDecision(decisionMode)}
+                      type="button"
+                    >
+                      {deciding
+                        ? "Сохраняем…"
+                        : decisionMode === "REVOKE"
+                          ? "Подтвердить отзыв"
+                          : "Подтвердить отклонение"}
+                    </button>
+                  </div>
+                </div>
+              ) : !decision ? (
+                <div className="task-decision-actions">
+                  <button
+                    className="primary-button"
+                    disabled={deciding}
+                    onClick={() => void submitDecision("APPROVE")}
+                    type="button"
+                  >
+                    {deciding ? "Сохраняем…" : "Подтвердить и запустить"}
+                  </button>
+                  <button
+                    ref={rejectRef}
+                    className="secondary-button"
+                    disabled={deciding}
+                    onClick={() => openDecisionMode("DENY")}
+                    type="button"
+                  >
+                    Отклонить
+                  </button>
+                </div>
+              ) : canRevoke ? (
+                <div className="task-decision-actions">
+                  <button
+                    className="primary-button"
+                    disabled={deciding}
+                    onClick={() => void submitDecision("APPROVE")}
+                    type="button"
+                  >
+                    {deciding ? "Отправляем…" : "Повторить отправку"}
+                  </button>
+                  <button
+                    ref={revokeRef}
+                    className="secondary-button"
+                    disabled={deciding}
+                    onClick={() => openDecisionMode("REVOKE")}
+                    type="button"
+                  >
+                    Отозвать разрешение
+                  </button>
+                </div>
+              ) : null}
+
+              {decisionError ? (
+                <p className="composer-error" role="alert">
+                  Решение не сохранено. Повторите без изменения полей.
+                </p>
+              ) : null}
+            </div>
+          </div>
         ) : null}
       </section>
     </div>

@@ -81,6 +81,7 @@ export function OpenClawOfficeWorld({
   }, [projectSkinId, systemSkinId]);
 
   const skin = getOfficeSkin(skinId) ?? configuredSkin;
+  const hasSkinOverride = skin.id !== configuredSkin.id;
   const office = createOfficePresentation(world, skin);
   const activeDeskCount = Math.min(
     4,
@@ -90,7 +91,11 @@ export function OpenClawOfficeWorld({
   const selectSkin = (nextSkinId: string) => {
     const next = getOfficeSkin(nextSkinId);
     if (!next) return;
-    window.localStorage.setItem(USER_SKIN_PREFERENCE_KEY, next.id);
+    if (next.id === configuredSkin.id) {
+      window.localStorage.removeItem(USER_SKIN_PREFERENCE_KEY);
+    } else {
+      window.localStorage.setItem(USER_SKIN_PREFERENCE_KEY, next.id);
+    }
     setSkinId(next.id);
   };
 
@@ -101,8 +106,8 @@ export function OpenClawOfficeWorld({
 
   return (
     <section aria-label="Игровая карта AI World">
-      <div className="memory-launch-controls">
-        <label htmlFor="world-skin">Map / skin</label>
+      <div className="memory-launch-controls world-skin-controls">
+        <label htmlFor="world-skin">Вид карты</label>
         <select
           id="world-skin"
           onChange={(event) => selectSkin(event.target.value)}
@@ -114,9 +119,11 @@ export function OpenClawOfficeWorld({
             </option>
           ))}
         </select>
-        <button disabled={skin.id === configuredSkin.id} onClick={useConfiguredSkin} type="button">
-          Project / system default
-        </button>
+        {hasSkinOverride ? (
+          <button className="world-skin-reset" onClick={useConfiguredSkin} type="button">
+            Сбросить
+          </button>
+        ) : null}
       </div>
       <div
         className="openclaw-office-world office-world"

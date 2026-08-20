@@ -1,4 +1,46 @@
 @media (max-width: 40rem) {
+  #world-panel .canvas-frame {
+    padding: var(--space-2);
+  }
+
+  #world-panel .world-skin-controls {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 0 var(--space-2);
+  }
+
+  #world-panel .world-skin-controls label {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  #world-panel .world-skin-controls select {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.5rem;
+  }
+
+  #world-panel .world-skin-reset {
+    min-height: 2.5rem;
+    padding-inline: var(--space-2);
+    white-space: nowrap;
+  }
+
+  #world-panel .office-agent-name {
+    box-sizing: border-box;
+    max-width: 5.25rem;
+    padding-inline: var(--space-1);
+    overflow: hidden;
+    font-size: 0.62rem;
+    line-height: 1.1;
+    text-align: center;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
   #world-panel + .inspector {
     min-height: 0;
     padding: var(--space-4);
@@ -39,5 +81,16 @@
 
   #world-panel + .inspector .secondary-button.inspector-chat-button {
     margin-left: 0.6rem;
+  }
+}
+
+@media (max-width: 22rem) {
+  #world-panel .world-skin-controls {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  #world-panel .world-skin-reset {
+    grid-column: 2;
+    justify-self: start;
   }
 }

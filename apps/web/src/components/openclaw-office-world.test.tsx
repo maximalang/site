@@ -27,6 +27,9 @@ describe("OpenClaw Office World presentation", () => {
     for (const agent of world.agents) {
       expect(screen.getByRole("button", { name: new RegExp(agent.core.displayName) })).toBeTruthy();
     }
+    expect(
+      screen.getByRole("button", { name: /Research Lead.*Открыть карточку агента/i }),
+    ).toBeTruthy();
     expect(container.querySelectorAll("[data-openclaw-primitive='desk']").length).toBeGreaterThan(
       1,
     );
@@ -96,7 +99,23 @@ describe("OpenClaw Office World presentation", () => {
     expect(container.querySelectorAll("[data-handoff-cue]")).toHaveLength(1);
   });
 
-  it("persists a user skin preference without changing canonical agents and resets to project skin", () => {
+  it("does not render reset when the configured skin is active", () => {
+    const world = projectWorldView(buildContractFixture());
+    render(
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+        projectSkinId="minimal-grid-v1"
+      />,
+    );
+
+    expect((screen.getByLabelText("Вид карты") as HTMLSelectElement).value).toBe("minimal-grid-v1");
+    expect(screen.queryByRole("button", { name: "Сбросить" })).toBeNull();
+  });
+
+  it("persists a user skin override and reveals reset", () => {
     const world = projectWorldView(buildContractFixture());
     const { container } = render(
       <OpenClawOfficeWorld
@@ -108,24 +127,36 @@ describe("OpenClaw Office World presentation", () => {
       />,
     );
 
-    const worldSurface = container.querySelector("[data-skin]");
-    expect(worldSurface?.getAttribute("data-skin")).toBe("minimal-grid-v1");
-    expect(worldSurface?.getAttribute("data-theme")).toBe("MINIMAL_GRID");
-
-    fireEvent.change(screen.getByLabelText("Map / skin"), {
+    fireEvent.change(screen.getByLabelText("Вид карты"), {
       target: { value: "space-station-v1" },
     });
 
+    const worldSurface = container.querySelector("[data-skin]");
     expect(worldSurface?.getAttribute("data-skin")).toBe("space-station-v1");
     expect(worldSurface?.getAttribute("data-theme")).toBe("SPACE_STATION");
     expect(window.localStorage.getItem("agent-world.office-skin.v1")).toBe("space-station-v1");
-    for (const agent of world.agents) {
-      expect(screen.getByRole("button", { name: new RegExp(agent.core.displayName) })).toBeTruthy();
-    }
+    expect(screen.getByRole("button", { name: "Сбросить" })).toBeTruthy();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Project / system default" }));
+  it("removes the user preference and applies configured skin on reset", () => {
+    const world = projectWorldView(buildContractFixture());
+    window.localStorage.setItem("agent-world.office-skin.v1", "space-station-v1");
+    const { container } = render(
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+        projectSkinId="minimal-grid-v1"
+      />,
+    );
+
+    const worldSurface = container.querySelector("[data-skin]");
+    expect(screen.getByRole("button", { name: "Сбросить" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Сбросить" }));
     expect(worldSurface?.getAttribute("data-skin")).toBe("minimal-grid-v1");
     expect(worldSurface?.getAttribute("data-theme")).toBe("MINIMAL_GRID");
     expect(window.localStorage.getItem("agent-world.office-skin.v1")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Сбросить" })).toBeNull();
   });
 });
