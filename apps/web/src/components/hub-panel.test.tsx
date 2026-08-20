@@ -195,7 +195,12 @@ describe("HubPanel", () => {
     const load = vi.fn(async () => fixture);
     const operationsLoad = vi.fn(async () => operationsFixture);
     render(
-      <HubPanel load={load} onSelectAgent={vi.fn()} operationsLoad={operationsLoad} csrfToken="csrf" />,
+      <HubPanel
+        load={load}
+        onSelectAgent={vi.fn()}
+        operationsLoad={operationsLoad}
+        csrfToken="csrf"
+      />,
     );
 
     await screen.findByRole("heading", { name: "Canonical Hub" });
@@ -213,14 +218,20 @@ describe("HubPanel", () => {
     await waitFor(() => expect(operationsLoad).toHaveBeenCalledTimes(1));
     const operationsSection = operationsHeading.closest("section");
     expect(operationsSection).not.toBeNull();
-    await user.click(within(operationsSection as HTMLElement).getByRole("button", { name: "Advanced" }));
-    expect(within(operationsSection as HTMLElement).getByRole("button", { name: "Simple" })).not.toBeNull();
+    await user.click(
+      within(operationsSection as HTMLElement).getByRole("button", { name: "Advanced" }),
+    );
+    expect(
+      within(operationsSection as HTMLElement).getByRole("button", { name: "Simple" }),
+    ).not.toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Реестр" }));
     expect(operationsSection?.closest('[role="tabpanel"]')?.hasAttribute("hidden")).toBe(true);
     await user.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(operationsLoad).toHaveBeenCalledTimes(1);
-    expect(within(operationsSection as HTMLElement).getByRole("button", { name: "Simple" })).not.toBeNull();
+    expect(
+      within(operationsSection as HTMLElement).getByRole("button", { name: "Simple" }),
+    ).not.toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Настройка" }));
     expect(titleInput.value).toBe("Audit release readiness");
