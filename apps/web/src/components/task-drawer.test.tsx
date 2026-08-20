@@ -241,6 +241,61 @@ describe("TaskDrawer", () => {
     );
   });
 
+  it("reuses a failed DENY decision id and rotates it when the reason changes", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("44444444-4444-4444-8444-444444444444")
+      .mockReturnValueOnce("55555555-5555-4555-8555-555555555555")
+      .mockReturnValueOnce("66666666-6666-4666-8666-666666666666");
+    const assign = vi.fn<TaskClient["assign"]>(async (input) => assignmentResponse(input));
+    let attempts = 0;
+    const decide = vi.fn<NonNullable<TaskClient["decide"]>>(async (input) => {
+      attempts += 1;
+      if (attempts <= 2) throw new Error("offline");
+      return negativeDecisionResponse(input.taskId, "DENY", input.reason ?? "");
+    });
+    render(
+      <TaskDrawer
+        agent={{ agentId, displayName: "Research Lead" }}
+        client={{ loadIndex: async () => index, assign, decide }}
+        csrfToken="csrf"
+        onAssigned={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.type(await screen.findByLabelText("Название"), "Verify protocol");
+    await user.click(screen.getByRole("button", { name: "Назначить задачу" }));
+    await user.click(await screen.findByRole("button", { name: "Отклонить" }));
+    const reason = screen.getByLabelText("Причина отклонения");
+    await user.type(reason, "  Duplicate request  ");
+    const confirm = screen.getByRole("button", { name: "Подтвердить отклонение" });
+
+    await user.click(confirm);
+    expect(await screen.findByRole("alert")).not.toBeNull();
+    await user.click(confirm);
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(2));
+    expect(decide.mock.calls[1]?.[0].decisionId).toBe(decide.mock.calls[0]?.[0].decisionId);
+    expect(decide.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        decision: "DENY",
+        decisionId: "55555555-5555-4555-8555-555555555555",
+        reason: "Duplicate request",
+      }),
+    );
+
+    await user.type(reason, " updated");
+    await user.click(confirm);
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(3));
+    expect(decide.mock.calls[2]?.[0]).toEqual(
+      expect.objectContaining({
+        decision: "DENY",
+        decisionId: "66666666-6666-4666-8666-666666666666",
+        reason: "Duplicate request updated",
+      }),
+    );
+  });
+
   it("keeps approve direct and reuses the same decision id for pending dispatch retry", async () => {
     const user = userEvent.setup();
     vi.spyOn(crypto, "randomUUID")
@@ -327,6 +382,67 @@ describe("TaskDrawer", () => {
     await user.click(confirm);
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(2));
     expect(decide.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        decision: "REVOKE",
+        decisionId: "66666666-6666-4666-8666-666666666666",
+        reason: "Changed priorities",
+      }),
+    );
+  });
+
+  it("keeps APPROVE retry identity while a failed REVOKE is cancelled and retried", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("44444444-4444-4444-8444-444444444444")
+      .mockReturnValueOnce("55555555-5555-4555-8555-555555555555")
+      .mockReturnValueOnce("66666666-6666-4666-8666-666666666666")
+      .mockReturnValueOnce("77777777-7777-4777-8777-777777777777");
+    const assign = vi.fn<TaskClient["assign"]>(async (input) => assignmentResponse(input));
+    let revokeAttempts = 0;
+    const decide = vi.fn<NonNullable<TaskClient["decide"]>>(async (input) => {
+      if (input.decision === "APPROVE") return approvedPendingResponse(input.taskId);
+      revokeAttempts += 1;
+      if (revokeAttempts === 1) throw new Error("offline");
+      return negativeDecisionResponse(input.taskId, "REVOKE", input.reason ?? "");
+    });
+    render(
+      <TaskDrawer
+        agent={{ agentId, displayName: "Research Lead" }}
+        client={{ loadIndex: async () => index, assign, decide }}
+        csrfToken="csrf"
+        onAssigned={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.type(await screen.findByLabelText("Название"), "Verify protocol");
+    await user.click(screen.getByRole("button", { name: "Назначить задачу" }));
+    await user.click(screen.getByRole("button", { name: "Подтвердить и запустить" }));
+    await waitFor(() => expect(decide).toHaveBeenCalledOnce());
+    expect(decide.mock.calls[0]?.[0].decisionId).toBe("55555555-5555-4555-8555-555555555555");
+
+    const revoke = screen.getByRole("button", { name: "Отозвать разрешение" });
+    await user.click(revoke);
+    await user.type(screen.getByLabelText("Причина отзыва"), "Changed priorities");
+    await user.click(screen.getByRole("button", { name: "Подтвердить отзыв" }));
+    expect(await screen.findByRole("alert")).not.toBeNull();
+    expect(decide.mock.calls[1]?.[0].decisionId).toBe("66666666-6666-4666-8666-666666666666");
+
+    await user.click(screen.getByRole("button", { name: "Отмена" }));
+    await user.click(screen.getByRole("button", { name: "Повторить отправку" }));
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(3));
+    expect(decide.mock.calls[2]?.[0]).toEqual(
+      expect.objectContaining({
+        decision: "APPROVE",
+        decisionId: "55555555-5555-4555-8555-555555555555",
+      }),
+    );
+
+    await user.click(revoke);
+    await user.type(screen.getByLabelText("Причина отзыва"), "Changed priorities");
+    await user.click(screen.getByRole("button", { name: "Подтвердить отзыв" }));
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(4));
+    expect(decide.mock.calls[3]?.[0]).toEqual(
       expect.objectContaining({
         decision: "REVOKE",
         decisionId: "66666666-6666-4666-8666-666666666666",
