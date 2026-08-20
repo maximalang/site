@@ -34,9 +34,9 @@ describe("IntegrationPanel", () => {
     await screen.findByRole("heading", { name: "Интеграции" });
     fireEvent.change(screen.getByLabelText("Тип"), { target: { value: "SSH" } });
     fireEvent.change(screen.getByLabelText("Название"), { target: { value: "Timeweb VDS" } });
-    fireEvent.change(screen.getByLabelText("Host"), { target: { value: "vds.example" } });
-    fireEvent.change(screen.getByLabelText("SSH user"), { target: { value: "agent-world" } });
-    fireEvent.change(screen.getByLabelText("Credential"), { target: { value: "private-key" } });
+    fireEvent.change(screen.getByLabelText("Хост"), { target: { value: "vds.example" } });
+    fireEvent.change(screen.getByLabelText("Пользователь SSH"), { target: { value: "agent-world" } });
+    fireEvent.change(screen.getByLabelText("Учётные данные"), { target: { value: "private-key" } });
     fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
     await vi.waitFor(() => expect(client.create).toHaveBeenCalled());
     expect(client.create.mock.calls[0]?.[0]).toEqual(
@@ -178,9 +178,9 @@ describe("IntegrationPanel", () => {
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
     expect(await screen.findByRole("option", { name: "STEEL" })).toBeTruthy();
-    expect(screen.queryByText(/workflow dispatch/)).toBeNull();
-    expect(screen.queryByText(/write-инструменты/)).toBeNull();
-    expect(screen.queryByText(/server\/deploy операции/)).toBeNull();
+    expect(screen.queryByText(/запуск workflow/)).toBeNull();
+    expect(screen.queryByText(/разрешённые инструменты записи/)).toBeNull();
+    expect(screen.queryByText(/разрешённые серверные операции/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Сессии" }));
     expect(await screen.findByText(/session-1 · live/)).toBeTruthy();
     expect(action).toHaveBeenCalledWith(integrationId, "STEEL_LIST_SESSIONS", "csrf");
@@ -239,9 +239,9 @@ describe("IntegrationPanel", () => {
       decideMutation,
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
-    fireEvent.click(await screen.findByText("Advanced · workflow dispatch"));
-    fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "maximalang" } });
-    fireEvent.change(screen.getByLabelText("Repository"), { target: { value: "site" } });
+    fireEvent.click(await screen.findByText("Расширенное · запуск workflow"));
+    fireEvent.change(screen.getByLabelText("Владелец"), { target: { value: "maximalang" } });
+    fireEvent.change(screen.getByLabelText("Репозиторий"), { target: { value: "site" } });
     fireEvent.click(screen.getByRole("button", { name: "Запросить запуск" }));
     await screen.findByText("PENDING");
     expect(decideMutation).not.toHaveBeenCalled();
@@ -304,14 +304,14 @@ describe("IntegrationPanel", () => {
       decideMutation: vi.fn(),
     };
     render(<IntegrationPanel client={client} csrfToken="csrf" />);
-    fireEvent.click(await screen.findByText("Advanced · разрешённые server/deploy операции"));
+    fireEvent.click(await screen.findByText("Расширенное · разрешённые серверные операции"));
     fireEvent.change(screen.getByLabelText("Название операции"), {
       target: { value: "Restart Agent World" },
     });
-    fireEvent.change(screen.getByLabelText("Systemd unit"), {
+    fireEvent.change(screen.getByLabelText("Юнит systemd"), {
       target: { value: "agent-world.service" },
     });
-    fireEvent.change(screen.getByLabelText("Host key SHA-256"), {
+    fireEvent.change(screen.getByLabelText("Ключ хоста SHA-256"), {
       target: { value: `SHA256:${"A".repeat(43)}` },
     });
     fireEvent.click(screen.getByRole("button", { name: "Зарегистрировать операцию" }));
