@@ -495,7 +495,12 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
-  await expect(page.getByText("Операторская среда", { exact: true })).toBeVisible();
+  const brandSubtitle = page.getByText("Операторская среда", { exact: true });
+  if ((page.viewportSize()?.width ?? 1440) <= 640) {
+    await expect(brandSubtitle).toBeHidden();
+  } else {
+    await expect(brandSubtitle).toBeVisible();
+  }
   await expect(page.getByText("Тестовые данные", { exact: true })).toBeVisible();
   await expect(page.getByRole("note")).toContainText("тестовые данные");
   await expect(page.getByRole("note")).toContainText("не отражает состояние Runtime");
@@ -649,9 +654,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Аккаунты ChatGPT" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 2, name: "Предпочтения выполнения" })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Предпочтения выполнения" }),
+  ).toHaveCount(0);
   expect(operationsRequestCount).toBe(0);
   expect(integrationRequestCount).toBe(0);
 
@@ -781,6 +786,12 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   const viewport = page.viewportSize();
   const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(documentWidth).toBeLessThanOrEqual(viewport?.width ?? documentWidth);
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    return new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
   await expect(page.getByRole("button", { name: "Выйти" })).toBeInViewport();
   expect(hubRequestCount).toBe(1);
   expect(apiCursors.length).toBeGreaterThan(0);
