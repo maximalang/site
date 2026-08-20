@@ -35,11 +35,11 @@ export function ProviderCredentialForm({
   return (
     <section className="hub-registry-section" aria-labelledby="provider-key-heading">
       <div className="hub-section-heading">
-        <h2 id="provider-key-heading">API provider key</h2>
+        <h2 id="provider-key-heading">API-ключ провайдера</h2>
       </div>
       <form className="provider-key-form" onSubmit={submit}>
         <label>
-          Account
+          Аккаунт
           <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
             {accounts.map((account) => (
               <option key={account.accountId} value={account.accountId}>
@@ -49,7 +49,7 @@ export function ProviderCredentialForm({
           </select>
         </label>
         <label>
-          API key
+          API-ключ
           <input
             autoComplete="off"
             maxLength={16_384}
