@@ -311,8 +311,12 @@ describe("HubPanel", () => {
     const automationTab = screen.getByRole("tab", { name: "Автоматизация" });
     expect(automationTab.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(automationTab);
+    const scheduleSection = screen.getByRole("heading", { name: "Расписания" }).closest("section");
+    expect(scheduleSection).not.toBeNull();
     await waitFor(() => {
-      expect((screen.getByLabelText("Agent") as HTMLSelectElement).value).toBe(createdAgentId);
+      expect(
+        (within(scheduleSection as HTMLElement).getByLabelText("Agent") as HTMLSelectElement).value,
+      ).toBe(createdAgentId);
     });
     expect(scheduleClient.load).toHaveBeenCalledTimes(1);
   });
