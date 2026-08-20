@@ -594,7 +594,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 2, name: "Execution preferences" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2, name: "Execution preferences" })).toHaveCount(
+    0,
+  );
 
   await registryTab.focus();
   await page.keyboard.press("ArrowRight");
