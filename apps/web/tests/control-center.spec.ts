@@ -606,7 +606,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
           if (!(navigation instanceof HTMLElement)) return false;
           const navigationRect = navigation.getBoundingClientRect();
           const tabRect = element.getBoundingClientRect();
-          return tabRect.left >= navigationRect.left - 1 && tabRect.right <= navigationRect.right + 1;
+          return (
+            tabRect.left >= navigationRect.left - 1 && tabRect.right <= navigationRect.right + 1
+          );
         }),
       )
       .toBe(true);
@@ -622,7 +624,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
     await expect(panel).toHaveCount(1);
     await expect(panel).toHaveAttribute("aria-labelledby", tabId ?? "");
   }
-  expect(await hubPanels.evaluateAll((panels) => panels.filter((panel) => !panel.hidden).length)).toBe(1);
+  expect(
+    await hubPanels.evaluateAll((panels) => panels.filter((panel) => !panel.hidden).length),
+  ).toBe(1);
   await expect(registryTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
