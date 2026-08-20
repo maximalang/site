@@ -64,14 +64,18 @@ describe("MemoryNetworkGraph", () => {
 
     expect(
       screen.getByRole("img", {
-        name: "Memory Network: 2 canonical memories, 2 provenance links",
+        name: "Сеть памяти: канонических записей — 2, связей происхождения — 2",
       }),
     ).toBeTruthy();
     expect(container.querySelectorAll("[data-memory-kind='memory']")).toHaveLength(2);
     expect(container.querySelectorAll("[data-memory-kind='reference']")).toHaveLength(1);
     expect(container.querySelectorAll("[data-relation='ACCEPTED_FROM']")).toHaveLength(1);
     expect(container.querySelectorAll("[data-relation='MERGED_INTO']")).toHaveLength(1);
-    expect(screen.getByText("Memory: PostgreSQL remains canonical.")).toBeTruthy();
+    expect(screen.getByText("Память: PostgreSQL remains canonical.")).toBeTruthy();
+    expect(screen.getByText("Каноническая память")).toBeTruthy();
+    expect(screen.getByText("Контекст происхождения")).toBeTruthy();
+    expect(screen.getByText("Принято из")).toBeTruthy();
+    expect(screen.getByText("Объединено в")).toBeTruthy();
   });
 
   it("wraps long visual labels into bounded lines without truncating semantic memory", () => {
@@ -79,7 +83,7 @@ describe("MemoryNetworkGraph", () => {
 
     expect(screen.getByText("PostgreSQL remains")).toBeTruthy();
     expect(screen.getByText("canonical.")).toBeTruthy();
-    expect(screen.getByText("Memory: PostgreSQL remains canonical.")).toBeTruthy();
+    expect(screen.getByText("Память: PostgreSQL remains canonical.")).toBeTruthy();
   });
 
   it("uses a compact two-column layout for the three-vertex canonical fixture on narrow canvas", async () => {
@@ -131,17 +135,17 @@ describe("MemoryNetworkGraph", () => {
     expect(ten.points.map((point) => point.id)).toEqual(vertices(10).map((point) => point.id));
   });
 
-  it("shows full canonical and provenance identifiers only in Advanced details", () => {
+  it("shows full canonical and provenance identifiers only in advanced details", () => {
     const { rerender } = render(<MemoryNetworkGraph advanced={false} network={network} />);
-    expect(screen.queryByRole("heading", { name: "Canonical nodes" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Канонические записи" })).toBeNull();
 
     rerender(<MemoryNetworkGraph advanced network={network} />);
-    expect(screen.getByRole("heading", { name: "Canonical nodes" })).toBeTruthy();
-    const provenanceHeading = screen.getByRole("heading", { name: "Provenance edges" });
+    expect(screen.getByRole("heading", { name: "Канонические записи" })).toBeTruthy();
+    const provenanceHeading = screen.getByRole("heading", { name: "Связи происхождения" });
     const provenanceSection = provenanceHeading.closest("section");
     expect(provenanceSection).not.toBeNull();
     if (!provenanceSection) return;
     expect(screen.getAllByText(firstId).length).toBeGreaterThan(0);
-    expect(within(provenanceSection).getByText("Merged into")).toBeTruthy();
+    expect(within(provenanceSection).getByText("Объединено в")).toBeTruthy();
   });
 });
