@@ -54,6 +54,6 @@ describe("OwnerGate", () => {
         }}
       />,
     );
-    expect((await screen.findByRole("alert")).textContent).toContain("Контур входа недоступен");
+    expect((await screen.findByRole("alert")).textContent).toContain("Вход сейчас недоступен");
   });
 });
