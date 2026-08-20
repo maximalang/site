@@ -88,14 +88,14 @@ describe("ExecutionPreferencesPanel", () => {
       selection.agentId ? agentModel : systemModel,
     );
     render(<ExecutionPreferencesPanel client={{ load, write }} csrfToken="csrf-token" hub={hub} />);
-    expect(await screen.findAllByText("Источник: System Defaults")).toHaveLength(5);
+    expect(await screen.findAllByText("Источник: системные значения")).toHaveLength(5);
     await user.selectOptions(screen.getByLabelText("Уровень"), "AGENT");
-    expect(await screen.findByText("Inherited from Project")).not.toBeNull();
-    const mode = screen.getByText("Mode").closest(".preference-field");
+    expect(await screen.findByText("Унаследовано: Проект")).not.toBeNull();
+    const mode = screen.getByText("Режим").closest(".preference-field");
     expect(mode).not.toBeNull();
-    expect(within(mode as HTMLElement).getByText("Override at Agent")).not.toBeNull();
+    expect(within(mode as HTMLElement).getByText("Переопределено: Агент")).not.toBeNull();
     await user.click(
-      within(mode as HTMLElement).getByRole("button", { name: "Reset to inherited" }),
+      within(mode as HTMLElement).getByRole("button", { name: "Сбросить к унаследованному" }),
     );
     await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
     expect(write).toHaveBeenCalledWith({
@@ -116,10 +116,10 @@ describe("ExecutionPreferencesPanel", () => {
         hub={hub}
       />,
     );
-    await screen.findAllByText("Источник: System Defaults");
+    await screen.findAllByText("Источник: системные значения");
     expect(
       screen
-        .getAllByRole("button", { name: "Reset to inherited" })
+        .getAllByRole("button", { name: "Сбросить к унаследованному" })
         .every((button) => button.hasAttribute("disabled")),
     ).toBe(true);
   });
