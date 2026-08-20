@@ -1,7 +1,7 @@
 "use client";
 
 import type { AgentId } from "@agent-world/domain";
-import type { HubReadModel } from "@agent-world/read-model";
+import type { HubReadModel, OperationsReadModel } from "@agent-world/read-model";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { loadHubReadModel } from "../client/hub-api";
 import { AgentProvisioningPanel } from "./agent-provisioning-panel";
@@ -11,7 +11,7 @@ import {
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
 import { HubRegistry } from "./hub-registry";
-import { IntegrationPanel } from "./integration-panel";
+import { type IntegrationClient, IntegrationPanel } from "./integration-panel";
 import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { MissionPanel } from "./mission-panel";
 import { ModelExecutionConnectionPanel } from "./model-execution-connection-panel";
@@ -49,6 +49,8 @@ export function HubPanel({
   nativeChatProfileClient,
   memoryClient,
   scheduleClient,
+  integrationClient,
+  operationsLoad,
 }: {
   load?: LoadHub;
   onSelectAgent: (agentId: AgentId) => void;
@@ -57,14 +59,20 @@ export function HubPanel({
   nativeChatProfileClient?: NativeChatProfileClient;
   memoryClient?: MemoryCenterClient;
   scheduleClient?: ScheduleClient;
+  integrationClient?: IntegrationClient;
+  operationsLoad?: () => Promise<OperationsReadModel>;
 }) {
   const [model, setModel] = useState<HubReadModel>();
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [provisionedAgentId, setProvisionedAgentId] = useState<string>();
   const [activeSection, setActiveSection] = useState<HubSection>("registry");
+  const [visitedSections, setVisitedSections] = useState<ReadonlySet<HubSection>>(
+    () => new Set<HubSection>(["registry"]),
+  );
   const navigationId = useId();
   const requestRef = useRef<HubRequest | undefined>(undefined);
+  const navigationRef = useRef<HTMLElement | null>(null);
   const tabRefs = useRef<Record<HubSection, HTMLButtonElement | null>>({
     registry: null,
     setup: null,
@@ -96,7 +104,25 @@ export function HubPanel({
     };
   }, [attempt, load]);
 
+  useEffect(() => {
+    const navigation = navigationRef.current;
+    const tab = tabRefs.current[activeSection];
+    if (!navigation || !tab || navigation.scrollWidth <= navigation.clientWidth) return;
+
+    const navigationRect = navigation.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect();
+    if (tabRect.left < navigationRect.left) {
+      navigation.scrollLeft -= navigationRect.left - tabRect.left;
+    } else if (tabRect.right > navigationRect.right) {
+      navigation.scrollLeft += tabRect.right - navigationRect.right;
+    }
+  }, [activeSection]);
+
   const selectSection = (section: HubSection, focus = false) => {
+    setVisitedSections((current) => {
+      if (current.has(section)) return current;
+      return new Set([...current, section]);
+    });
     setActiveSection(section);
     if (focus) tabRefs.current[section]?.focus();
   };
@@ -144,8 +170,96 @@ export function HubPanel({
     );
   }
 
-  const activeTabId = `${navigationId}-${activeSection}-tab`;
-  const activePanelId = `${navigationId}-${activeSection}-panel`;
+  const renderSectionContent = (section: HubSection) => {
+    if (section === "registry") {
+      return <HubRegistry model={model} onSelectAgent={onSelectAgent} />;
+    }
+
+    if (section === "setup") {
+      return (
+        <>
+          <ChatGptAccountPanel
+            accounts={model.accounts}
+            csrfToken={csrfToken}
+            onCreated={() => setAttempt((value) => value + 1)}
+            providers={model.providers}
+          />
+          <MissionPanel csrfToken={csrfToken} projects={model.projects} />
+          <AgentProvisioningPanel
+            csrfToken={csrfToken}
+            onConfigureSchedule={(agentId) => {
+              setProvisionedAgentId(agentId);
+              selectSection("automation", true);
+            }}
+            onProvisioned={(agentId) => {
+              setProvisionedAgentId(agentId);
+              setAttempt((value) => value + 1);
+            }}
+            projects={model.projects}
+            skills={model.skills}
+            tools={model.tools}
+          />
+          <ModelExecutionConnectionPanel
+            csrfToken={csrfToken}
+            model={model}
+            onProvisioned={() => setAttempt((value) => value + 1)}
+          />
+        </>
+      );
+    }
+
+    if (section === "runtime") {
+      return (
+        <>
+          <OperationsPanel {...(operationsLoad ? { load: operationsLoad } : {})} />
+          <IntegrationPanel
+            {...(integrationClient ? { client: integrationClient } : {})}
+            csrfToken={csrfToken}
+          />
+        </>
+      );
+    }
+
+    if (section === "memory") {
+      return (
+        <MemoryCenter
+          {...(memoryClient ? { client: memoryClient } : {})}
+          csrfToken={csrfToken}
+          projects={model.projects}
+        />
+      );
+    }
+
+    if (section === "automation") {
+      return (
+        <>
+          <NativeChatProfilePanel
+            {...(nativeChatProfileClient ? { client: nativeChatProfileClient } : {})}
+            csrfToken={csrfToken}
+            hub={model}
+          />
+          <SchedulePanel
+            {...(scheduleClient ? { client: scheduleClient } : {})}
+            csrfToken={csrfToken}
+            hub={model}
+            {...(provisionedAgentId ? { focusAgentId: provisionedAgentId } : {})}
+          />
+        </>
+      );
+    }
+
+    return (
+      <>
+        <ProviderCredentialForm csrfToken={csrfToken} model={model} />
+        <ModelRouteCheckPanel csrfToken={csrfToken} model={model} />
+        <ExecutionPreferencesPanel
+          {...(preferenceClient ? { client: preferenceClient } : {})}
+          csrfToken={csrfToken}
+          hub={model}
+        />
+      </>
+    );
+  };
 
   return (
     <div className="hub-panel">
@@ -157,7 +271,7 @@ export function HubPanel({
         <p>Управление сущностями, runtime, памятью, автоматизацией и маршрутами.</p>
       </div>
       <div className="hub-workspace-shell">
-        <nav aria-label="Разделы Hub" className="hub-section-nav">
+        <nav ref={navigationRef} aria-label="Разделы Hub" className="hub-section-nav">
           <div aria-label="Разделы Canonical Hub" className="hub-section-tabs" role="tablist">
             {HUB_SECTIONS.map((section) => {
               const selected = activeSection === section.id;
@@ -183,89 +297,28 @@ export function HubPanel({
           </div>
         </nav>
 
-        <section
-          aria-labelledby={activeTabId}
-          className="hub-section-panel"
-          id={activePanelId}
-          role="tabpanel"
-        >
-          <div className="hub-section-content" data-hub-section={activeSection}>
-            {activeSection === "registry" ? (
-              <HubRegistry model={model} onSelectAgent={onSelectAgent} />
-            ) : null}
-
-            {activeSection === "setup" ? (
-              <>
-                <ChatGptAccountPanel
-                  accounts={model.accounts}
-                  csrfToken={csrfToken}
-                  onCreated={() => setAttempt((value) => value + 1)}
-                  providers={model.providers}
-                />
-                <MissionPanel csrfToken={csrfToken} projects={model.projects} />
-                <AgentProvisioningPanel
-                  csrfToken={csrfToken}
-                  onConfigureSchedule={() => selectSection("automation")}
-                  onProvisioned={(agentId) => {
-                    setProvisionedAgentId(agentId);
-                    setAttempt((value) => value + 1);
-                  }}
-                  projects={model.projects}
-                  skills={model.skills}
-                  tools={model.tools}
-                />
-                <ModelExecutionConnectionPanel
-                  csrfToken={csrfToken}
-                  model={model}
-                  onProvisioned={() => setAttempt((value) => value + 1)}
-                />
-              </>
-            ) : null}
-
-            {activeSection === "runtime" ? (
-              <>
-                <OperationsPanel />
-                <IntegrationPanel csrfToken={csrfToken} />
-              </>
-            ) : null}
-
-            {activeSection === "memory" ? (
-              <MemoryCenter
-                {...(memoryClient ? { client: memoryClient } : {})}
-                csrfToken={csrfToken}
-                projects={model.projects}
-              />
-            ) : null}
-
-            {activeSection === "automation" ? (
-              <>
-                <NativeChatProfilePanel
-                  {...(nativeChatProfileClient ? { client: nativeChatProfileClient } : {})}
-                  csrfToken={csrfToken}
-                  hub={model}
-                />
-                <SchedulePanel
-                  {...(scheduleClient ? { client: scheduleClient } : {})}
-                  csrfToken={csrfToken}
-                  hub={model}
-                  {...(provisionedAgentId ? { focusAgentId: provisionedAgentId } : {})}
-                />
-              </>
-            ) : null}
-
-            {activeSection === "routing" ? (
-              <>
-                <ProviderCredentialForm csrfToken={csrfToken} model={model} />
-                <ModelRouteCheckPanel csrfToken={csrfToken} model={model} />
-                <ExecutionPreferencesPanel
-                  {...(preferenceClient ? { client: preferenceClient } : {})}
-                  csrfToken={csrfToken}
-                  hub={model}
-                />
-              </>
-            ) : null}
-          </div>
-        </section>
+        <div className="hub-section-panels">
+          {HUB_SECTIONS.map((section) => {
+            const selected = activeSection === section.id;
+            const visited = visitedSections.has(section.id);
+            return (
+              <section
+                aria-labelledby={`${navigationId}-${section.id}-tab`}
+                className="hub-section-panel"
+                hidden={!selected}
+                id={`${navigationId}-${section.id}-panel`}
+                key={section.id}
+                role="tabpanel"
+              >
+                {visited ? (
+                  <div className="hub-section-content" data-hub-section={section.id}>
+                    {renderSectionContent(section.id)}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
