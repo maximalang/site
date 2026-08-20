@@ -193,9 +193,13 @@ test("World skin preference and Memory Network remain canonical in the browser",
   const skinSelector = page.getByLabel("Вид карты");
   await expect(skinSelector).toHaveValue("openclaw-office-open-floor-v1");
   await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Research Lead.*Открыть карточку агента/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Research Lead.*Открыть карточку агента/ }),
+  ).toBeVisible();
   expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
   ).toBe(true);
 
   await skinSelector.selectOption("space-station-v1");
@@ -232,10 +236,11 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await expect(memoryDialog.locator("[data-relation='MERGED_INTO']")).toHaveCount(1);
   await expect(memoryDialog.locator("[data-memory-kind='memory']")).toHaveCount(2);
   await expect(memoryDialog.locator("[data-memory-kind='reference']")).toHaveCount(1);
-  await expect(memoryDialog.getByText("Canonical memory", { exact: true })).toBeVisible();
-  await expect(memoryDialog.getByText("Provenance context", { exact: true })).toBeVisible();
-  await expect(memoryDialog.getByText("Accepted from", { exact: true })).toBeVisible();
-  await expect(memoryDialog.getByText("Merged into", { exact: true })).toBeVisible();
+  const legend = memoryDialog.getByLabel("Легенда Memory Network");
+  await expect(legend.getByText("Canonical memory", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Provenance context", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Accepted from", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Merged into", { exact: true })).toBeVisible();
   expect(Number(await graph.getAttribute("height"))).toBeLessThanOrEqual(360);
 
   const graphRegion = memoryDialog.getByRole("region", {
@@ -245,7 +250,9 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await graphRegion.focus();
   await expect(graphRegion).toBeFocused();
   expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
   ).toBe(true);
 
   const accessibility = await new AxeBuilder({ page }).include("dialog").analyze();
