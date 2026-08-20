@@ -34,6 +34,7 @@ const MEMORY_ACTION_COPY = {
   ACCEPT: "Принято",
   MERGE: "Объединено",
   REJECT: "Отклонено",
+  SUPERSEDE: "Заменено",
 } as const;
 
 function decisionId(): string {
