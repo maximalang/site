@@ -35,6 +35,12 @@ const HUB_SECTIONS = [
 
 type HubSection = (typeof HUB_SECTIONS)[number]["id"];
 
+type HubRequest = {
+  attempt: number;
+  load: LoadHub;
+  promise: Promise<HubReadModel>;
+};
+
 export function HubPanel({
   load = defaultLoadHub,
   onSelectAgent,
@@ -58,6 +64,7 @@ export function HubPanel({
   const [provisionedAgentId, setProvisionedAgentId] = useState<string>();
   const [activeSection, setActiveSection] = useState<HubSection>("registry");
   const navigationId = useId();
+  const requestRef = useRef<HubRequest>();
   const tabRefs = useRef<Record<HubSection, HTMLButtonElement | null>>({
     registry: null,
     setup: null,
@@ -70,7 +77,14 @@ export function HubPanel({
   useEffect(() => {
     let active = true;
     setError(false);
-    void load(attempt)
+    if (
+      !requestRef.current ||
+      requestRef.current.attempt !== attempt ||
+      requestRef.current.load !== load
+    ) {
+      requestRef.current = { attempt, load, promise: load(attempt) };
+    }
+    void requestRef.current.promise
       .then((next) => {
         if (active) setModel(next);
       })
