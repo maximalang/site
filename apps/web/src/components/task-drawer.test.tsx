@@ -407,13 +407,12 @@ describe("TaskDrawer", () => {
     );
   });
 
-  it("keeps APPROVE retry identity across failed REVOKE and rotates stale revoke id after re-approve", async () => {
+  it("keeps APPROVE and failed REVOKE retry identities isolated across re-approve", async () => {
     const user = userEvent.setup();
     vi.spyOn(crypto, "randomUUID")
       .mockReturnValueOnce("44444444-4444-4444-8444-444444444444")
       .mockReturnValueOnce("55555555-5555-4555-8555-555555555555")
-      .mockReturnValueOnce("66666666-6666-4666-8666-666666666666")
-      .mockReturnValueOnce("77777777-7777-4777-8777-777777777777");
+      .mockReturnValueOnce("66666666-6666-4666-8666-666666666666");
     const assign = vi.fn<TaskClient["assign"]>(async (input) => assignmentResponse(input));
     let revokeAttempts = 0;
     const decide = vi.fn<NonNullable<TaskClient["decide"]>>(async (input) => {
@@ -461,7 +460,7 @@ describe("TaskDrawer", () => {
     expect(decide.mock.calls[3]?.[0]).toEqual(
       expect.objectContaining({
         decision: "REVOKE",
-        decisionId: "77777777-7777-4777-8777-777777777777",
+        decisionId: "66666666-6666-4666-8666-666666666666",
         reason: "Changed priorities",
       }),
     );
