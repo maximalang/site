@@ -28,6 +28,7 @@
 }
 
 .canvas {
+  max-width: 100%;
   max-height: 32rem;
   overflow: auto;
   border: 1px solid var(--border);
@@ -182,10 +183,40 @@
 
 @media (max-width: 720px) {
   .root {
+    gap: var(--space-2);
     padding: var(--space-4);
+  }
+
+  .nodeLabel {
+    font-size: 11px;
+  }
+
+  .nodeMeta {
+    font-size: 9px;
+  }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .legend span {
+    min-width: 0;
+    gap: var(--space-1);
   }
 
   .advanced {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .root {
+    padding: var(--space-3);
+  }
+
+  .legend {
+    font-size: 0.7rem;
   }
 }
