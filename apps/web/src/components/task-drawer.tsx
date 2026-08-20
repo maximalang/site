@@ -12,6 +12,7 @@ import { assignTask } from "../client/task-api";
 
 type AgentIdentity = { agentId: string; displayName: string };
 type DecisionMode = "DENY" | "REVOKE";
+type DecisionRetry = { decisionId: string; signature: string };
 
 export type TaskClient = {
   loadIndex(agentId: string): Promise<AgentConversationList>;
@@ -76,10 +77,8 @@ export function TaskDrawer({
   const [decisionReason, setDecisionReason] = useState("");
   const [deciding, setDeciding] = useState(false);
   const [decisionError, setDecisionError] = useState(false);
-  const [decisionRetry, setDecisionRetry] = useState<{
-    decisionId: string;
-    signature: string;
-  }>();
+  const [decisionRetry, setDecisionRetry] = useState<DecisionRetry>();
+  const [negativeDecisionRetry, setNegativeDecisionRetry] = useState<DecisionRetry>();
   const [retry, setRetry] = useState<{ taskId: string; signature: string }>();
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -187,11 +186,13 @@ export function TaskDrawer({
     const reason = decisionReason.trim();
     if (kind !== "APPROVE" && !reason) return;
     const signature = JSON.stringify([assigned.task.id, kind, reason]);
+    const previousAttempt = kind === "APPROVE" ? decisionRetry : negativeDecisionRetry;
     const attempt =
-      decisionRetry?.signature === signature
-        ? decisionRetry
+      previousAttempt?.signature === signature
+        ? previousAttempt
         : { decisionId: crypto.randomUUID(), signature };
-    setDecisionRetry(attempt);
+    if (kind === "APPROVE") setDecisionRetry(attempt);
+    else setNegativeDecisionRetry(attempt);
     setDeciding(true);
     setDecisionError(false);
     try {
@@ -203,7 +204,11 @@ export function TaskDrawer({
         csrfToken,
       });
       setDecision(result);
-      setDecisionRetry(kind === "APPROVE" && result.dispatch === "PENDING" ? attempt : undefined);
+      if (kind === "APPROVE") {
+        setDecisionRetry(result.dispatch === "PENDING" ? attempt : undefined);
+      } else {
+        setNegativeDecisionRetry(undefined);
+      }
       setDecisionMode(undefined);
       setDecisionReason("");
       onDecided?.(result);
@@ -347,7 +352,10 @@ export function TaskDrawer({
         ) : null}
         {!loading && index && taskConversations.length > 0 && assigned ? (
           <div className="task-assigned-surface">
-            <section className="task-assignment-summary" aria-labelledby="task-assignment-summary-title">
+            <section
+              className="task-assignment-summary"
+              aria-labelledby="task-assignment-summary-title"
+            >
               <p className="eyebrow">Task</p>
               <h3 id="task-assignment-summary-title">Задача назначена</h3>
               <dl>
