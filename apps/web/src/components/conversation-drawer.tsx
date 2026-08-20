@@ -48,7 +48,7 @@ function displayTime(value: string): string {
 function sendFailureCopy(error: unknown): string {
   if (typeof error === "object" && error !== null && "code" in error) {
     if (error.code === "NO_ACTIVE_SESSION") {
-      return "У агента нет активной runtime-сессии. Сообщение сохранено для точного повтора.";
+      return "У агента нет активной Runtime-сессии. Сообщение сохранено для точного повтора.";
     }
     if (error.code === "IDEMPOTENCY_CONFLICT") {
       return "Этот идентификатор уже относится к другому сообщению. Измените текст и отправьте снова.";
@@ -213,7 +213,7 @@ export function ConversationDrawer({
       >
         <div className="drawer-header">
           <div>
-            <p className="eyebrow">Conversation</p>
+            <p className="eyebrow">Диалог</p>
             <h2 id="conversation-title">{agent.displayName}</h2>
           </div>
           <div className="drawer-actions">
