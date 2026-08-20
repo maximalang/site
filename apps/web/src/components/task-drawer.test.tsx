@@ -286,7 +286,8 @@ describe("TaskDrawer", () => {
       }),
     );
 
-    await user.type(reason, " updated");
+    await user.clear(reason);
+    await user.type(reason, "Duplicate request updated");
     await user.click(confirm);
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(3));
     expect(decide.mock.calls[2]?.[0]).toEqual(
@@ -344,18 +345,20 @@ describe("TaskDrawer", () => {
     expect(decide.mock.calls[1]?.[0].decisionId).toBe(decide.mock.calls[0]?.[0].decisionId);
   });
 
-  it("opens revoke mode without an API call and only confirms revoke with a required reason", async () => {
+  it("opens revoke mode without an API call and retries a failed revoke with the same decision id", async () => {
     const user = userEvent.setup();
     vi.spyOn(crypto, "randomUUID")
       .mockReturnValueOnce("44444444-4444-4444-8444-444444444444")
       .mockReturnValueOnce("55555555-5555-4555-8555-555555555555")
       .mockReturnValueOnce("66666666-6666-4666-8666-666666666666");
     const assign = vi.fn<TaskClient["assign"]>(async (input) => assignmentResponse(input));
-    const decide = vi.fn<NonNullable<TaskClient["decide"]>>(async (input) =>
-      input.decision === "REVOKE"
-        ? negativeDecisionResponse(input.taskId, "REVOKE", input.reason ?? "")
-        : approvedPendingResponse(input.taskId),
-    );
+    let revokeAttempts = 0;
+    const decide = vi.fn<NonNullable<TaskClient["decide"]>>(async (input) => {
+      if (input.decision !== "REVOKE") return approvedPendingResponse(input.taskId);
+      revokeAttempts += 1;
+      if (revokeAttempts === 1) throw new Error("offline");
+      return negativeDecisionResponse(input.taskId, "REVOKE", input.reason ?? "");
+    });
     render(
       <TaskDrawer
         agent={{ agentId, displayName: "Research Lead" }}
@@ -382,6 +385,7 @@ describe("TaskDrawer", () => {
 
     await user.type(reason, "  Changed priorities  ");
     await user.click(confirm);
+    expect(await screen.findByRole("alert")).not.toBeNull();
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(2));
     expect(decide.mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({
@@ -390,9 +394,20 @@ describe("TaskDrawer", () => {
         reason: "Changed priorities",
       }),
     );
+
+    await user.click(confirm);
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(3));
+    expect(decide.mock.calls[2]?.[0].decisionId).toBe(decide.mock.calls[1]?.[0].decisionId);
+    expect(decide.mock.calls[2]?.[0]).toEqual(
+      expect.objectContaining({
+        decision: "REVOKE",
+        decisionId: "66666666-6666-4666-8666-666666666666",
+        reason: "Changed priorities",
+      }),
+    );
   });
 
-  it("keeps APPROVE retry identity while a failed REVOKE is cancelled and retried", async () => {
+  it("keeps APPROVE retry identity across failed REVOKE and rotates stale revoke id after re-approve", async () => {
     const user = userEvent.setup();
     vi.spyOn(crypto, "randomUUID")
       .mockReturnValueOnce("44444444-4444-4444-8444-444444444444")
@@ -423,8 +438,7 @@ describe("TaskDrawer", () => {
     await waitFor(() => expect(decide).toHaveBeenCalledOnce());
     expect(decide.mock.calls[0]?.[0].decisionId).toBe("55555555-5555-4555-8555-555555555555");
 
-    const revoke = screen.getByRole("button", { name: "Отозвать разрешение" });
-    await user.click(revoke);
+    await user.click(screen.getByRole("button", { name: "Отозвать разрешение" }));
     await user.type(screen.getByLabelText("Причина отзыва"), "Changed priorities");
     await user.click(screen.getByRole("button", { name: "Подтвердить отзыв" }));
     expect(await screen.findByRole("alert")).not.toBeNull();
@@ -440,14 +454,14 @@ describe("TaskDrawer", () => {
       }),
     );
 
-    await user.click(revoke);
+    await user.click(screen.getByRole("button", { name: "Отозвать разрешение" }));
     await user.type(screen.getByLabelText("Причина отзыва"), "Changed priorities");
     await user.click(screen.getByRole("button", { name: "Подтвердить отзыв" }));
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(4));
     expect(decide.mock.calls[3]?.[0]).toEqual(
       expect.objectContaining({
         decision: "REVOKE",
-        decisionId: "66666666-6666-4666-8666-666666666666",
+        decisionId: "77777777-7777-4777-8777-777777777777",
         reason: "Changed priorities",
       }),
     );
