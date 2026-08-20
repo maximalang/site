@@ -35,7 +35,9 @@ describe("IntegrationPanel", () => {
     fireEvent.change(screen.getByLabelText("Тип"), { target: { value: "SSH" } });
     fireEvent.change(screen.getByLabelText("Название"), { target: { value: "Timeweb VDS" } });
     fireEvent.change(screen.getByLabelText("Хост"), { target: { value: "vds.example" } });
-    fireEvent.change(screen.getByLabelText("Пользователь SSH"), { target: { value: "agent-world" } });
+    fireEvent.change(screen.getByLabelText("Пользователь SSH"), {
+      target: { value: "agent-world" },
+    });
     fireEvent.change(screen.getByLabelText("Учётные данные"), { target: { value: "private-key" } });
     fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
     await vi.waitFor(() => expect(client.create).toHaveBeenCalled());
