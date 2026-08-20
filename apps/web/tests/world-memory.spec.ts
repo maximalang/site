@@ -12,6 +12,26 @@ import { buildContractFixture } from "../src/test-fixtures";
 const projectId = "project_33333333-3333-3333-3333-333333333333";
 const csrfToken = "c".repeat(43);
 
+async function expectWithinHorizontalBounds(
+  container: import("@playwright/test").Locator,
+  element: import("@playwright/test").Locator,
+) {
+  const [containerBox, elementBox] = await Promise.all([
+    container.boundingBox(),
+    element.boundingBox(),
+  ]);
+  expect(containerBox).not.toBeNull();
+  expect(elementBox).not.toBeNull();
+  if (!containerBox || !elementBox) {
+    throw new Error("Expected visible elements with bounding boxes");
+  }
+  const tolerance = 1;
+  expect(elementBox.x).toBeGreaterThanOrEqual(containerBox.x - tolerance);
+  expect(elementBox.x + elementBox.width).toBeLessThanOrEqual(
+    containerBox.x + containerBox.width + tolerance,
+  );
+}
+
 const hubFixture = HubReadModelSchema.parse({
   schemaVersion: 1,
   generatedAt: "2026-08-17T12:00:00.000Z",
@@ -236,11 +256,52 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await expect(memoryDialog.locator("[data-relation='MERGED_INTO']")).toHaveCount(1);
   await expect(memoryDialog.locator("[data-memory-kind='memory']")).toHaveCount(2);
   await expect(memoryDialog.locator("[data-memory-kind='reference']")).toHaveCount(1);
+
+  const memoryToolbar = memoryDialog.locator(".memory-toolbar");
+  const boundedControls = [
+    memoryDialog.locator(".drawer-header"),
+    memoryDialog.getByRole("heading", { level: 2, name: "Memory Center · AI World" }),
+    memoryDialog.getByRole("button", { name: "Закрыть Memory Center" }),
+    memoryToolbar,
+    memoryDialog.getByRole("tab", { name: "Входящие" }),
+    memoryDialog.getByRole("tab", { name: "Хронология" }),
+    memoryDialog.getByRole("tab", { name: "Сеть" }),
+    memoryDialog.getByRole("button", { name: "Основное" }),
+    memoryDialog.getByRole("button", { name: "Расширенное" }),
+  ];
+  for (const control of boundedControls) {
+    await expect(control).toBeVisible();
+    await expectWithinHorizontalBounds(memoryDialog, control);
+  }
+
+  const dialogBox = await memoryDialog.boundingBox();
+  const viewport = page.viewportSize();
+  expect(dialogBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  if (!dialogBox || !viewport) {
+    throw new Error("Expected Memory Center and viewport bounds");
+  }
+  expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(viewport.width);
+
+  const dialogBeforeFocus = await memoryDialog.evaluate((dialog) => ({
+    clientWidth: dialog.clientWidth,
+    scrollLeft: dialog.scrollLeft,
+    scrollWidth: dialog.scrollWidth,
+  }));
+  expect(dialogBeforeFocus.scrollWidth).toBeLessThanOrEqual(dialogBeforeFocus.clientWidth);
+  expect(dialogBeforeFocus.scrollLeft).toBe(0);
+
   const legend = memoryDialog.getByLabel("Легенда сети памяти");
-  await expect(legend.getByText("Каноническая память", { exact: true })).toBeVisible();
-  await expect(legend.getByText("Контекст происхождения", { exact: true })).toBeVisible();
-  await expect(legend.getByText("Принято из", { exact: true })).toBeVisible();
-  await expect(legend.getByText("Объединено в", { exact: true })).toBeVisible();
+  const legendItems = [
+    legend.getByText("Каноническая память", { exact: true }),
+    legend.getByText("Контекст происхождения", { exact: true }),
+    legend.getByText("Принято из", { exact: true }),
+    legend.getByText("Объединено в", { exact: true }),
+  ];
+  for (const item of legendItems) {
+    await expect(item).toBeVisible();
+  }
   expect(Number(await graph.getAttribute("height"))).toBeLessThanOrEqual(360);
 
   const graphRegion = memoryDialog.getByRole("region", {
@@ -249,6 +310,20 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await expect(graphRegion).toHaveAttribute("tabindex", "0");
   await graphRegion.focus();
   await expect(graphRegion).toBeFocused();
+
+  const dialogAfterFocus = await memoryDialog.evaluate((dialog) => ({
+    clientWidth: dialog.clientWidth,
+    scrollLeft: dialog.scrollLeft,
+    scrollWidth: dialog.scrollWidth,
+  }));
+  expect(dialogAfterFocus.scrollWidth).toBeLessThanOrEqual(dialogAfterFocus.clientWidth);
+  expect(dialogAfterFocus.scrollLeft).toBe(0);
+  for (const control of boundedControls) {
+    await expectWithinHorizontalBounds(memoryDialog, control);
+  }
+  for (const item of legendItems) {
+    await expectWithinHorizontalBounds(memoryDialog, item);
+  }
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
