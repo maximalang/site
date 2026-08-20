@@ -20,7 +20,7 @@ test("production without secrets fails closed at the owner gate", async ({
 
   const pageResponse = await page.goto("/");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Контур входа недоступен" }),
+    page.getByRole("heading", { level: 1, name: "Вход сейчас недоступен" }),
   ).toBeVisible();
 
   const apiResponse = await request.get("/api/world");
