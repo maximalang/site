@@ -10,6 +10,11 @@
   cursor: pointer;
 }
 
+.command-agent-select strong,
+.command-agent-select small {
+  display: block;
+}
+
 .command-agent-select:hover strong,
 .command-agent-select:focus-visible strong {
   color: var(--accent);
@@ -26,11 +31,6 @@
 
   #command-panel .command-agent-select {
     min-height: 3rem;
-  }
-
-  #command-panel .command-agent-select strong,
-  #command-panel .command-agent-select small {
-    display: block;
   }
 
   #command-panel tbody tr > th {
