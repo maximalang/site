@@ -332,7 +332,7 @@ describe("TaskDrawer", () => {
       }),
     );
     expect(
-      await screen.findByText("Задача подтверждена и ожидает доступный runtime."),
+      await screen.findByText("Задача подтверждена и ожидает доступный Runtime."),
     ).not.toBeNull();
     expect(screen.getByText("account_99999999-9999-9999-9999-999999999999")).not.toBeNull();
     expect(screen.getByText("gpt-5.6-codex")).not.toBeNull();
