@@ -494,8 +494,11 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "AI World" })).toBeVisible();
-  await expect(page.getByRole("note")).toContainText("проверочные данные, не live runtime");
+  await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
+  await expect(page.getByText("Операторская среда", { exact: true })).toBeVisible();
+  await expect(page.getByText("Тестовые данные", { exact: true })).toBeVisible();
+  await expect(page.getByRole("note")).toContainText("тестовые данные");
+  await expect(page.getByRole("note")).toContainText("не отражает состояние Runtime");
   await expect(page.locator("main")).toHaveCount(1);
   await expect(page.getByText("Research Lead → Reviewer", { exact: true })).toBeVisible();
   await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
@@ -542,7 +545,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await taskDialog.getByLabel("Название").fill("Проверить новый контракт");
   await taskDialog.getByLabel("Описание").fill("Сохранить ссылки на источники.");
   await taskDialog.getByRole("button", { name: "Назначить задачу" }).click();
-  await expect(taskDialog.getByText(/требует подтверждения/i)).toBeVisible();
+  await expect(taskDialog.getByText(/требуется подтверждение/i)).toBeVisible();
   expect(assignedTaskId).toMatch(/^task_[0-9a-f-]{36}$/);
   const taskAccessibility = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
   expect(taskAccessibility.violations).toEqual([]);
@@ -566,6 +569,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   const commandTab = page.getByRole("tab", { name: "Command" });
   await commandTab.click();
   await expect(page.getByRole("heading", { level: 1, name: "Command" })).toBeVisible();
+  await expect(page.getByText("Общая проекция", { exact: true })).toBeVisible();
   const canonicalRow = page.getByRole("row", { name: new RegExp(fixtureAgent) });
   await expect(canonicalRow).toContainText(fixtureTask);
   await expect(canonicalRow).toContainText("Выполняет");
@@ -644,8 +648,8 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(registryTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 2, name: "Execution preferences" })).toHaveCount(
+  await expect(page.getByRole("heading", { level: 2, name: "Аккаунты ChatGPT" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2, name: "Предпочтения выполнения" })).toHaveCount(
     0,
   );
   expect(operationsRequestCount).toBe(0);
@@ -668,9 +672,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expectTabVisibleInHubNavigation(registryTab);
 
   await setupTab.click();
-  await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Аккаунты ChatGPT" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Новая Mission" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Новый Agent" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Новый агент" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(0);
   const missionTitle = page.getByLabel("Название Mission");
   const missionGoal = page.getByLabel("Цель");
@@ -680,7 +684,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await runtimeTab.click();
   await expect(page.getByRole("heading", { level: 2, name: "Operations" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Интеграции" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2, name: "Аккаунты ChatGPT" })).toHaveCount(0);
   expect(operationsRequestCount).toBeGreaterThan(0);
   expect(integrationRequestCount).toBeGreaterThan(0);
   const operationsRequestsAfterFirstVisit = operationsRequestCount;
@@ -705,11 +709,11 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(memoryDialog).toBeVisible();
   await expect(memoryDialog.getByText("PostgreSQL remains canonical.")).toBeVisible();
   await expect(memoryDialog.getByRole("button", { name: "Закрыть Memory Center" })).toBeFocused();
-  await memoryDialog.getByRole("button", { name: "Accept" }).click();
-  await expect(memoryDialog.getByText("Inbox пуст.")).toBeVisible();
-  await memoryDialog.getByRole("tab", { name: "Inbox" }).focus();
+  await memoryDialog.getByRole("button", { name: "Принять" }).click();
+  await expect(memoryDialog.getByText("Входящих предложений нет.")).toBeVisible();
+  await memoryDialog.getByRole("tab", { name: "Входящие" }).focus();
   await page.keyboard.press("ArrowRight");
-  await expect(memoryDialog.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
+  await expect(memoryDialog.getByRole("tab", { name: "Хронология" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
@@ -723,14 +727,14 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expectTabVisibleInHubNavigation(automationTab);
   const nativeChatSection = page.locator("section.native-chat-profile-panel");
   await expect(nativeChatSection.getByRole("heading", { name: "Native Plus Chat" })).toBeVisible();
-  await expect(nativeChatSection.getByLabel("Browser profile alias")).toHaveCount(0);
+  await expect(nativeChatSection.getByLabel("Псевдоним профиля браузера")).toHaveCount(0);
   await nativeChatSection
-    .getByLabel("AI World App URL")
+    .getByLabel("URL приложения Agent World")
     .fill("https://chatgpt.com/g/ai-world-agent");
   await nativeChatSection.getByRole("button", { name: "Сохранить подключение" }).click();
   await expect(nativeChatSection.getByText("Подключение сохранено")).toBeVisible();
-  await nativeChatSection.getByRole("button", { name: "Advanced" }).click();
-  await expect(nativeChatSection.getByLabel("Browser profile alias")).toHaveValue("plus-1");
+  await nativeChatSection.getByRole("button", { name: "Расширенное" }).click();
+  await expect(nativeChatSection.getByLabel("Псевдоним профиля браузера")).toHaveValue("plus-1");
 
   const scheduleSection = page.locator("section.schedule-panel");
   await expect(scheduleSection.getByRole("heading", { name: "Расписания" })).toBeVisible();
@@ -739,19 +743,19 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await scheduleSection.getByRole("button", { name: "Создать расписание" }).click();
   await expect(scheduleSection.getByText("Расписание создано")).toBeVisible();
   await expect(scheduleSection.getByText(/0 9 \* \* \*/)).toBeVisible();
-  await scheduleSection.getByRole("button", { name: "Advanced" }).click();
+  await scheduleSection.getByRole("button", { name: "Расширенное" }).click();
   await expect(scheduleSection.getByLabel("Cron (5 полей)")).toBeVisible();
 
   await routingTab.click();
   await expectTabVisibleInHubNavigation(routingTab);
   await expect(
-    page.getByRole("heading", { level: 2, name: "Execution preferences" }),
+    page.getByRole("heading", { level: 2, name: "Предпочтения выполнения" }),
   ).toBeVisible();
-  await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
+  await expect(page.getByText("Источник: системные значения")).toHaveCount(5);
   const providerKeySection = page
     .locator("section.hub-registry-section")
-    .filter({ has: page.getByRole("heading", { name: "API provider key" }) });
-  const apiKeyInput = providerKeySection.getByLabel("API key");
+    .filter({ has: page.getByRole("heading", { name: "API-ключ провайдера" }) });
+  const apiKeyInput = providerKeySection.getByLabel("API-ключ");
   await expect(apiKeyInput).toHaveAttribute("type", "password");
   await apiKeyInput.fill("browser-provider-secret");
   await providerKeySection.locator('button[type="submit"]').click();
@@ -768,7 +772,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(routeReceipt).toContainText("provider_10101010-1010-1010-1010-101010101010");
   await expect(routeReceipt).toContainText("account_11111111-1111-1111-1111-111111111111");
   await expect(routeReceipt).toContainText("gpt-5-mini");
-  await expect(routeReceipt).toContainText("7 tokens");
+  await expect(routeReceipt).toContainText("токенов: 7");
   await expect(page.getByRole("heading", { level: 2, name: "Native Plus Chat" })).toHaveCount(0);
 
   const hubAccessibility = await new AxeBuilder({ page }).analyze();
@@ -777,6 +781,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   const viewport = page.viewportSize();
   const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(documentWidth).toBeLessThanOrEqual(viewport?.width ?? documentWidth);
+  await expect(page.getByRole("button", { name: "Выйти" })).toBeInViewport();
   expect(hubRequestCount).toBe(1);
   expect(apiCursors.length).toBeGreaterThan(0);
   expect(new Set(apiCursors)).toEqual(new Set([3]));
@@ -851,7 +856,7 @@ test("the owner login gate does not persist credentials in browser storage", asy
   await page.goto("/");
   await page.getByLabel("Пароль владельца").fill("browser-only-secret");
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "AI World" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
   expect(
     await page.evaluate(() => ({
       local: Object.values(localStorage),
