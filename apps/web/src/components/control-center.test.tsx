@@ -18,6 +18,25 @@ vi.mock("./openclaw-office-world", () => ({
 afterEach(cleanup);
 
 describe("ControlCenter", () => {
+  it("keeps the Agent World hierarchy and Russian operator copy across topbar, World and Command", async () => {
+    const user = userEvent.setup();
+    render(<ControlCenter csrfToken="csrf" loadReadModel={async () => buildContractFixture()} />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "World" })).not.toBeNull();
+    expect(screen.getByText("Операторская среда")).not.toBeNull();
+    expect(screen.getByText("Тестовые данные")).not.toBeNull();
+    expect(screen.getByText(/Позиция \d+/)).not.toBeNull();
+    expect(screen.getByText("Рабочая среда")).not.toBeNull();
+    expect(screen.getByText(/Карта отражает реальные статусы агентов/i)).not.toBeNull();
+    expect(screen.queryByRole("heading", { level: 1, name: "AI World" })).toBeNull();
+
+    await user.click(screen.getByRole("tab", { name: "Command" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Command" })).not.toBeNull();
+    expect(screen.getByText("Общая проекция")).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Агент" })).not.toBeNull();
+    expect(screen.getByText(/то же каноническое состояние агентов, что и World/i)).not.toBeNull();
+  });
+
   it("switches World and Command over one read model without losing selection", async () => {
     const user = userEvent.setup();
     const loadReadModel = vi.fn(async () => buildContractFixture());
@@ -132,7 +151,7 @@ describe("ControlCenter", () => {
         }}
       />,
     );
-    await screen.findByRole("heading", { level: 1, name: "AI World" });
+    await screen.findByRole("heading", { level: 1, name: "World" });
     await user.click(screen.getByRole("button", { name: "Выйти" }));
     expect(await screen.findByRole("alert")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Выйти" })).not.toBeNull();
@@ -186,7 +205,7 @@ describe("ControlCenter", () => {
         }}
       />,
     );
-    await screen.findByRole("heading", { level: 1, name: "AI World" });
+    await screen.findByRole("heading", { level: 1, name: "World" });
     await user.click(screen.getByRole("button", { name: /Research Lead.*Выполняет/i }));
     await user.click(screen.getByRole("button", { name: "Назначить задачу" }));
     expect(await screen.findByRole("heading", { name: "Задача для Research Lead" })).not.toBeNull();
@@ -202,7 +221,7 @@ describe("ControlCenter", () => {
         csrfToken: "csrf",
       }),
     );
-    expect(await within(dialog).findByText(/требует подтверждения/i)).not.toBeNull();
+    expect(await within(dialog).findByText(/требуется подтверждение/i)).not.toBeNull();
     await waitFor(() => expect(loadReadModel).toHaveBeenCalledTimes(2));
   });
 });
