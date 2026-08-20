@@ -56,7 +56,13 @@ describe("MemoryCenter", () => {
     await user.click(screen.getByRole("button", { name: "Открыть Memory Center" }));
     const dialog = screen.getByRole("dialog", { name: /Memory Center · AI World/ });
     expect(await within(dialog).findByText("PostgreSQL remains canonical.")).not.toBeNull();
-    await user.click(within(dialog).getByRole("button", { name: "Accept" }));
+    expect(within(dialog).getByText("Каноническая память")).not.toBeNull();
+    expect(within(dialog).getByRole("tab", { name: "Входящие" })).not.toBeNull();
+    expect(within(dialog).getByRole("tab", { name: "Хронология" })).not.toBeNull();
+    expect(within(dialog).getByRole("tab", { name: "Сеть" })).not.toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Основное" })).not.toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Расширенное" })).not.toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Принять" }));
     expect(decide).toHaveBeenCalledWith(expect.objectContaining({ action: "ACCEPT" }), "csrf");
     fireEvent(dialog, new Event("cancel", { bubbles: false, cancelable: true }));
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -94,8 +100,8 @@ describe("MemoryCenter", () => {
 
     await user.click(screen.getByRole("button", { name: "Открыть Memory Center" }));
     const dialog = screen.getByRole("dialog", { name: /Memory Center · AI World/ });
-    expect(await within(dialog).findByText(/Exact canonical match/)).not.toBeNull();
-    await user.click(within(dialog).getByRole("button", { name: "Merge exact" }));
+    expect(await within(dialog).findByText(/точное совпадение с канонической памятью/i)).not.toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Объединить с совпадением" }));
 
     expect(decide).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -118,7 +124,7 @@ describe("MemoryCenter", () => {
         projects={[project] as never}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "Добавить RAG источник" }));
+    await user.click(screen.getByRole("button", { name: "Добавить RAG-источник" }));
     await user.type(screen.getByLabelText("Название"), "Architecture");
     await user.type(screen.getByLabelText("Источник / имя файла"), "architecture.md");
     await user.type(
@@ -134,6 +140,6 @@ describe("MemoryCenter", () => {
       }),
       "csrf",
     );
-    expect((await screen.findByRole("status")).textContent).toContain("Источник добавлен");
+    expect((await screen.findByRole("status")).textContent).toContain("RAG-источник добавлен");
   });
 });
