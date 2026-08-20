@@ -216,6 +216,10 @@
     padding: var(--space-3);
   }
 
+  .nodeLabel {
+    font-size: 10px;
+  }
+
   .legend {
     font-size: 0.7rem;
   }
