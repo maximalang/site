@@ -259,23 +259,23 @@ describe("HubPanel", () => {
 
     const load = vi.fn(async (attempt: number) => {
       if (attempt === 0 || !createdAgentId) return fixture;
+      const createdAgent = {
+        agentId: createdAgentId,
+        slug: "new-agent",
+        displayName: "New Agent",
+        role: "Scheduled operator",
+        isEnabled: true,
+        skillAssignments: [],
+        toolAssignments: [],
+      };
       return HubReadModelSchema.parse({
         ...fixture,
-        agents: [
-          ...fixture.agents,
-          {
-            agentId: createdAgentId,
-            slug: "new-agent",
-            displayName: "New Agent",
-            role: "Scheduled operator",
-            isEnabled: true,
-            skillAssignments: [],
-            toolAssignments: [],
-          },
-        ],
+        agents: [...fixture.agents, createdAgent].sort((left, right) =>
+          left.agentId.localeCompare(right.agentId),
+        ),
         projects: fixture.projects.map((project) => ({
           ...project,
-          agentIds: [...project.agentIds, createdAgentId],
+          agentIds: [...project.agentIds, createdAgentId].sort(),
         })),
       });
     });
