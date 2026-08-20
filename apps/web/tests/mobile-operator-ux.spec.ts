@@ -234,9 +234,16 @@ test("Command and Task expose compact mobile operator decisions without changing
   await expect(reviewerRow).toHaveAttribute("data-selected", "true");
   await expect(researchRow).toHaveAttribute("data-selected", "false");
   if (viewportWidth <= 640) {
-    await expect(reviewerRow.getByText("Подтверждение: Требуется", { exact: true })).toBeVisible();
+    await expect(reviewerRow.getByText("Свободен", { exact: true })).toBeVisible();
+    await expect(reviewerRow.getByText("—", { exact: true })).toBeVisible();
+    await expect(
+      researchRow.getByText("Подтверждение: Не требуется", { exact: true }),
+    ).toHaveCount(0);
+    await expect(reviewerRow.locator(".command-mobile-approval")).toHaveCount(0);
   } else {
-    await expect(page.getByRole("region", { name: "Reviewer" })).toBeVisible();
+    const reviewerInspector = page.getByRole("region", { name: "Reviewer" });
+    await expect(reviewerInspector).toBeVisible();
+    await expect(reviewerInspector.getByText("Нет активной задачи", { exact: true })).toBeVisible();
   }
   expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount);
   expect(
