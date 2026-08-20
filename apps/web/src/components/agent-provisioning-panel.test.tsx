@@ -25,17 +25,17 @@ describe("AgentProvisioningPanel", () => {
         tools={[{ toolId: "tool_11111111-1111-1111-1111-111111111111", displayName: "Browser" }]}
       />,
     );
-    await user.type(screen.getByLabelText("Имя Agent"), "Research Lead");
+    await user.type(screen.getByLabelText("Имя агента"), "Research Lead");
     await user.type(screen.getByLabelText("Slug"), "research-lead");
     await user.type(screen.getByLabelText("Роль"), "Evidence lead");
-    await user.type(screen.getByLabelText("Instructions"), "Use primary evidence.");
+    await user.type(screen.getByLabelText("Инструкции"), "Use primary evidence.");
     await user.click(screen.getByLabelText("Research"));
     await user.click(screen.getByLabelText("Browser"));
-    await user.click(screen.getByText("Advanced"));
-    await user.selectOptions(screen.getByLabelText("Memory context"), "RICH");
-    await user.selectOptions(screen.getByLabelText("Token budget"), "QUALITY");
-    await user.selectOptions(screen.getByLabelText("Preferred execution"), "CHAT");
-    await user.click(screen.getByRole("button", { name: "Создать Agent" }));
+    await user.click(screen.getByText("Расширенные настройки"));
+    await user.selectOptions(screen.getByLabelText("Контекст памяти"), "RICH");
+    await user.selectOptions(screen.getByLabelText("Бюджет токенов"), "QUALITY");
+    await user.selectOptions(screen.getByLabelText("Предпочтительный режим выполнения"), "CHAT");
+    await user.click(screen.getByRole("button", { name: "Создать агента" }));
     expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "AGENT_CREATE",
@@ -48,7 +48,7 @@ describe("AgentProvisioningPanel", () => {
       }),
       "csrf",
     );
-    expect(await screen.findByText("Agent Instance создан")).not.toBeNull();
+    expect(await screen.findByText("Агент создан")).not.toBeNull();
     expect(onProvisioned).toHaveBeenCalledWith(expect.stringMatching(/^agent_/));
     const scheduleButton = screen.getByRole("button", { name: "Настроить расписание" });
     await user.click(scheduleButton);
