@@ -36,7 +36,7 @@ export function ModelExecutionConnectionPanel({
   const agents = model.agents.filter((agent) => project?.agentIds.includes(agent.agentId));
   const [agentId, setAgentId] = useState(agents[0]?.agentId ?? "");
   const [modelRouteId, setModelRouteId] = useState(candidates[0]?.modelRouteId ?? "");
-  const [title, setTitle] = useState("Model execution");
+  const [title, setTitle] = useState("Выполнение модели");
   const [state, setState] = useState<"IDLE" | "SAVING" | "SAVED" | "ERROR">("IDLE");
   const selectedRoute = candidates.find((route) => route.modelRouteId === modelRouteId);
 
@@ -78,18 +78,18 @@ export function ModelExecutionConnectionPanel({
     <section aria-labelledby="model-execution-connection-title" className="hub-control-card">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Agent Route</p>
+          <p className="eyebrow">Маршрут агента</p>
           <h2 id="model-execution-connection-title">Подключить API / Local</h2>
         </div>
       </div>
-      {state === "SAVED" ? <p role="status">Route и Agent session подключены</p> : null}
-      {state === "ERROR" ? <p role="alert">Подключение не создано.</p> : null}
+      {state === "SAVED" ? <p role="status">Маршрут и сессия агента подключены</p> : null}
+      {state === "ERROR" ? <p role="alert">Не удалось создать подключение.</p> : null}
       {candidates.length === 0 || model.projects.length === 0 ? (
-        <p>Нужны доступный API/Local ModelRoute и Project с Agent.</p>
+        <p>Нужны доступный API/Local ModelRoute и проект с агентом.</p>
       ) : (
         <div className="hub-control-form">
           <label>
-            Project
+            Проект
             <select
               value={projectId}
               onChange={(event) => {
@@ -107,7 +107,7 @@ export function ModelExecutionConnectionPanel({
             </select>
           </label>
           <label>
-            Agent
+            Агент
             <select value={agentId} onChange={(event) => setAgentId(event.target.value)}>
               {agents.map((agent) => (
                 <option key={agent.agentId} value={agent.agentId}>
@@ -120,9 +120,9 @@ export function ModelExecutionConnectionPanel({
             Название сессии
             <input value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
-          <p>Execution: Auto · {selectedRoute?.modelName ?? "нет доступного route"}</p>
+          <p>Выполнение: AUTO · {selectedRoute?.modelName ?? "нет доступного маршрута"}</p>
           <details>
-            <summary>Advanced</summary>
+            <summary>Расширенные настройки</summary>
             <label>
               ModelRoute
               <select
