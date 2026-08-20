@@ -226,9 +226,11 @@ describe("TaskDrawer", () => {
     await user.click(screen.getByRole("button", { name: "Отмена" }));
     expect(screen.queryByLabelText("Причина отклонения")).toBeNull();
     expect(decide).not.toHaveBeenCalled();
-    await waitFor(() => expect(document.activeElement).toBe(reject));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Отклонить" })),
+    );
 
-    await user.click(reject);
+    await user.click(screen.getByRole("button", { name: "Отклонить" }));
     await user.type(screen.getByLabelText("Причина отклонения"), "  Duplicate request  ");
     await user.click(screen.getByRole("button", { name: "Подтвердить отклонение" }));
     await waitFor(() => expect(decide).toHaveBeenCalledOnce());
