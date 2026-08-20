@@ -236,9 +236,9 @@ test("Command and Task expose compact mobile operator decisions without changing
   if (viewportWidth <= 640) {
     await expect(reviewerRow.getByText("Свободен", { exact: true })).toBeVisible();
     await expect(reviewerRow.getByText("—", { exact: true })).toBeVisible();
-    await expect(
-      researchRow.getByText("Подтверждение: Не требуется", { exact: true }),
-    ).toHaveCount(0);
+    await expect(researchRow.getByText("Подтверждение: Не требуется", { exact: true })).toHaveCount(
+      0,
+    );
     await expect(reviewerRow.locator(".command-mobile-approval")).toHaveCount(0);
   } else {
     const reviewerInspector = page.getByRole("region", { name: "Reviewer" });
