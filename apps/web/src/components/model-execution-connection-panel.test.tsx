@@ -50,7 +50,7 @@ describe("ModelExecutionConnectionPanel", () => {
         onProvisioned={onProvisioned}
       />,
     );
-    expect(screen.getByText("Execution: Auto · GPT-X")).toBeTruthy();
+    expect(screen.getByText("Выполнение: AUTO · GPT-X")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Подключить" }));
     expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -61,7 +61,7 @@ describe("ModelExecutionConnectionPanel", () => {
       }),
       "csrf",
     );
-    expect(await screen.findByText("Route и Agent session подключены")).toBeTruthy();
+    expect(await screen.findByText("Маршрут и сессия агента подключены")).toBeTruthy();
     expect(onProvisioned).toHaveBeenCalledOnce();
   });
 });
