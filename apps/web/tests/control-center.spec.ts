@@ -569,7 +569,19 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   const canonicalRow = page.getByRole("row", { name: new RegExp(fixtureAgent) });
   await expect(canonicalRow).toContainText(fixtureTask);
   await expect(canonicalRow).toContainText("Выполняет");
-  await expect(inspector.getByRole("heading", { level: 2, name: fixtureAgent })).toBeVisible();
+  const viewportWidth = page.viewportSize()?.width ?? 1440;
+  if (viewportWidth <= 640) {
+    await expect(page.locator("#command-panel + .inspector")).toBeHidden();
+    await expect(canonicalRow).toBeVisible();
+    await expect(
+      canonicalRow.getByText("Подтверждение: Не требуется", { exact: true }),
+    ).toBeVisible();
+    await expect(canonicalRow.getByRole("button", { name: "Диалог" })).toBeVisible();
+    await expect(canonicalRow.getByRole("button", { name: "Задача" })).toBeVisible();
+  } else {
+    await expect(inspector.getByRole("heading", { level: 2, name: fixtureAgent })).toBeVisible();
+    await expect(inspector.getByText("Не требуется", { exact: true })).toBeVisible();
+  }
 
   const commandAccessibility = await new AxeBuilder({ page }).analyze();
   expect(commandAccessibility.violations).toEqual([]);
