@@ -30,7 +30,8 @@
   }
 
   #world-panel .office-agent-name {
-    max-width: 5.75rem;
+    box-sizing: border-box;
+    max-width: 5.25rem;
     padding-inline: var(--space-1);
     overflow: hidden;
     font-size: 0.62rem;
