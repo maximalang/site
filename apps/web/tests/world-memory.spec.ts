@@ -213,6 +213,7 @@ test("World skin preference and Memory Network remain canonical in the browser",
 
   await page.getByRole("tab", { name: "Hub" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Canonical Hub" })).toBeVisible();
+  await page.getByRole("tab", { name: "Memory" }).click();
   const memorySection = page.locator("section.memory-center-launcher");
   await memorySection.getByRole("button", { name: "Открыть Memory Center" }).click();
   const memoryDialog = page.getByRole("dialog", { name: "Memory Center · AI World" });
