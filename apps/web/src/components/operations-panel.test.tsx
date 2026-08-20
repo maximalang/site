@@ -37,12 +37,13 @@ const model = OperationsReadModelSchema.parse({
 });
 
 describe("OperationsPanel", () => {
-  it("shows truthful simple metrics and opt-in advanced provenance", async () => {
+  it("shows truthful basic metrics and opt-in advanced provenance", async () => {
     render(<OperationsPanel load={async () => model} />);
     expect(await screen.findByText("Verify evidence")).toBeTruthy();
     expect(screen.getByText("≈ $0.000420")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
-    expect(screen.getByText(/Cached input: 40/)).toBeTruthy();
-    expect(screen.getByText(/LiteLLM response estimate/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Расширенное" }));
+    expect(screen.getByText(/Кэшированный вход: 40/)).toBeTruthy();
+    expect(screen.getByText(/Источник стоимости: оценка ответа LiteLLM/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Основное" })).toBeTruthy();
   });
 });
