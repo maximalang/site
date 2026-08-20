@@ -367,6 +367,63 @@
   }
 }
 
+@media (max-width: 360px) {
+  dialog.memory-center-dialog {
+    overflow-x: hidden;
+  }
+
+  dialog.memory-center-dialog .drawer-header {
+    min-width: 0;
+  }
+
+  dialog.memory-center-dialog .drawer-header > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  dialog.memory-center-dialog .drawer-header h2 {
+    overflow-wrap: anywhere;
+  }
+
+  dialog.memory-center-dialog .drawer-header .icon-button {
+    flex: 0 0 2.75rem;
+  }
+
+  .memory-toolbar {
+    width: 100%;
+    min-width: 0;
+    padding-inline: var(--space-3);
+  }
+
+  .memory-tabs,
+  .complexity-toggle {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .memory-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .complexity-toggle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .memory-tabs button,
+  .complexity-toggle button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: var(--space-2);
+    white-space: normal;
+  }
+
+  .memory-tabs button:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mode-tabs button,
   .topbar-logout,
