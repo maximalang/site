@@ -11,6 +11,7 @@ export function AgentProvisioningPanel({
   csrfToken,
   client = { execute: executeHubCommand },
   onProvisioned,
+  onConfigureSchedule,
 }: {
   projects: Array<{ projectId: string; name: string }>;
   skills: Array<{ skillId: string; displayName: string }>;
@@ -18,6 +19,7 @@ export function AgentProvisioningPanel({
   csrfToken: string;
   client?: { execute(command: AgentCommand, csrfToken: string): Promise<unknown> };
   onProvisioned?: (agentId: string) => void;
+  onConfigureSchedule?: (agentId: string) => void;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.projectId ?? "");
   const [displayName, setDisplayName] = useState("");
@@ -37,12 +39,13 @@ export function AgentProvisioningPanel({
     setState("SAVING");
     try {
       const uuid = crypto.randomUUID();
+      const agentId = `agent_${uuid}`;
       await client.execute(
         {
           schemaVersion: 1,
           commandId: `hub_command_${crypto.randomUUID()}`,
           kind: "AGENT_CREATE",
-          agentId: `agent_${uuid}`,
+          agentId,
           slug,
           displayName,
           role,
@@ -58,8 +61,8 @@ export function AgentProvisioningPanel({
         } as AgentCommand,
         csrfToken,
       );
-      setCreatedAgentId(`agent_${uuid}`);
-      onProvisioned?.(`agent_${uuid}`);
+      setCreatedAgentId(agentId);
+      onProvisioned?.(agentId);
       setState("SAVED");
     } catch {
       setState("ERROR");
@@ -77,7 +80,13 @@ export function AgentProvisioningPanel({
       {createdAgentId ? (
         <button
           type="button"
-          onClick={() => document.getElementById("schedule-panel-title")?.scrollIntoView()}
+          onClick={() => {
+            if (onConfigureSchedule) {
+              onConfigureSchedule(createdAgentId);
+            } else {
+              document.getElementById("schedule-panel-title")?.scrollIntoView();
+            }
+          }}
         >
           Настроить расписание
         </button>
