@@ -95,21 +95,21 @@ export function SchedulePanel({
     <section className="schedule-panel" aria-labelledby="schedule-panel-title">
       <div className="hub-section-heading">
         <div>
-          <p className="eyebrow">Agents · Automation</p>
+          <p className="eyebrow">Агенты · Автоматизация</p>
           <h2 id="schedule-panel-title">Расписания</h2>
         </div>
         <fieldset className="settings-level">
           <legend className="visually-hidden">Уровень настроек расписания</legend>
           <button aria-pressed={!advanced} onClick={() => setAdvanced(false)} type="button">
-            Simple
+            Основное
           </button>
           <button aria-pressed={advanced} onClick={() => setAdvanced(true)} type="button">
-            Advanced
+            Расширенное
           </button>
         </fieldset>
       </div>
       <p className="panel-note">
-        Срабатывание создаёт Task с обязательным подтверждением. Account и transport выбираются
+        Срабатывание создаёт задачу с обязательным подтверждением. Аккаунт и транспорт выбираются
         позже.
       </p>
       <form className="schedule-form" onSubmit={submit}>
@@ -125,7 +125,7 @@ export function SchedulePanel({
           </select>
         </label>
         <label>
-          Agent
+          Агент
           <select onChange={(event) => setAgentId(event.target.value)} required value={agentId}>
             <option value="">Выберите агента</option>
             {agents.map((agent) => (
@@ -156,7 +156,7 @@ export function SchedulePanel({
               />
             </label>
             <label>
-              Timezone
+              Часовой пояс
               <input
                 onChange={(event) => setTimezone(event.target.value)}
                 required
