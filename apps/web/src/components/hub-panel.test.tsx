@@ -102,6 +102,48 @@ describe("HubPanel", () => {
     expect(onSelectAgent).toHaveBeenCalledWith(fixture.agents[0]?.agentId);
   });
 
+  it("shows only the active Hub section and keeps one shared read-model load", async () => {
+    const user = userEvent.setup();
+    const load = vi.fn(async () => fixture);
+    render(<HubPanel load={load} onSelectAgent={vi.fn()} />);
+
+    await screen.findByRole("heading", { name: "Canonical Hub" });
+    const registryTab = screen.getByRole("tab", { name: "Реестр" });
+    const setupTab = screen.getByRole("tab", { name: "Настройка" });
+    expect(registryTab.getAttribute("aria-selected")).toBe("true");
+    expect(setupTab.getAttribute("aria-selected")).toBe("false");
+    expect(screen.queryByRole("heading", { name: "ChatGPT Accounts" })).toBeNull();
+
+    await user.click(setupTab);
+    expect(setupTab.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: "ChatGPT Accounts" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Новая Mission" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Новый Agent" })).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "Канонические модели" })).toBeNull();
+
+    setupTab.focus();
+    await user.keyboard("{ArrowRight}");
+    const runtimeTab = screen.getByRole("tab", { name: "Runtime" });
+    expect(runtimeTab).toHaveFocus();
+    expect(runtimeTab.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: "Operations" })).not.toBeNull();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(setupTab).toHaveFocus();
+    expect(setupTab.getAttribute("aria-selected")).toBe("true");
+
+    await user.keyboard("{End}");
+    const routingTab = screen.getByRole("tab", { name: "Маршруты" });
+    expect(routingTab).toHaveFocus();
+    expect(routingTab.getAttribute("aria-selected")).toBe("true");
+
+    await user.keyboard("{Home}");
+    expect(registryTab).toHaveFocus();
+    expect(registryTab.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: "Канонические модели" })).not.toBeNull();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
   it("shows explicit empty collections without inventing infrastructure", async () => {
     const empty = HubReadModelSchema.parse({
       ...fixture,
