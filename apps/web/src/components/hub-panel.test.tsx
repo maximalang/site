@@ -115,6 +115,10 @@ describe("HubPanel", () => {
     render(<HubPanel load={async () => fixture} onSelectAgent={onSelectAgent} />);
 
     expect(await screen.findByRole("heading", { name: "Canonical Hub" })).not.toBeNull();
+    expect(screen.getByText("Управление")).not.toBeNull();
+    expect(
+      screen.getByText("Управление сущностями, Runtime, памятью, автоматизацией и маршрутами."),
+    ).not.toBeNull();
     expect(screen.getAllByRole("heading", { name: "GPT-X" })).toHaveLength(1);
     expect(screen.getByText("2 маршрута")).not.toBeNull();
     const summary = screen.getByText("Параметры маршрутов");
@@ -123,8 +127,8 @@ describe("HubPanel", () => {
     expect(summary.closest("details")?.hasAttribute("open")).toBe(true);
     expect(screen.getByText("gpt-x-primary")).not.toBeNull();
     expect(screen.getByText("gpt-x-fallback")).not.toBeNull();
-    expect(screen.getAllByText("EXPERIMENTAL · not selectable")).toHaveLength(2);
-    expect(screen.getByText("OFFICIAL · selectable")).not.toBeNull();
+    expect(screen.getAllByText("EXPERIMENTAL · недоступен для выбора")).toHaveLength(2);
+    expect(screen.getByText("OFFICIAL · доступен для выбора")).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: /Researcher.*Evidence-first research/i }));
     expect(onSelectAgent).toHaveBeenCalledWith(fixture.agents[0]?.agentId);
@@ -156,15 +160,15 @@ describe("HubPanel", () => {
     expect(setupTab.getAttribute("aria-selected")).toBe("false");
     expect(registryPanel?.hidden).toBe(false);
     expect(setupPanel?.hidden).toBe(true);
-    expect(screen.queryByRole("heading", { name: "ChatGPT Accounts" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Аккаунты ChatGPT" })).toBeNull();
 
     await user.click(setupTab);
     expect(setupTab.getAttribute("aria-selected")).toBe("true");
     expect(setupPanel?.hidden).toBe(false);
     expect(registryPanel?.hidden).toBe(true);
-    expect(screen.getByRole("heading", { name: "ChatGPT Accounts" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Аккаунты ChatGPT" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Новая Mission" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Новый Agent" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Новый агент" })).not.toBeNull();
     expect(screen.queryByRole("heading", { name: "Канонические модели" })).toBeNull();
 
     setupTab.focus();
@@ -219,10 +223,10 @@ describe("HubPanel", () => {
     const operationsSection = operationsHeading.closest("section");
     expect(operationsSection).not.toBeNull();
     await user.click(
-      within(operationsSection as HTMLElement).getByRole("button", { name: "Advanced" }),
+      within(operationsSection as HTMLElement).getByRole("button", { name: "Расширенное" }),
     );
     expect(
-      within(operationsSection as HTMLElement).getByRole("button", { name: "Simple" }),
+      within(operationsSection as HTMLElement).getByRole("button", { name: "Основное" }),
     ).not.toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Реестр" }));
@@ -230,7 +234,7 @@ describe("HubPanel", () => {
     await user.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(operationsLoad).toHaveBeenCalledTimes(1);
     expect(
-      within(operationsSection as HTMLElement).getByRole("button", { name: "Simple" }),
+      within(operationsSection as HTMLElement).getByRole("button", { name: "Основное" }),
     ).not.toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Настройка" }));
@@ -299,11 +303,11 @@ describe("HubPanel", () => {
     );
     await screen.findByRole("heading", { name: "Canonical Hub" });
     await user.click(screen.getByRole("tab", { name: "Настройка" }));
-    await user.type(screen.getByLabelText("Имя Agent"), "New Agent");
+    await user.type(screen.getByLabelText("Имя агента"), "New Agent");
     await user.type(screen.getByLabelText("Slug"), "new-agent");
     await user.type(screen.getByLabelText("Роль"), "Scheduled operator");
-    await user.type(screen.getByLabelText("Instructions"), "Run the scheduled workflow.");
-    await user.click(screen.getByRole("button", { name: "Создать Agent" }));
+    await user.type(screen.getByLabelText("Инструкции"), "Run the scheduled workflow.");
+    await user.click(screen.getByRole("button", { name: "Создать агента" }));
     const scheduleButton = await screen.findByRole("button", { name: "Настроить расписание" });
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
 
@@ -315,7 +319,7 @@ describe("HubPanel", () => {
     expect(scheduleSection).not.toBeNull();
     await waitFor(() => {
       expect(
-        (within(scheduleSection as HTMLElement).getByLabelText("Agent") as HTMLSelectElement).value,
+        (within(scheduleSection as HTMLElement).getByLabelText("Агент") as HTMLSelectElement).value,
       ).toBe(createdAgentId);
     });
     expect(scheduleClient.load).toHaveBeenCalledTimes(1);

@@ -30,6 +30,13 @@ const defaultClient: MemoryCenterClient = {
   ingest: ingestRagDocument,
 };
 
+const MEMORY_ACTION_COPY = {
+  ACCEPT: "Принято",
+  MERGE: "Объединено",
+  REJECT: "Отклонено",
+  SUPERSEDE: "Заменено",
+} as const;
+
 function decisionId(): string {
   return `memory_decision_${crypto.randomUUID()}`;
 }
@@ -158,7 +165,7 @@ function MemoryDrawer({
     >
       <div className="drawer-header">
         <div>
-          <p className="eyebrow">Canonical memory</p>
+          <p className="eyebrow">Каноническая память</p>
           <h2 id="memory-center-title">Memory Center · {projectName}</h2>
         </div>
         <button
@@ -183,33 +190,35 @@ function MemoryDrawer({
               tabIndex={view === item ? 0 : -1}
               type="button"
             >
-              {{ INBOX: "Inbox", TIMELINE: "Timeline", NETWORK: "Network" }[item]}
+              {{ INBOX: "Входящие", TIMELINE: "Хронология", NETWORK: "Сеть" }[item]}
             </button>
           ))}
         </div>
         <fieldset className="complexity-toggle">
-          <legend className="visually-hidden">Сложность настроек</legend>
+          <legend className="visually-hidden">Уровень представления</legend>
           <button aria-pressed={!advanced} onClick={() => setAdvanced(false)} type="button">
-            Simple
+            Основное
           </button>
           <button aria-pressed={advanced} onClick={() => setAdvanced(true)} type="button">
-            Advanced
+            Расширенное
           </button>
         </fieldset>
       </div>
       {loading ? (
         <p className="drawer-state" aria-busy="true">
-          Загружаем canonical projection…
+          Загружаем память…
         </p>
       ) : null}
       {error ? (
         <p className="drawer-state" role="alert">
-          Memory Center сейчас недоступен.
+          Memory Center сейчас недоступен. Повторите действие позже.
         </p>
       ) : null}
       {!loading && inbox ? (
         <ul className="memory-inbox-list">
-          {inbox.proposals.length === 0 ? <li className="hub-empty">Inbox пуст.</li> : null}
+          {inbox.proposals.length === 0 ? (
+            <li className="hub-empty">Входящих предложений нет.</li>
+          ) : null}
           {inbox.proposals.map((proposal) => {
             const exactCandidate = proposal.curationCandidates[0];
             return (
@@ -217,17 +226,17 @@ function MemoryDrawer({
                 <p>{proposal.content}</p>
                 {exactCandidate ? (
                   <p className="panel-note">
-                    Exact canonical match найден — Merge не создаст дубль.
+                    Найдено точное совпадение с канонической памятью — объединение не создаст дубль.
                   </p>
                 ) : null}
                 {advanced ? (
                   <dl className="memory-provenance">
                     <div>
-                      <dt>Source</dt>
+                      <dt>Источник</dt>
                       <dd>{proposal.sourceContextItemId}</dd>
                     </div>
                     <div>
-                      <dt>Importance</dt>
+                      <dt>Важность</dt>
                       <dd>{proposal.importance}</dd>
                     </div>
                   </dl>
@@ -238,14 +247,14 @@ function MemoryDrawer({
                     onClick={() => void decide(proposal.id, "ACCEPT")}
                     type="button"
                   >
-                    Accept
+                    Принять
                   </button>
                   <button
                     disabled={pendingProposalId === proposal.id}
                     onClick={() => void decide(proposal.id, "REJECT")}
                     type="button"
                   >
-                    Reject
+                    Отклонить
                   </button>
                   {exactCandidate ? (
                     <button
@@ -255,13 +264,13 @@ function MemoryDrawer({
                       }
                       type="button"
                     >
-                      Merge exact
+                      Объединить с совпадением
                     </button>
                   ) : null}
                   {advanced ? (
                     <>
                       <select
-                        aria-label={`Цель Merge для ${proposal.content}`}
+                        aria-label={`Цель объединения для ${proposal.content}`}
                         onChange={(event) =>
                           setMergeTargets((current) => ({
                             ...current,
@@ -282,7 +291,7 @@ function MemoryDrawer({
                         onClick={() => void decide(proposal.id, "MERGE")}
                         type="button"
                       >
-                        Merge
+                        Объединить
                       </button>
                     </>
                   ) : null}
@@ -296,7 +305,7 @@ function MemoryDrawer({
         <ol className="memory-timeline">
           {timeline.entries.map((entry) => (
             <li key={entry.decisionId}>
-              <span className="status-pill">{entry.action}</span>
+              <span className="status-pill">{MEMORY_ACTION_COPY[entry.action]}</span>
               <p>{entry.content}</p>
               <time dateTime={entry.decidedAt}>
                 {new Date(entry.decidedAt).toLocaleString("ru-RU")}
@@ -375,17 +384,19 @@ export function MemoryCenter({
     <section className="memory-center-launcher" aria-labelledby="memory-center-launcher-title">
       <div className="hub-section-heading">
         <div>
-          <p className="eyebrow">Shared context</p>
+          <p className="eyebrow">Общий контекст</p>
           <h2 id="memory-center-launcher-title">Memory Center</h2>
         </div>
         <span className="count-badge">{available.length}</span>
       </div>
-      <p className="panel-note">Network, Timeline и Inbox читают один PostgreSQL event stream.</p>
+      <p className="panel-note">
+        Входящие, Хронология и Сеть показывают одну каноническую историю памяти.
+      </p>
       {available.length === 0 ? (
-        <p className="hub-empty">Сначала добавьте активный Project.</p>
+        <p className="hub-empty">Сначала добавьте активный проект.</p>
       ) : (
         <div className="memory-launch-controls">
-          <label htmlFor="memory-project">Project</label>
+          <label htmlFor="memory-project">Проект</label>
           <select
             id="memory-project"
             onChange={(event) => setProjectId(event.target.value)}
@@ -407,7 +418,7 @@ export function MemoryCenter({
             Открыть Memory Center
           </button>
           <button onClick={() => setRagOpen((value) => !value)} type="button">
-            {ragOpen ? "Скрыть RAG ingestion" : "Добавить RAG источник"}
+            {ragOpen ? "Скрыть RAG-источник" : "Добавить RAG-источник"}
           </button>
         </div>
       )}
@@ -448,14 +459,14 @@ export function MemoryCenter({
             />
           </label>
           <details>
-            <summary>Advanced</summary>
+            <summary>Расширенные настройки</summary>
             <label>
-              MIME type
+              MIME-тип
               <select
                 onChange={(event) => setRagMimeType(event.target.value as typeof ragMimeType)}
                 value={ragMimeType}
               >
-                <option value="AUTO">Auto</option>
+                <option value="AUTO">Авто</option>
                 <option value="text/plain">text/plain</option>
                 <option value="text/markdown">text/markdown</option>
               </select>
@@ -464,9 +475,9 @@ export function MemoryCenter({
           <button className="primary-button" disabled={ragPending} type="submit">
             {ragPending ? "Индексируем…" : "Индексировать"}
           </button>
-          {ragStatus === "SUCCEEDED" ? <p role="status">Источник добавлен в shared RAG.</p> : null}
+          {ragStatus === "SUCCEEDED" ? <p role="status">RAG-источник добавлен.</p> : null}
           {ragStatus === "FAILED" ? (
-            <p role="alert">RAG ingestion недоступен или отклонил источник.</p>
+            <p role="alert">Не удалось добавить RAG-источник. Проверьте данные и повторите.</p>
           ) : null}
         </form>
       ) : null}

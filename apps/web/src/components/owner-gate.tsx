@@ -74,7 +74,7 @@ export function OwnerGate({ auth = defaultAuthClient }: { auth?: AuthClient }) {
       } else if (error instanceof AuthenticationApiError && error.status === 429) {
         setLoginError("Слишком много попыток. Повторите вход через 15 минут.");
       } else {
-        setLoginError("Контур входа недоступен. Попробуйте позже.");
+        setLoginError("Вход сейчас недоступен. Повторите позже.");
       }
     } finally {
       setSubmitting(false);
@@ -101,23 +101,23 @@ export function OwnerGate({ auth = defaultAuthClient }: { auth?: AuthClient }) {
           <div className="auth-brand" aria-hidden="true">
             AW
           </div>
-          <p className="eyebrow">Private control plane</p>
+          <p className="eyebrow">Доступ владельца</p>
           {state.kind === "CHECKING" ? (
             <>
               <h1 id="auth-title">Проверяем сессию</h1>
-              <p aria-busy="true">Доступ к рабочему контуру остаётся закрытым до проверки.</p>
+              <p aria-busy="true">Рабочий интерфейс остаётся закрытым до завершения проверки.</p>
             </>
           ) : null}
           {state.kind === "UNAVAILABLE" ? (
             <div role="alert">
-              <h1 id="auth-title">Контур входа недоступен</h1>
-              <p>Система не подменяет сбой формы входа сообщением о неверном пароле.</p>
+              <h1 id="auth-title">Вход сейчас недоступен</h1>
+              <p>Система не показывает ошибку пароля, если не может проверить сессию.</p>
               <button
                 className="primary-button"
                 onClick={() => setCheckNonce((value) => value + 1)}
                 type="button"
               >
-                Проверить снова
+                Повторить
               </button>
             </div>
           ) : null}

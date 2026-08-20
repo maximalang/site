@@ -68,8 +68,8 @@ export function HubRegistry({
       })),
     ],
     [
-      "Execution routes",
-      "Execution routes пока не добавлены",
+      "Маршруты выполнения",
+      "Маршруты выполнения пока не добавлены",
       model.executionRoutes.map((item) => ({
         id: item.routeId,
         primary: item.label,
@@ -77,8 +77,8 @@ export function HubRegistry({
       })),
     ],
     [
-      "Skills",
-      "Skills пока не добавлены",
+      "Навыки",
+      "Навыки пока не добавлены",
       model.skills.map((item) => ({
         id: item.skillId,
         primary: item.displayName,
@@ -86,8 +86,8 @@ export function HubRegistry({
       })),
     ],
     [
-      "Tools",
-      "Tools пока не добавлены",
+      "Инструменты",
+      "Инструменты пока не добавлены",
       model.tools.map((item) => ({
         id: item.toolId,
         primary: item.displayName,
@@ -135,7 +135,9 @@ export function HubRegistry({
                     </div>
                     <span className="route-count">{routeCount(item.routes.length)}</span>
                   </div>
-                  <p>Auto выбирает один из вложенных ModelRoute без дублей карточки.</p>
+                  <p>
+                    Автовыбор использует один из вложенных ModelRoute без дублирования карточки.
+                  </p>
                   <details>
                     <summary>Параметры маршрутов</summary>
                     <ul className="hub-route-list">
@@ -177,12 +179,12 @@ export function HubRegistry({
       </section>
       <section className="hub-secondary-grid" aria-label="Реестры Hub">
         <RegistrySection
-          empty="Transport capabilities are unavailable"
-          title="Transport status"
+          empty="Транспортные возможности недоступны"
+          title="Состояние транспорта"
           values={model.transportCapabilities.map((capability) => ({
             id: capability.mode,
             primary: capability.mode,
-            secondary: `${capability.support} · ${capability.selectable ? "selectable" : "not selectable"}`,
+            secondary: `${capability.support} · ${capability.selectable ? "доступен для выбора" : "недоступен для выбора"}`,
           }))}
         />
         {registry.map(([title, empty, values]) => (

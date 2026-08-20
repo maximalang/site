@@ -47,6 +47,13 @@ const APPROVAL_COPY: Record<TaskApproval, string> = {
   REVOKED: "Отозвано",
 };
 
+function sourceStatusCopy(source: WorldReadModel["source"] | undefined): string {
+  if (!source) return "Загрузка";
+  if (source === "LIVE") return "Runtime";
+  if (source === "CONTRACT_FIXTURE") return "Тестовые данные";
+  return "Источник недоступен";
+}
+
 function StatusBadge({ status }: { status: AgentProjectionCore["status"] }) {
   return (
     <span className="status-badge" data-status={status}>
@@ -79,7 +86,7 @@ function AgentInspector({
     <section className="inspector" aria-labelledby="agent-inspector-title">
       <div className="inspector-heading">
         <div>
-          <p className="eyebrow">Agent</p>
+          <p className="eyebrow">Агент</p>
           <h2 id="agent-inspector-title">{agent.displayName}</h2>
         </div>
         <StatusBadge status={agent.status} />
@@ -101,7 +108,7 @@ function AgentInspector({
           </div>
         ) : null}
       </dl>
-      <p className="inspector-note">Runtime-сессии и credentials не входят в эту проекцию.</p>
+      <p className="inspector-note">Runtime-сессии и учётные данные не входят в эту проекцию.</p>
       <button
         className="primary-button inspector-chat-button"
         onClick={() => onOpenConversation(agent.agentId)}
@@ -135,7 +142,7 @@ function AgentRoster({
     <section className="world-roster" aria-labelledby="world-roster-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Roster</p>
+          <p className="eyebrow">Команда</p>
           <h2 id="world-roster-title">Агенты</h2>
         </div>
         <span className="count-badge">{agents.length}</span>
@@ -180,16 +187,16 @@ function CommandTable({
     <section className="command-panel" aria-labelledby="command-agents-title">
       <div className="section-heading command-heading">
         <div>
-          <p className="eyebrow">Canonical fleet</p>
+          <p className="eyebrow">Общая проекция</p>
           <h2 id="command-agents-title">Состояние агентов</h2>
         </div>
-        <p>{agents.length} подключено к общей проекции</p>
+        <p>{agents.length} агентов в общей проекции</p>
       </div>
       <section className="table-scroll" aria-label="Таблица состояния агентов">
         <table>
           <thead>
             <tr>
-              <th scope="col">Agent</th>
+              <th scope="col">Агент</th>
               <th scope="col">Статус</th>
               <th scope="col">Задача</th>
               <th scope="col">Действие</th>
@@ -390,16 +397,16 @@ export function ControlCenter({
           </span>
           <div>
             <p>Agent World</p>
-            <span>Operating Environment</span>
+            <span>Операторская среда</span>
           </div>
         </div>
         <div className="topbar-meta">
-          <div className="topbar-status" aria-label="Состояние проекции" role="status">
+          <div className="topbar-status" aria-label="Источник состояния" role="status">
             <span className="live-indicator" data-live={model?.source === "LIVE"}>
               <span aria-hidden="true" />
-              {model?.source === "LIVE" ? "Live" : "Read-only"}
+              {sourceStatusCopy(model?.source)}
             </span>
-            <span>Cursor {model?.cursor.lastSequence ?? 0}</span>
+            <span>Позиция {model?.cursor.lastSequence ?? 0}</span>
           </div>
           {onLogout ? (
             <div className="logout-control">
@@ -463,13 +470,13 @@ export function ControlCenter({
             Hub
           </button>
         </div>
-        <p className="projection-note">Один domain layer · World, Command и Hub</p>
+        <p className="projection-note">Единое состояние · World, Command и Hub</p>
       </nav>
 
       <main id="main-content" tabIndex={-1}>
         {mode !== "HUB" && model?.source === "CONTRACT_FIXTURE" ? (
           <div className="fixture-banner" role="note">
-            Контрактный снимок — это проверочные данные, не live runtime.
+            Контрактный снимок содержит тестовые данные и не отражает состояние Runtime.
           </div>
         ) : null}
 
@@ -491,16 +498,16 @@ export function ControlCenter({
         {mode !== "HUB" && !model && !loadError ? (
           <section className="center-state" aria-busy="true" aria-label="Загрузка состояния">
             <span aria-hidden="true" className="loading-grid" />
-            <h1>Загружаем общую проекцию</h1>
-            <p>World и Command получат один и тот же cursor.</p>
+            <h1>Загружаем состояние</h1>
+            <p>World и Command используют одно согласованное состояние.</p>
           </section>
         ) : null}
 
         {mode !== "HUB" && loadError ? (
           <section className="center-state" role="alert">
-            <p className="eyebrow">Ошибка API</p>
-            <h1>Не удалось проверить read model</h1>
-            <p>Ответ не используется, пока не пройдёт каноническую схему.</p>
+            <p className="eyebrow">Ошибка загрузки</p>
+            <h1>Не удалось загрузить состояние</h1>
+            <p>Данные не показаны, потому что не прошли проверку схемы.</p>
             <button
               className="primary-button"
               onClick={() => setReloadNonce((value) => value + 1)}
@@ -530,10 +537,12 @@ export function ControlCenter({
               >
                 <div className="workspace-intro">
                   <div>
-                    <p className="eyebrow">Headquarters</p>
-                    <h1>AI World</h1>
+                    <p className="eyebrow">Рабочая среда</p>
+                    <h1>World</h1>
                   </div>
-                  <p>Реальные статусы двигают проекцию. Декоративных LLM-вызовов нет.</p>
+                  <p>
+                    Карта отражает реальные статусы агентов и не генерирует декоративную активность.
+                  </p>
                 </div>
                 <div className="world-grid">
                   <div className="canvas-frame">
@@ -561,10 +570,10 @@ export function ControlCenter({
               >
                 <div className="workspace-intro">
                   <div>
-                    <p className="eyebrow">Control plane</p>
+                    <p className="eyebrow">Управление</p>
                     <h1>Command</h1>
                   </div>
-                  <p>Операторская таблица использует тот же cursor и Agent identity.</p>
+                  <p>Таблица показывает то же каноническое состояние агентов, что и World.</p>
                 </div>
                 <CommandTable
                   agents={agents}

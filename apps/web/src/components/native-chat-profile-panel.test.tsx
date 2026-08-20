@@ -40,7 +40,7 @@ const empty = NativeChatBrowserProfileListSchema.parse({ schemaVersion: 1, profi
 afterEach(cleanup);
 
 describe("NativeChatProfilePanel", () => {
-  it("keeps profile alias automatic in Simple mode and saves the App URL", async () => {
+  it("keeps profile alias automatic in basic mode and saves the App URL", async () => {
     const user = userEvent.setup();
     const configured = NativeChatBrowserProfileConfigurationSchema.parse({
       schemaVersion: 1,
@@ -60,8 +60,8 @@ describe("NativeChatProfilePanel", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Native Plus Chat" })).not.toBeNull();
-    expect(screen.queryByLabelText("Browser profile alias")).toBeNull();
-    await user.type(screen.getByLabelText("AI World App URL"), configured.launchUrl);
+    expect(screen.queryByLabelText("Псевдоним профиля браузера")).toBeNull();
+    await user.type(screen.getByLabelText("URL приложения Agent World"), configured.launchUrl);
     await user.click(screen.getByRole("button", { name: "Сохранить подключение" }));
 
     await waitFor(() =>
@@ -79,7 +79,7 @@ describe("NativeChatProfilePanel", () => {
     expect(await screen.findByText("Подключение сохранено")).not.toBeNull();
   });
 
-  it("reveals the opaque alias and enabled toggle only in Advanced mode", async () => {
+  it("reveals the opaque alias and enabled toggle only in advanced mode", async () => {
     const user = userEvent.setup();
     render(
       <NativeChatProfilePanel
@@ -89,8 +89,8 @@ describe("NativeChatProfilePanel", () => {
       />,
     );
     await screen.findByRole("heading", { name: "Native Plus Chat" });
-    await user.click(screen.getByRole("button", { name: "Advanced" }));
-    expect(screen.getByLabelText("Browser profile alias")).not.toBeNull();
-    expect(screen.getByLabelText("Launcher enabled")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Расширенное" }));
+    expect(screen.getByLabelText("Псевдоним профиля браузера")).not.toBeNull();
+    expect(screen.getByLabelText("Launcher включён")).not.toBeNull();
   });
 });

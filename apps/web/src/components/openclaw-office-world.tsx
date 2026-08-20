@@ -105,7 +105,7 @@ export function OpenClawOfficeWorld({
   };
 
   return (
-    <section aria-label="Игровая карта AI World">
+    <section aria-label="Карта World">
       <div className="memory-launch-controls world-skin-controls">
         <label htmlFor="world-skin">Вид карты</label>
         <select
@@ -132,13 +132,13 @@ export function OpenClawOfficeWorld({
         data-theme={skin.theme}
       >
         <svg
-          aria-label={`${skin.label}: AI World с четырьмя рабочими зонами`}
+          aria-label={`${skin.label}: карта World с четырьмя рабочими зонами`}
           className="office-floor"
           role="img"
           style={{ color: skin.palette.grid }}
           viewBox={`0 0 ${office.width} ${office.height}`}
         >
-          <title>{skin.label} — проекция реального состояния AI World</title>
+          <title>{skin.label} — визуальная проекция состояния World</title>
           <defs>
             <pattern id="office-grid" width="28" height="28" patternUnits="userSpaceOnUse">
               <path d="M28 0H0V28" fill="none" stroke="currentColor" strokeOpacity=".08" />

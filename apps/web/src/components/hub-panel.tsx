@@ -146,9 +146,9 @@ export function HubPanel({
   if (error) {
     return (
       <section className="hub-state" role="alert">
-        <p className="eyebrow">Ошибка API</p>
+        <p className="eyebrow">Ошибка загрузки</p>
         <h1>Hub недоступен</h1>
-        <p>Приватные или непроверенные данные не отображаются.</p>
+        <p>Непроверенные или закрытые данные не отображаются. Можно повторить загрузку.</p>
         <button
           className="primary-button"
           onClick={() => setAttempt((value) => value + 1)}
@@ -165,7 +165,7 @@ export function HubPanel({
       <section className="hub-state" aria-busy="true" aria-label="Загрузка Hub">
         <span aria-hidden="true" className="loading-grid" />
         <h1>Загружаем Canonical Hub</h1>
-        <p>Читаем один owner-only PostgreSQL snapshot.</p>
+        <p>Получаем проверенное состояние, доступное владельцу.</p>
       </section>
     );
   }
@@ -265,10 +265,10 @@ export function HubPanel({
     <div className="hub-panel">
       <div className="workspace-intro hub-intro">
         <div>
-          <p className="eyebrow">Lobby</p>
+          <p className="eyebrow">Управление</p>
           <h1>Canonical Hub</h1>
         </div>
-        <p>Управление сущностями, runtime, памятью, автоматизацией и маршрутами.</p>
+        <p>Управление сущностями, Runtime, памятью, автоматизацией и маршрутами.</p>
       </div>
       <div className="hub-workspace-shell">
         <nav ref={navigationRef} aria-label="Разделы Hub" className="hub-section-nav">

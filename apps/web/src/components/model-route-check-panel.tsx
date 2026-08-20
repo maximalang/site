@@ -46,8 +46,8 @@ export function ModelRouteCheckPanel({
       </ul>
       {receipt ? (
         <p role="status">
-          {receipt.mode} · {receipt.providerId} · {receipt.accountId ?? "без Account"} ·{" "}
-          {receipt.remoteModelId} · {receipt.usage.totalTokens} tokens
+          {receipt.mode} · {receipt.providerId} · {receipt.accountId ?? "без аккаунта"} ·{" "}
+          {receipt.remoteModelId} · токенов: {receipt.usage.totalTokens}
         </p>
       ) : null}
       {failed ? <p role="alert">Маршрут не прошёл проверку.</p> : null}

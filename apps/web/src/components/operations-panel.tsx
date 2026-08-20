@@ -48,25 +48,25 @@ export function OperationsPanel({
           onClick={() => setAdvanced((value) => !value)}
           type="button"
         >
-          {advanced ? "Simple" : "Advanced"}
+          {advanced ? "Основное" : "Расширенное"}
         </button>
       </div>
       <dl className="operations-metrics">
         <div>
-          <dt>Runs</dt>
+          <dt>Выполнения</dt>
           <dd>
             {observatory.runs.completed} / {observatory.runs.total}
           </dd>
         </div>
         <div>
-          <dt>Tokens in / out</dt>
+          <dt>Токены: вход / выход</dt>
           <dd>
             {observatory.tokens.input.toLocaleString("ru")} /{" "}
             {observatory.tokens.output.toLocaleString("ru")}
           </dd>
         </div>
         <div>
-          <dt>Context pressure</dt>
+          <dt>Нагрузка контекста</dt>
           <dd>{Math.round(observatory.context.pressure * 100)}%</dd>
         </div>
         <div>
@@ -90,21 +90,23 @@ export function OperationsPanel({
       </ol>
       {advanced ? (
         <div className="operations-advanced">
-          <p>Cached input: {observatory.tokens.cachedInput.toLocaleString("ru")}</p>
+          <p>Кэшированный вход: {observatory.tokens.cachedInput.toLocaleString("ru")}</p>
           <p>
-            Context: {observatory.context.estimatedTokens.toLocaleString("ru")} /{" "}
+            Контекст: {observatory.context.estimatedTokens.toLocaleString("ru")} /{" "}
             {observatory.context.budgetTokens.toLocaleString("ru")}
           </p>
-          <p>Edges: {actionGraph.edges.length}</p>
+          <p>Связи: {actionGraph.edges.length}</p>
           {observatory.monetaryCost.status === "ESTIMATED" ? (
-            <p>Cost source: LiteLLM response estimate · {observatory.monetaryCost.jobCount} jobs</p>
+            <p>
+              Источник стоимости: оценка ответа LiteLLM · задач: {observatory.monetaryCost.jobCount}
+            </p>
           ) : null}
           <ul>
             {observatory.routeSignals.map((signal) => (
               <li key={signal.routeId}>
-                {signal.routeId}: limits {Math.round(signal.remainingLimits * 100)}%, cost
-                efficiency {Math.round(signal.costEfficiency * 100)}%,{" "}
-                {signal.isFresh ? "fresh" : "stale"}
+                {signal.routeId}: лимиты {Math.round(signal.remainingLimits * 100)}%, эффективность
+                стоимости {Math.round(signal.costEfficiency * 100)}%,{" "}
+                {signal.isFresh ? "актуальные данные" : "устаревшие данные"}
               </li>
             ))}
           </ul>

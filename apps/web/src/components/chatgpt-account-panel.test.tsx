@@ -21,8 +21,8 @@ describe("ChatGptAccountPanel", () => {
       />,
     );
     await user.type(screen.getByLabelText("Название аккаунта"), "Plus primary");
-    await user.click(screen.getByLabelText("Разрешить Codex surface"));
-    await user.click(screen.getByRole("button", { name: "Добавить ChatGPT Account" }));
+    await user.click(screen.getByLabelText("Разрешить поверхность Codex"));
+    await user.click(screen.getByRole("button", { name: "Добавить аккаунт ChatGPT" }));
     expect(execute).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ kind: "PROVIDER_CREATE", category: "CONSUMER_ACCOUNT" }),
@@ -40,6 +40,6 @@ describe("ChatGptAccountPanel", () => {
     );
     expect(execute.mock.calls[1]?.[0]).not.toHaveProperty("agentId");
     expect(onCreated).toHaveBeenCalledWith(expect.stringMatching(/^account_/));
-    expect(await screen.findByText("Account добавлен; требуется вход")).not.toBeNull();
+    expect(await screen.findByText("Аккаунт добавлен; требуется вход")).not.toBeNull();
   });
 });

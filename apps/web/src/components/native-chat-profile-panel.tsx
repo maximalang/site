@@ -100,27 +100,27 @@ export function NativeChatProfilePanel({
     <section className="native-chat-profile-panel" aria-labelledby="native-chat-profile-title">
       <div className="hub-section-heading">
         <div>
-          <p className="eyebrow">Accounts · Chat transport</p>
+          <p className="eyebrow">Аккаунты · Чат</p>
           <h2 id="native-chat-profile-title">Native Plus Chat</h2>
         </div>
         <fieldset className="settings-level">
           <legend className="visually-hidden">Уровень настроек</legend>
           <button aria-pressed={!advanced} onClick={() => setAdvanced(false)} type="button">
-            Simple
+            Основное
           </button>
           <button aria-pressed={advanced} onClick={() => setAdvanced(true)} type="button">
-            Advanced
+            Расширенное
           </button>
         </fieldset>
       </div>
       <p className="panel-note">
-        Launcher отправляет только run_id. Результат возвращается через AI World MCP, не через DOM.
+        Launcher отправляет только run_id. Результат возвращается через MCP, а не читается из DOM.
       </p>
       {eligibleAccounts.length === 0 ? (
-        <p className="hub-empty">Добавьте ChatGPT Interactive Account с surface CHAT.</p>
+        <p className="hub-empty">Добавьте аккаунт ChatGPT с CHAT в доступных поверхностях.</p>
       ) : (
         <form className="native-chat-profile-form" method="post" onSubmit={submit}>
-          <label htmlFor="native-chat-account">ChatGPT Account</label>
+          <label htmlFor="native-chat-account">Аккаунт ChatGPT</label>
           <select
             id="native-chat-account"
             name="accountId"
@@ -136,9 +136,9 @@ export function NativeChatProfilePanel({
               </option>
             ))}
           </select>
-          <label htmlFor="native-chat-launch-url">AI World App URL</label>
+          <label htmlFor="native-chat-launch-url">URL приложения Agent World</label>
           <p className="field-hint" id="native-chat-launch-url-hint">
-            Точный chatgpt.com URL подключённого AI World App или Custom GPT.
+            Точный URL chatgpt.com подключённого приложения Agent World или Custom GPT.
           </p>
           <input
             aria-describedby="native-chat-launch-url-hint"
@@ -152,8 +152,8 @@ export function NativeChatProfilePanel({
           />
           {advanced ? (
             <fieldset>
-              <legend>Launcher routing</legend>
-              <label htmlFor="native-chat-profile-ref">Browser profile alias</label>
+              <legend>Маршрутизация Launcher</legend>
+              <label htmlFor="native-chat-profile-ref">Псевдоним профиля браузера</label>
               <input
                 id="native-chat-profile-ref"
                 name="profileRef"
@@ -170,7 +170,7 @@ export function NativeChatProfilePanel({
                   onChange={(event) => setIsEnabled(event.target.checked)}
                   type="checkbox"
                 />
-                Launcher enabled
+                Launcher включён
               </label>
             </fieldset>
           ) : null}

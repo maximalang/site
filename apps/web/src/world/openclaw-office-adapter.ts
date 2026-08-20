@@ -52,10 +52,10 @@ export const DEFAULT_OFFICE_SKIN: OfficeSkin = {
   width: 1_200,
   height: 700,
   zones: [
-    { id: "COMMONS", label: "Commons", x: 60, y: 70, width: 250, height: 560 },
-    { id: "FOCUS", label: "Focus", x: 340, y: 70, width: 420, height: 560 },
-    { id: "COLLABORATION", label: "Collaboration", x: 790, y: 70, width: 170, height: 560 },
-    { id: "REVIEW_OPS", label: "Review / Ops", x: 990, y: 70, width: 150, height: 560 },
+    { id: "COMMONS", label: "Общая зона", x: 60, y: 70, width: 250, height: 560 },
+    { id: "FOCUS", label: "Фокус", x: 340, y: 70, width: 420, height: 560 },
+    { id: "COLLABORATION", label: "Совместная работа", x: 790, y: 70, width: 170, height: 560 },
+    { id: "REVIEW_OPS", label: "Проверка / Операции", x: 990, y: 70, width: 150, height: 560 },
   ],
   palette: {
     floor: "#1c2a26",
@@ -77,10 +77,10 @@ export const SPACE_STATION_SKIN: OfficeSkin = {
   width: 1_200,
   height: 700,
   zones: [
-    { id: "COMMONS", label: "Habitat", x: 60, y: 70, width: 240, height: 250 },
-    { id: "COLLABORATION", label: "Comms", x: 60, y: 350, width: 240, height: 280 },
-    { id: "FOCUS", label: "Flight Deck", x: 330, y: 70, width: 520, height: 560 },
-    { id: "REVIEW_OPS", label: "Mission Control", x: 880, y: 70, width: 260, height: 560 },
+    { id: "COMMONS", label: "Жилой модуль", x: 60, y: 70, width: 240, height: 250 },
+    { id: "COLLABORATION", label: "Связь", x: 60, y: 350, width: 240, height: 280 },
+    { id: "FOCUS", label: "Командный мостик", x: 330, y: 70, width: 520, height: 560 },
+    { id: "REVIEW_OPS", label: "Центр управления", x: 880, y: 70, width: 260, height: 560 },
   ],
   palette: {
     floor: "#101827",
@@ -102,10 +102,10 @@ export const CYBER_AI_LAB_SKIN: OfficeSkin = {
   width: 1_200,
   height: 700,
   zones: [
-    { id: "COMMONS", label: "Neural Lounge", x: 60, y: 70, width: 260, height: 560 },
-    { id: "FOCUS", label: "Compute Lab", x: 350, y: 70, width: 380, height: 560 },
-    { id: "COLLABORATION", label: "Link Room", x: 760, y: 70, width: 380, height: 270 },
-    { id: "REVIEW_OPS", label: "Control Core", x: 760, y: 370, width: 380, height: 260 },
+    { id: "COMMONS", label: "Нейрозона", x: 60, y: 70, width: 260, height: 560 },
+    { id: "FOCUS", label: "Вычисления", x: 350, y: 70, width: 380, height: 560 },
+    { id: "COLLABORATION", label: "Связь", x: 760, y: 70, width: 380, height: 270 },
+    { id: "REVIEW_OPS", label: "Контроль", x: 760, y: 370, width: 380, height: 260 },
   ],
   palette: {
     floor: "#11131c",
@@ -127,10 +127,10 @@ export const MINIMAL_GRID_SKIN: OfficeSkin = {
   width: 1_200,
   height: 700,
   zones: [
-    { id: "COMMONS", label: "Idle", x: 60, y: 70, width: 240, height: 560 },
-    { id: "FOCUS", label: "Active", x: 340, y: 70, width: 240, height: 560 },
-    { id: "COLLABORATION", label: "Handoff", x: 620, y: 70, width: 240, height: 560 },
-    { id: "REVIEW_OPS", label: "Review", x: 900, y: 70, width: 240, height: 560 },
+    { id: "COMMONS", label: "Свободны", x: 60, y: 70, width: 240, height: 560 },
+    { id: "FOCUS", label: "Работа", x: 340, y: 70, width: 240, height: 560 },
+    { id: "COLLABORATION", label: "Передача", x: 620, y: 70, width: 240, height: 560 },
+    { id: "REVIEW_OPS", label: "Проверка", x: 900, y: 70, width: 240, height: 560 },
   ],
   palette: {
     floor: "#151719",
@@ -223,12 +223,12 @@ const STATUS_PRESENTATION: Record<
 > = {
   IDLE: { visualStatus: "IDLE", actionCue: "NONE", zone: "COMMONS", label: "Свободен" },
   QUEUED: { visualStatus: "QUEUED", actionCue: "NONE", zone: "FOCUS", label: "В очереди" },
-  RUNNING: { visualStatus: "WORKING", actionCue: "WORK", zone: "FOCUS", label: "Работает" },
+  RUNNING: { visualStatus: "WORKING", actionCue: "WORK", zone: "FOCUS", label: "Выполняет" },
   WAITING_APPROVAL: {
     visualStatus: "REVIEWING",
     actionCue: "REVIEW",
     zone: "REVIEW_OPS",
-    label: "Ждёт решения",
+    label: "Ждёт подтверждения",
   },
   BLOCKED: {
     visualStatus: "BLOCKED",

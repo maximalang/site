@@ -55,7 +55,7 @@ function compactLabelLines(value: string): string[] {
 }
 
 function referenceLabel(id: string): string {
-  return `Context ref …${id.slice(-8)}`;
+  return `Контекст …${id.slice(-8)}`;
 }
 
 function edgeKey(edge: MemoryNetwork["edges"][number]): string {
@@ -134,7 +134,7 @@ export function layoutVertices(
 }
 
 function relationCopy(relation: MemoryNetwork["edges"][number]["relation"]): string {
-  return relation === "MERGED_INTO" ? "Merged into" : "Accepted from";
+  return relation === "MERGED_INTO" ? "Объединено в" : "Принято из";
 }
 
 export function MemoryNetworkGraph({
@@ -170,21 +170,21 @@ export function MemoryNetworkGraph({
   return (
     <section className={styles.root} aria-label="Сеть принятой памяти">
       <div className={styles.summary}>
-        <strong>{network.nodes.length} canonical memories</strong>
-        <span>{network.edges.length} provenance links</span>
+        <strong>Каноническая память: {network.nodes.length}</strong>
+        <span>Связи происхождения: {network.edges.length}</span>
       </div>
       {layout.points.length === 0 ? (
-        <p className={styles.empty}>Network пуст.</p>
+        <p className={styles.empty}>Сеть пуста.</p>
       ) : (
         <>
           <section
-            aria-label="Прокручиваемая схема Memory Network"
+            aria-label="Прокручиваемая схема сети памяти"
             className={styles.canvas}
             ref={canvasRef}
             tabIndex={0}
           >
             <svg
-              aria-label={`Memory Network: ${network.nodes.length} canonical memories, ${network.edges.length} provenance links`}
+              aria-label={`Сеть памяти: канонических записей — ${network.nodes.length}, связей происхождения — ${network.edges.length}`}
               className={styles.svg}
               data-testid="memory-network-graph"
               height={layout.height}
@@ -192,7 +192,7 @@ export function MemoryNetworkGraph({
               viewBox={`0 0 ${layout.width} ${layout.height}`}
               width={layout.width}
             >
-              <title>Canonical Memory Network with provenance links</title>
+              <title>Каноническая сеть памяти со связями происхождения</title>
               <defs>
                 <marker
                   id={markerId}
@@ -257,7 +257,7 @@ export function MemoryNetworkGraph({
                           textAnchor="middle"
                           y={labelLines.length > 1 ? "76" : "60"}
                         >
-                          importance {point.importance.toFixed(2)}
+                          важность {point.importance.toFixed(2)}
                         </text>
                       ) : null}
                     </g>
@@ -266,23 +266,23 @@ export function MemoryNetworkGraph({
               </g>
             </svg>
           </section>
-          <section className={styles.legend} aria-label="Легенда Memory Network">
+          <section className={styles.legend} aria-label="Легенда сети памяти">
             <span>
-              <i className={styles.memoryKey} aria-hidden="true" /> Canonical memory
+              <i className={styles.memoryKey} aria-hidden="true" /> Каноническая память
             </span>
             <span>
-              <i className={styles.referenceKey} aria-hidden="true" /> Provenance context
+              <i className={styles.referenceKey} aria-hidden="true" /> Контекст происхождения
             </span>
             <span>
-              <i className={styles.acceptedKey} aria-hidden="true" /> Accepted from
+              <i className={styles.acceptedKey} aria-hidden="true" /> Принято из
             </span>
             <span>
-              <i className={styles.mergedKey} aria-hidden="true" /> Merged into
+              <i className={styles.mergedKey} aria-hidden="true" /> Объединено в
             </span>
           </section>
           <ul className="visually-hidden">
             {network.nodes.map((node) => (
-              <li key={node.contextItemId}>Memory: {node.content}</li>
+              <li key={node.contextItemId}>Память: {node.content}</li>
             ))}
             {network.edges.map((edge) => (
               <li key={`${edgeKey(edge)}:accessible`}>
@@ -294,19 +294,19 @@ export function MemoryNetworkGraph({
           {advanced ? (
             <div className={styles.advanced}>
               <section aria-labelledby="memory-network-node-details">
-                <h3 id="memory-network-node-details">Canonical nodes</h3>
+                <h3 id="memory-network-node-details">Канонические записи</h3>
                 <ul>
                   {network.nodes.map((node) => (
                     <li key={node.contextItemId}>
                       <strong>{node.content}</strong>
                       <code>{node.contextItemId}</code>
-                      <span>Source {node.sourceContextItemId}</span>
+                      <span>Источник {node.sourceContextItemId}</span>
                     </li>
                   ))}
                 </ul>
               </section>
               <section aria-labelledby="memory-network-edge-details">
-                <h3 id="memory-network-edge-details">Provenance edges</h3>
+                <h3 id="memory-network-edge-details">Связи происхождения</h3>
                 <ul>
                   {network.edges.map((edge) => (
                     <li key={`${edgeKey(edge)}:advanced`}>
