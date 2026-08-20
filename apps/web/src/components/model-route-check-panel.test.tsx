@@ -44,6 +44,6 @@ describe("ModelRouteCheckPanel", () => {
     expect(status.textContent).toContain("provider_33333333");
     expect(status.textContent).toContain("account_44444444");
     expect(status.textContent).toContain("gpt-5-mini");
-    expect(status.textContent).toContain("7 tokens");
+    expect(status.textContent).toContain("токенов: 7");
   });
 });
