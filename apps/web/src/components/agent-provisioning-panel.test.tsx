@@ -11,10 +11,12 @@ describe("AgentProvisioningPanel", () => {
     const user = userEvent.setup();
     const execute = vi.fn().mockResolvedValue(undefined);
     const onProvisioned = vi.fn();
+    const onConfigureSchedule = vi.fn();
     render(
       <AgentProvisioningPanel
         csrfToken="csrf"
         client={{ execute }}
+        onConfigureSchedule={onConfigureSchedule}
         onProvisioned={onProvisioned}
         projects={[{ projectId: "project_11111111-1111-1111-1111-111111111111", name: "AI World" }]}
         skills={[
@@ -48,6 +50,8 @@ describe("AgentProvisioningPanel", () => {
     );
     expect(await screen.findByText("Agent Instance создан")).not.toBeNull();
     expect(onProvisioned).toHaveBeenCalledWith(expect.stringMatching(/^agent_/));
-    expect(screen.getByRole("button", { name: "Настроить расписание" })).not.toBeNull();
+    const scheduleButton = screen.getByRole("button", { name: "Настроить расписание" });
+    await user.click(scheduleButton);
+    expect(onConfigureSchedule).toHaveBeenCalledWith(onProvisioned.mock.calls[0]?.[0]);
   });
 });
