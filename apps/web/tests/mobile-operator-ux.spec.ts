@@ -132,7 +132,7 @@ async function installRoutes(page: Page, decisions: DecisionRequest[]) {
             agentId,
             approvalId: approvalId(input.taskId),
             adapterKind: "OPENCLAW",
-            bindingId: "binding_66666666-6666-6666-666666666666",
+            bindingId: "binding_66666666-6666-6666-6666-666666666666",
             sessionId: "session_77777777-7777-7777-7777-777777777777",
             status: "DISPATCH_PENDING",
             attempt: 0,
