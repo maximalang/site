@@ -100,7 +100,9 @@ describe("MemoryCenter", () => {
 
     await user.click(screen.getByRole("button", { name: "Открыть Memory Center" }));
     const dialog = screen.getByRole("dialog", { name: /Memory Center · AI World/ });
-    expect(await within(dialog).findByText(/точное совпадение с канонической памятью/i)).not.toBeNull();
+    expect(
+      await within(dialog).findByText(/точное совпадение с канонической памятью/i),
+    ).not.toBeNull();
     await user.click(within(dialog).getByRole("button", { name: "Объединить с совпадением" }));
 
     expect(decide).toHaveBeenCalledWith(
