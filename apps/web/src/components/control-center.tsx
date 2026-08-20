@@ -196,42 +196,60 @@ function CommandTable({
             </tr>
           </thead>
           <tbody>
-            {agents.map((agent) => (
-              <tr data-selected={agent.agentId === selectedAgentId} key={agent.agentId}>
-                <th scope="row">
-                  <strong>{agent.displayName}</strong>
-                  <small>{agent.role}</small>
-                </th>
-                <td>
-                  <StatusBadge status={agent.status} />
-                </td>
-                <td>{agent.currentTask?.title ?? "—"}</td>
-                <td>
-                  <div className="command-row-actions">
+            {agents.map((agent) => {
+              const selected = agent.agentId === selectedAgentId;
+              return (
+                <tr data-selected={selected} key={agent.agentId}>
+                  <th scope="row">
                     <button
-                      className="text-button"
-                      onClick={() => {
-                        onSelect(agent.agentId);
-                        onOpenConversation(agent.agentId);
-                      }}
+                      aria-label={`Выбрать ${agent.displayName}`}
+                      aria-pressed={selected}
+                      className="command-agent-select"
+                      onClick={() => onSelect(agent.agentId)}
                       type="button"
                     >
-                      Диалог
+                      <strong>{agent.displayName}</strong>
+                      <small>{agent.role}</small>
                     </button>
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        onSelect(agent.agentId);
-                        onAssignTask(agent.agentId);
-                      }}
-                      type="button"
-                    >
-                      Задача
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </th>
+                  <td>
+                    <StatusBadge status={agent.status} />
+                  </td>
+                  <td>
+                    <span className="command-task-title">{agent.currentTask?.title ?? "—"}</span>
+                    {selected && agent.currentTask ? (
+                      <span className="command-mobile-approval">
+                        Подтверждение: {APPROVAL_COPY[agent.currentTask.approval]}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <div className="command-row-actions">
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          onSelect(agent.agentId);
+                          onOpenConversation(agent.agentId);
+                        }}
+                        type="button"
+                      >
+                        Диалог
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          onSelect(agent.agentId);
+                          onAssignTask(agent.agentId);
+                        }}
+                        type="button"
+                      >
+                        Задача
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
