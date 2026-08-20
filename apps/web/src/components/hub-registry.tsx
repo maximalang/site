@@ -135,7 +135,9 @@ export function HubRegistry({
                     </div>
                     <span className="route-count">{routeCount(item.routes.length)}</span>
                   </div>
-                  <p>Автовыбор использует один из вложенных ModelRoute без дублирования карточки.</p>
+                  <p>
+                    Автовыбор использует один из вложенных ModelRoute без дублирования карточки.
+                  </p>
                   <details>
                     <summary>Параметры маршрутов</summary>
                     <ul className="hub-route-list">
