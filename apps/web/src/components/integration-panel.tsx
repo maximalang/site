@@ -286,12 +286,12 @@ export function IntegrationPanel({
     <section aria-labelledby="integrations-title" className="integrations-panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">MCP · Automation · Servers · Browser</p>
+          <p className="eyebrow">MCP · Автоматизация · Серверы · Браузер</p>
           <h2 id="integrations-title">Интеграции</h2>
         </div>
         <span className="count-badge">{registry?.integrations.length ?? 0}</span>
       </div>
-      {error ? <p role="alert">Команда отклонена или registry недоступен.</p> : null}
+      {error ? <p role="alert">Команда отклонена или реестр недоступен.</p> : null}
       {actionResult ? (
         <div className="integration-action-result" aria-live="polite">
           <strong>{actionResult.action}</strong>
@@ -308,7 +308,7 @@ export function IntegrationPanel({
       ) : null}
       {mutationReceipt ? (
         <div className="integration-action-result" aria-live="polite">
-          <strong>Подтверждение внешней write-команды</strong>
+          <strong>Подтверждение внешней команды записи</strong>
           <span>{mutationReceipt.state}</span>
           {mutationReceipt.state === "PENDING" ? (
             <div>
@@ -338,17 +338,17 @@ export function IntegrationPanel({
           <input value={label} onChange={(event) => setLabel(event.target.value)} />
         </label>
         <label>
-          {kind === "SSH" ? "Host" : "HTTPS URL"}
+          {kind === "SSH" ? "Хост" : "HTTPS URL"}
           <input value={locator} onChange={(event) => setLocator(event.target.value)} />
         </label>
         {kind === "SSH" ? (
           <label>
-            SSH user
+            Пользователь SSH
             <input value={username} onChange={(event) => setUsername(event.target.value)} />
           </label>
         ) : null}
         <label>
-          Credential
+          Учётные данные
           <input
             autoComplete="new-password"
             type="password"
@@ -377,7 +377,7 @@ export function IntegrationPanel({
                 ? item.endpoint.url
                 : `${item.endpoint.username}@${item.endpoint.host}:${item.endpoint.port}`}
             </small>
-            <span>{item.hasCredential ? "Credential настроен" : "Без credential"}</span>
+            <span>{item.hasCredential ? "Учётные данные настроены" : "Без учётных данных"}</span>
             <button
               type="button"
               disabled={busy}
@@ -387,16 +387,16 @@ export function IntegrationPanel({
             </button>
             {item.kind === "GITHUB" ? (
               <details>
-                <summary>Advanced · workflow dispatch</summary>
+                <summary>Расширенное · запуск workflow</summary>
                 <label>
-                  Owner
+                  Владелец
                   <input
                     value={githubOwner}
                     onChange={(event) => setGithubOwner(event.target.value)}
                   />
                 </label>
                 <label>
-                  Repository
+                  Репозиторий
                   <input
                     value={githubRepository}
                     onChange={(event) => setGithubRepository(event.target.value)}
@@ -431,7 +431,7 @@ export function IntegrationPanel({
             ) : null}
             {item.kind === "MCP" ? (
               <details>
-                <summary>Advanced · разрешённые write-инструменты</summary>
+                <summary>Расширенное · разрешённые инструменты записи</summary>
                 <label>
                   Название
                   <input
@@ -482,10 +482,10 @@ export function IntegrationPanel({
             ) : null}
             {item.kind === "SSH" ? (
               <details>
-                <summary>Advanced · разрешённые server/deploy операции</summary>
+                <summary>Расширенное · разрешённые серверные операции</summary>
                 <p>
-                  Fingerprint SHA-256 берётся из доверенного provisioning-канала; AI World отклоняет
-                  другой host key.
+                  Fingerprint SHA-256 берётся из доверенного канала настройки; Agent World отклоняет
+                  другой ключ хоста.
                 </p>
                 <label>
                   Операция
@@ -495,8 +495,8 @@ export function IntegrationPanel({
                       setSshOperationKind(event.target.value as typeof sshOperationKind)
                     }
                   >
-                    <option value="SYSTEMD_RESTART">Restart systemd service</option>
-                    <option value="DOCKER_COMPOSE_DEPLOY">Deploy Docker Compose project</option>
+                    <option value="SYSTEMD_RESTART">Перезапустить службу systemd</option>
+                    <option value="DOCKER_COMPOSE_DEPLOY">Развернуть проект Docker Compose</option>
                   </select>
                 </label>
                 <label>
@@ -507,12 +507,12 @@ export function IntegrationPanel({
                   />
                 </label>
                 <label>
-                  {sshOperationKind === "SYSTEMD_RESTART" ? "Systemd unit" : "Compose project"}
+                  {sshOperationKind === "SYSTEMD_RESTART" ? "Юнит systemd" : "Проект Compose"}
                   <input value={sshTarget} onChange={(event) => setSshTarget(event.target.value)} />
                 </label>
                 {sshOperationKind === "DOCKER_COMPOSE_DEPLOY" ? (
                   <label>
-                    Абсолютный deployment path
+                    Абсолютный путь развёртывания
                     <input
                       value={sshWorkingDirectory}
                       onChange={(event) => setSshWorkingDirectory(event.target.value)}
@@ -520,7 +520,7 @@ export function IntegrationPanel({
                   </label>
                 ) : null}
                 <label>
-                  Host key SHA-256
+                  Ключ хоста SHA-256
                   <input
                     value={sshHostKeySha256}
                     onChange={(event) => setSshHostKeySha256(event.target.value)}
@@ -588,12 +588,12 @@ export function IntegrationPanel({
               {item.kind === "MCP"
                 ? "Инструменты"
                 : item.kind === "N8N"
-                  ? "Workflow"
+                  ? "Процессы"
                   : item.kind === "GITHUB"
                     ? "Репозитории"
                     : item.kind === "STEEL"
                       ? "Сессии"
-                      : "Host info"}
+                      : "Данные хоста"}
             </button>
           </li>
         ))}
