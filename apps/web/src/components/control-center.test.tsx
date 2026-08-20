@@ -46,12 +46,14 @@ describe("ControlCenter", () => {
     expect(within(researchRow).getByRole("button", { name: "Задача" })).not.toBeNull();
 
     const reviewerRow = screen.getByRole("row", {
-      name: /Reviewer.*Свободен.*Review protocol contract/i,
+      name: /Reviewer.*Свободен.*—/i,
     });
     await user.click(within(reviewerRow).getByRole("button", { name: "Выбрать Reviewer" }));
     expect(reviewerRow.getAttribute("data-selected")).toBe("true");
     expect(researchRow.getAttribute("data-selected")).toBe("false");
-    expect(within(reviewerRow).getByText("Подтверждение: Требуется")).not.toBeNull();
+    expect(within(researchRow).queryByText("Подтверждение: Не требуется")).toBeNull();
+    expect(within(reviewerRow).queryByText(/Подтверждение:/)).toBeNull();
+    expect(within(reviewerRow).getByText("—", { exact: true })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Reviewer" })).not.toBeNull();
     expect(loadReadModel).toHaveBeenCalledTimes(1);
   });
