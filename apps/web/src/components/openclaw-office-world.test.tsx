@@ -111,7 +111,7 @@ describe("OpenClaw Office World presentation", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Вид карты")).toHaveValue("minimal-grid-v1");
+    expect((screen.getByLabelText("Вид карты") as HTMLSelectElement).value).toBe("minimal-grid-v1");
     expect(screen.queryByRole("button", { name: "Сбросить" })).toBeNull();
   });
 
