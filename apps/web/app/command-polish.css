@@ -1,16 +1,45 @@
+.command-agent-select {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.command-agent-select:hover strong,
+.command-agent-select:focus-visible strong {
+  color: var(--accent);
+}
+
+.command-mobile-approval {
+  display: none;
+}
+
 @media (max-width: 40rem) {
   #command-panel + .inspector {
-    padding: var(--space-4);
-  }
-
-  #command-panel + .inspector .agent-role,
-  #command-panel + .inspector .agent-facts > div:not(:last-child),
-  #command-panel + .inspector .inspector-note,
-  #command-panel + .inspector .inspector-chat-button {
     display: none;
   }
 
-  #command-panel + .inspector .agent-facts {
-    margin-bottom: 0;
+  #command-panel .command-agent-select {
+    min-height: 3rem;
+  }
+
+  #command-panel .command-task-title,
+  #command-panel .command-mobile-approval {
+    display: block;
+  }
+
+  #command-panel .command-mobile-approval {
+    margin-top: var(--space-2);
+    color: var(--text-muted);
+    font-size: 0.74rem;
+  }
+
+  #command-panel tr[data-selected="true"] .command-mobile-approval {
+    color: var(--text);
   }
 }
