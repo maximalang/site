@@ -53,7 +53,7 @@ describe("MissionPanel", () => {
         projects={[{ projectId: "project_11111111-1111-1111-1111-111111111111", name: "AI World" }]}
       />,
     );
-    await user.click(screen.getByText("Advanced"));
+    await user.click(screen.getByText("Расширенные настройки"));
     await user.selectOptions(screen.getByLabelText("Политика выполнения"), "AUTO_SAFE_HANDOFF");
     await user.type(screen.getByLabelText("Название Mission"), "Auto mission");
     await user.type(screen.getByLabelText("Цель"), "Execute safe dependency handoffs.");
