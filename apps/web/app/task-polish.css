@@ -149,10 +149,3 @@
     grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
   }
 }
-
-@media (max-width: 22rem) {
-  .task-decision-actions,
-  .task-decision-reason-mode .task-decision-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
