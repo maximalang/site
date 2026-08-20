@@ -236,14 +236,14 @@ export function TaskDrawer({
   const decisionStatus = decision
     ? decision.approval.type === "APPROVED"
       ? decision.dispatch === "PENDING"
-        ? "Задача подтверждена и ожидает доступный runtime."
-        : "Задача подтверждена и передана в runtime."
+        ? "Задача подтверждена и ожидает доступный Runtime."
+        : "Задача подтверждена и передана в Runtime."
       : decision.approval.type === "DENIED"
         ? "Выполнение задачи отклонено."
         : decision.approval.type === "REVOKED"
           ? "Разрешение на выполнение отозвано."
-          : "Задача назначена. Статус: требует подтверждения; запуск не выполнен."
-    : "Задача назначена. Статус: требует подтверждения; запуск не выполнен.";
+          : "Задача назначена. Требуется подтверждение; запуск не выполнен."
+    : "Задача назначена. Требуется подтверждение; запуск не выполнен.";
   const canRevoke = decision?.approval.type === "APPROVED" && decision.dispatch === "PENDING";
 
   return (
@@ -258,7 +258,7 @@ export function TaskDrawer({
       >
         <div className="drawer-header">
           <div>
-            <p className="eyebrow">Task assignment</p>
+            <p className="eyebrow">Назначение</p>
             <h2 id="task-title">Задача для {agent.displayName}</h2>
           </div>
           <button
@@ -356,7 +356,7 @@ export function TaskDrawer({
               className="task-assignment-summary"
               aria-labelledby="task-assignment-summary-title"
             >
-              <p className="eyebrow">Task</p>
+              <p className="eyebrow">Назначено</p>
               <h3 id="task-assignment-summary-title">Задача назначена</h3>
               <dl>
                 <div>
@@ -391,21 +391,21 @@ export function TaskDrawer({
                 {decisionStatus}
               </p>
               {decision?.execution ? (
-                <dl className="task-execution-provenance" aria-label="Execution provenance">
+                <dl className="task-execution-provenance" aria-label="Параметры выполнения">
                   <div>
-                    <dt>Account</dt>
+                    <dt>Аккаунт</dt>
                     <dd>{decision.execution.accountId ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt>Model</dt>
+                    <dt>Модель</dt>
                     <dd>{decision.execution.remoteModelId ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt>Mode</dt>
+                    <dt>Режим</dt>
                     <dd>{decision.execution.mode}</dd>
                   </div>
                   <div>
-                    <dt>Adapter</dt>
+                    <dt>Адаптер</dt>
                     <dd>{decision.execution.adapterKind}</dd>
                   </div>
                 </dl>
