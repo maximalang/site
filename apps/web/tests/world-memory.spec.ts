@@ -228,7 +228,7 @@ test("World skin preference and Memory Network remain canonical in the browser",
   const memorySection = page.locator("section.memory-center-launcher");
   await memorySection.getByRole("button", { name: "Открыть Memory Center" }).click();
   const memoryDialog = page.getByRole("dialog", { name: "Memory Center · AI World" });
-  await memoryDialog.getByRole("tab", { name: "Network" }).click();
+  await memoryDialog.getByRole("tab", { name: "Сеть" }).click();
 
   const graph = memoryDialog.getByTestId("memory-network-graph");
   await expect(graph).toBeVisible();
@@ -236,15 +236,15 @@ test("World skin preference and Memory Network remain canonical in the browser",
   await expect(memoryDialog.locator("[data-relation='MERGED_INTO']")).toHaveCount(1);
   await expect(memoryDialog.locator("[data-memory-kind='memory']")).toHaveCount(2);
   await expect(memoryDialog.locator("[data-memory-kind='reference']")).toHaveCount(1);
-  const legend = memoryDialog.getByLabel("Легенда Memory Network");
-  await expect(legend.getByText("Canonical memory", { exact: true })).toBeVisible();
-  await expect(legend.getByText("Provenance context", { exact: true })).toBeVisible();
-  await expect(legend.getByText("Accepted from", { exact: true })).toBeVisible();
-  await expect(legend.getByText("Merged into", { exact: true })).toBeVisible();
+  const legend = memoryDialog.getByLabel("Легенда сети памяти");
+  await expect(legend.getByText("Каноническая память", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Контекст происхождения", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Принято из", { exact: true })).toBeVisible();
+  await expect(legend.getByText("Объединено в", { exact: true })).toBeVisible();
   expect(Number(await graph.getAttribute("height"))).toBeLessThanOrEqual(360);
 
   const graphRegion = memoryDialog.getByRole("region", {
-    name: "Прокручиваемая схема Memory Network",
+    name: "Прокручиваемая схема сети памяти",
   });
   await expect(graphRegion).toHaveAttribute("tabindex", "0");
   await graphRegion.focus();
