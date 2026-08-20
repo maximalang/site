@@ -72,19 +72,19 @@ export function ChatGptAccountPanel({
     <section className="chatgpt-account-panel" aria-labelledby="chatgpt-account-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Account ≠ Agent</p>
-          <h2 id="chatgpt-account-title">ChatGPT Accounts</h2>
+          <p className="eyebrow">Аккаунт ≠ агент</p>
+          <h2 id="chatgpt-account-title">Аккаунты ChatGPT</h2>
         </div>
         <span className="count-badge">
           {accounts.filter((account) => account.authMechanism === "CHATGPT_INTERACTIVE").length}
         </span>
       </div>
       <p>
-        Добавление регистрирует Account; browser login выполняется отдельно и только после него
-        health станет активным.
+        Здесь регистрируется аккаунт. Вход в ChatGPT выполняется отдельно; только после него
+        состояние подключения может стать активным.
       </p>
-      {state === "SAVED" ? <p role="status">Account добавлен; требуется вход</p> : null}
-      {state === "ERROR" ? <p role="alert">Account не добавлен.</p> : null}
+      {state === "SAVED" ? <p role="status">Аккаунт добавлен; требуется вход</p> : null}
+      {state === "ERROR" ? <p role="alert">Не удалось добавить аккаунт.</p> : null}
       <div className="chatgpt-account-form">
         <label>
           Название аккаунта
@@ -104,7 +104,7 @@ export function ChatGptAccountPanel({
             checked={codex}
             onChange={(event) => setCodex(event.target.checked)}
           />
-          Разрешить Codex surface
+          Разрешить поверхность Codex
         </label>
         <button
           className="primary-button"
@@ -112,7 +112,7 @@ export function ChatGptAccountPanel({
           disabled={!csrfToken || !label || state === "SAVING"}
           onClick={() => void submit()}
         >
-          {state === "SAVING" ? "Добавляем…" : "Добавить ChatGPT Account"}
+          {state === "SAVING" ? "Добавляем…" : "Добавить аккаунт ChatGPT"}
         </button>
       </div>
     </section>
