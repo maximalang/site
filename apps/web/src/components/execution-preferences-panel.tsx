@@ -28,15 +28,15 @@ const defaultClient: ExecutionPreferenceClient = {
 function sourceLabel(source: ExecutionPreferenceLayer["scope"]): string {
   switch (source.kind) {
     case "SYSTEM":
-      return "System Defaults";
+      return "Системные значения";
     case "PROJECT":
-      return "Project";
+      return "Проект";
     case "AGENT":
-      return "Agent";
+      return "Агент";
     case "TASK":
-      return "Task";
+      return "Задача";
     case "RUN":
-      return "Run";
+      return "Выполнение";
   }
 }
 
@@ -46,9 +46,9 @@ function provenanceLabel(
 ): string {
   const label = sourceLabel(source);
   if (source.kind === local.kind) {
-    return source.kind === "SYSTEM" ? "Источник: System Defaults" : `Override at ${label}`;
+    return source.kind === "SYSTEM" ? "Источник: системные значения" : `Переопределено: ${label}`;
   }
-  return `Inherited from ${label}`;
+  return `Унаследовано: ${label}`;
 }
 
 function modelValue(value: Overrides["model"]): string {
@@ -153,13 +153,14 @@ export function ExecutionPreferencesPanel({
     <section className="preference-panel" aria-labelledby="execution-preferences-title">
       <div className="hub-section-heading">
         <div>
-          <p className="eyebrow">Policy</p>
-          <h2 id="execution-preferences-title">Execution preferences</h2>
+          <p className="eyebrow">Политика выполнения</p>
+          <h2 id="execution-preferences-title">Предпочтения выполнения</h2>
         </div>
         <span className="count-badge">5</span>
       </div>
       <p className="preference-lead">
-        Хранятся только локальные overrides; effective значения вычисляются по цепочке наследования.
+        Сохраняются только локальные переопределения; итоговые значения вычисляются по цепочке
+        наследования.
       </p>
       <div className="preference-scope-grid">
         <label>
@@ -168,12 +169,12 @@ export function ExecutionPreferencesPanel({
             value={scopeKind}
             onChange={(event) => setScopeKind(event.target.value as ScopeKind)}
           >
-            <option value="SYSTEM">System Defaults</option>
+            <option value="SYSTEM">Системные значения</option>
             <option disabled={!projectId} value="PROJECT">
-              Project
+              Проект
             </option>
             <option disabled={!agentId} value="AGENT">
-              Agent
+              Агент
             </option>
           </select>
         </label>
@@ -217,27 +218,27 @@ export function ExecutionPreferencesPanel({
           </select>
         </label>
       </div>
-      {!selection ? <p className="hub-empty">Выберите существующий scope.</p> : null}
+      {!selection ? <p className="hub-empty">Выберите существующий уровень.</p> : null}
       {selection && !model && !error ? (
         <p className="hub-empty" aria-busy="true">
-          Читаем policy snapshot…
+          Загружаем настройки…
         </p>
       ) : null}
       {error ? (
         <p className="preference-error" role="alert">
-          Настройки не сохранены. Проверьте scope и повторите.
+          Настройки не сохранены. Проверьте выбранный уровень и повторите.
         </p>
       ) : null}
       {model ? (
         <div className="preference-fields">
           <PreferenceField
-            label="Model"
+            label="Модель"
             source={provenanceLabel(model.resolved.model.source, model.local.scope)}
             canReset={!localRequired && draft.model !== undefined}
             onReset={() => reset("model")}
           >
             <select
-              aria-label="Model override"
+              aria-label="Переопределение модели"
               value={modelValue(draft.model)}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -253,8 +254,8 @@ export function ExecutionPreferencesPanel({
                 }))
               }
             >
-              {!localRequired ? <option value="INHERIT">Inherited</option> : null}
-              <option value="AUTO">Auto</option>
+              {!localRequired ? <option value="INHERIT">Унаследовать</option> : null}
+              <option value="AUTO">AUTO</option>
               {hub.models
                 .filter((item) => item.isEnabled)
                 .map((item) => (
@@ -265,13 +266,13 @@ export function ExecutionPreferencesPanel({
             </select>
           </PreferenceField>
           <PreferenceField
-            label="Account"
+            label="Аккаунт"
             source={provenanceLabel(model.resolved.account.source, model.local.scope)}
             canReset={!localRequired && draft.account !== undefined}
             onReset={() => reset("account")}
           >
             <select
-              aria-label="Account override"
+              aria-label="Переопределение аккаунта"
               value={accountValue(draft.account)}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -287,8 +288,8 @@ export function ExecutionPreferencesPanel({
                 }))
               }
             >
-              {!localRequired ? <option value="INHERIT">Inherited</option> : null}
-              <option value="AUTO">Auto</option>
+              {!localRequired ? <option value="INHERIT">Унаследовать</option> : null}
+              <option value="AUTO">AUTO</option>
               {hub.accounts
                 .filter((item) => item.isEnabled)
                 .map((item) => (
@@ -299,13 +300,13 @@ export function ExecutionPreferencesPanel({
             </select>
           </PreferenceField>
           <PreferenceField
-            label="Mode"
+            label="Режим"
             source={provenanceLabel(model.resolved.mode.source, model.local.scope)}
             canReset={!localRequired && draft.mode !== undefined}
             onReset={() => reset("mode")}
           >
             <select
-              aria-label="Mode override"
+              aria-label="Переопределение режима"
               value={draft.mode ?? "INHERIT"}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -315,20 +316,20 @@ export function ExecutionPreferencesPanel({
                 }))
               }
             >
-              {!localRequired ? <option value="INHERIT">Inherited</option> : null}
+              {!localRequired ? <option value="INHERIT">Унаследовать</option> : null}
               {["AUTO", "CHAT", "WORK", "CODEX", "API", "LOCAL"].map((value) => (
                 <option key={value}>{value}</option>
               ))}
             </select>
           </PreferenceField>
           <PreferenceField
-            label="Context"
+            label="Контекст"
             source={provenanceLabel(model.resolved.context.source, model.local.scope)}
             canReset={!localRequired && draft.context !== undefined}
             onReset={() => reset("context")}
           >
             <select
-              aria-label="Context override"
+              aria-label="Переопределение контекста"
               value={draft.context ?? "INHERIT"}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -338,20 +339,20 @@ export function ExecutionPreferencesPanel({
                 }))
               }
             >
-              {!localRequired ? <option value="INHERIT">Inherited</option> : null}
+              {!localRequired ? <option value="INHERIT">Унаследовать</option> : null}
               {["AUTO", "LEAN", "BALANCED", "RICH"].map((value) => (
                 <option key={value}>{value}</option>
               ))}
             </select>
           </PreferenceField>
           <PreferenceField
-            label="Budget"
+            label="Бюджет"
             source={provenanceLabel(model.resolved.budget.source, model.local.scope)}
             canReset={!localRequired && draft.budget !== undefined}
             onReset={() => reset("budget")}
           >
             <select
-              aria-label="Budget override"
+              aria-label="Переопределение бюджета"
               value={draft.budget ?? "INHERIT"}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -361,7 +362,7 @@ export function ExecutionPreferencesPanel({
                 }))
               }
             >
-              {!localRequired ? <option value="INHERIT">Inherited</option> : null}
+              {!localRequired ? <option value="INHERIT">Унаследовать</option> : null}
               {["AUTO", "ECONOMY", "BALANCED", "QUALITY"].map((value) => (
                 <option key={value}>{value}</option>
               ))}
@@ -373,7 +374,7 @@ export function ExecutionPreferencesPanel({
             onClick={() => void persist(draft)}
             type="button"
           >
-            {saving ? "Сохраняем…" : "Сохранить overrides"}
+            {saving ? "Сохраняем…" : "Сохранить изменения"}
           </button>
         </div>
       ) : null}
@@ -402,7 +403,7 @@ function PreferenceField({
       </div>
       <span>{source}</span>
       <button disabled={!canReset} onClick={onReset} type="button">
-        Reset to inherited
+        Сбросить к унаследованному
       </button>
     </div>
   );
