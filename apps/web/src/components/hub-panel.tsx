@@ -174,7 +174,6 @@ export function HubPanel({
           className="hub-section-panel"
           id={activePanelId}
           role="tabpanel"
-          tabIndex={0}
         >
           <div className="hub-section-content" data-hub-section={activeSection}>
             {activeSection === "registry" ? (
