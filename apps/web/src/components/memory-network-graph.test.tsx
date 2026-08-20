@@ -3,7 +3,11 @@
 import type { MemoryNetwork } from "@agent-world/domain";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryNetworkGraph } from "./memory-network-graph";
+import {
+  layoutVertices,
+  MemoryNetworkGraph,
+  type NetworkVertex,
+} from "./memory-network-graph";
 
 const sourceId = "context_item_11111111-1111-1111-1111-111111111111";
 const firstId = "context_item_22222222-2222-2222-2222-222222222222";
@@ -46,6 +50,16 @@ const network = {
   ],
 } as MemoryNetwork;
 
+function vertices(count: number): NetworkVertex[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `vertex-${String(index).padStart(2, "0")}`,
+    kind: index % 4 === 3 ? "REFERENCE" : "MEMORY",
+    content: `Memory vertex ${index}`,
+    importance: index % 4 === 3 ? null : 0.8,
+    createdAt: `2026-08-15T10:${String(index).padStart(2, "0")}:00.000Z`,
+  }));
+}
+
 afterEach(cleanup);
 
 describe("MemoryNetworkGraph", () => {
@@ -72,7 +86,7 @@ describe("MemoryNetworkGraph", () => {
     expect(screen.getByText("Memory: PostgreSQL remains canonical.")).toBeTruthy();
   });
 
-  it("reflows provenance vertices into one column when the graph canvas is narrow", async () => {
+  it("uses a compact two-column layout for the three-vertex canonical fixture on narrow canvas", async () => {
     const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
     Object.defineProperty(HTMLElement.prototype, "clientWidth", {
       configurable: true,
@@ -87,15 +101,42 @@ describe("MemoryNetworkGraph", () => {
         element.getAttribute("transform"),
       );
       expect(transforms).toEqual([
-        "translate(180 102)",
-        "translate(180 226)",
-        "translate(180 350)",
+        "translate(100 82)",
+        "translate(260 82)",
+        "translate(100 206)",
       ]);
-      expect(graph.getAttribute("height")).toBe("452");
+      expect(graph.getAttribute("height")).toBe("300");
     } finally {
       if (original) Object.defineProperty(HTMLElement.prototype, "clientWidth", original);
       else Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
     }
+  });
+
+  it("keeps adaptive layout bounded and deterministic from empty through larger networks", () => {
+    const empty = layoutVertices([], 320);
+    const one = layoutVertices(vertices(1), 320);
+    const three = layoutVertices(vertices(3), 320);
+    const ten = layoutVertices(vertices(10), 320);
+    const repeatedTen = layoutVertices(vertices(10), 320);
+
+    expect(empty.width).toBeGreaterThanOrEqual(280);
+    expect(empty.height).toBe(160);
+    expect(empty.points).toHaveLength(0);
+    expect(one.height).toBe(200);
+    expect(three.height).toBe(300);
+    expect(ten.height).toBeGreaterThan(three.height);
+    expect(new Set(three.points.map((point) => point.x)).size).toBe(2);
+    expect(repeatedTen).toEqual(ten);
+
+    for (const layout of [one, three, ten]) {
+      for (const point of layout.points) {
+        expect(point.x).toBeGreaterThan(0);
+        expect(point.y).toBeGreaterThan(0);
+        expect(point.x).toBeLessThan(layout.width);
+        expect(point.y).toBeLessThan(layout.height);
+      }
+    }
+    expect(ten.points.map((point) => point.id)).toEqual(vertices(10).map((point) => point.id));
   });
 
   it("shows full canonical and provenance identifiers only in Advanced details", () => {
