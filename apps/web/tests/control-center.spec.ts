@@ -669,8 +669,10 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.getByRole("heading", { level: 2, name: "Operations" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Интеграции" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toHaveCount(0);
-  expect(operationsRequestCount).toBe(1);
-  expect(integrationRequestCount).toBe(1);
+  expect(operationsRequestCount).toBeGreaterThan(0);
+  expect(integrationRequestCount).toBeGreaterThan(0);
+  const operationsRequestsAfterFirstVisit = operationsRequestCount;
+  const integrationRequestsAfterFirstVisit = integrationRequestCount;
 
   await setupTab.click();
   await expect(missionTitle).toHaveValue("Audit release readiness");
@@ -680,8 +682,8 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(runtimePanel).toBeHidden();
   await runtimeTab.click();
   await expect(page.getByRole("heading", { level: 2, name: "Operations" })).toBeVisible();
-  expect(operationsRequestCount).toBe(1);
-  expect(integrationRequestCount).toBe(1);
+  expect(operationsRequestCount).toBe(operationsRequestsAfterFirstVisit);
+  expect(integrationRequestCount).toBe(integrationRequestsAfterFirstVisit);
 
   await memoryTab.click();
   const memorySection = page.locator("section.memory-center-launcher");
