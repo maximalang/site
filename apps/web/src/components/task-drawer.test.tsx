@@ -82,11 +82,7 @@ function approvedPendingResponse(taskId: string) {
   });
 }
 
-function negativeDecisionResponse(
-  taskId: string,
-  kind: "DENY" | "REVOKE",
-  reason: string,
-) {
+function negativeDecisionResponse(taskId: string, kind: "DENY" | "REVOKE", reason: string) {
   return ApprovalDecisionResponseSchema.parse({
     schemaVersion: 1,
     outcome: "DECIDED",
