@@ -2,7 +2,7 @@ import type { MemoryNetwork } from "@agent-world/domain";
 import { useEffect, useId, useRef, useState } from "react";
 import styles from "./memory-network-graph.module.css";
 
-type NetworkVertex = {
+export type NetworkVertex = {
   id: string;
   kind: "MEMORY" | "REFERENCE";
   content: string;
@@ -17,9 +17,11 @@ type NetworkPoint = NetworkVertex & {
 
 const DEFAULT_CANVAS_WIDTH = 640;
 const MIN_CANVAS_WIDTH = 280;
-const MIN_CELL_WIDTH = 160;
+const DEFAULT_CELL_WIDTH = 160;
+const SMALL_CELL_WIDTH = 120;
 const CELL_HEIGHT = 124;
-const CANVAS_PADDING = 40;
+const DEFAULT_CANVAS_PADDING = 40;
+const SMALL_CANVAS_PADDING = 20;
 const LABEL_LINE_LENGTH = 20;
 const LABEL_MAX_LINES = 2;
 
@@ -96,7 +98,7 @@ function buildVertices(network: MemoryNetwork): NetworkVertex[] {
     });
 }
 
-function layoutVertices(
+export function layoutVertices(
   vertices: NetworkVertex[],
   availableWidth = DEFAULT_CANVAS_WIDTH,
 ): {
@@ -105,26 +107,28 @@ function layoutVertices(
   height: number;
 } {
   const width = Math.max(MIN_CANVAS_WIDTH, Math.floor(availableWidth));
-  if (vertices.length === 0) return { points: [], width, height: 280 };
+  if (vertices.length === 0) return { points: [], width, height: 160 };
 
+  const smallNetwork = vertices.length <= 4;
+  const padding = smallNetwork ? SMALL_CANVAS_PADDING : DEFAULT_CANVAS_PADDING;
+  const minimumCellWidth = smallNetwork ? SMALL_CELL_WIDTH : DEFAULT_CELL_WIDTH;
+  const innerWidth = Math.max(minimumCellWidth, width - padding * 2);
   const naturalColumns = Math.max(1, Math.ceil(Math.sqrt(vertices.length * 1.35)));
-  const maxColumns = Math.max(
-    1,
-    Math.floor(Math.max(MIN_CELL_WIDTH, width - CANVAS_PADDING * 2) / MIN_CELL_WIDTH),
-  );
-  const columns = Math.min(naturalColumns, maxColumns);
+  const maxColumns = Math.max(1, Math.floor(innerWidth / minimumCellWidth));
+  const columns = Math.min(vertices.length, naturalColumns, maxColumns);
   const rows = Math.ceil(vertices.length / columns);
-  const innerWidth = Math.max(MIN_CELL_WIDTH, width - CANVAS_PADDING * 2);
   const cellWidth = innerWidth / columns;
-  const height = Math.max(280, CANVAS_PADDING * 2 + rows * CELL_HEIGHT);
+  const contentHeight = padding * 2 + rows * CELL_HEIGHT;
+  const minimumHeight = vertices.length === 1 ? 200 : smallNetwork && rows === 1 ? 220 : 300;
+  const height = Math.max(minimumHeight, contentHeight);
 
   return {
     width,
     height,
     points: vertices.map((vertex, index) => ({
       ...vertex,
-      x: CANVAS_PADDING + cellWidth * ((index % columns) + 0.5),
-      y: CANVAS_PADDING + CELL_HEIGHT / 2 + Math.floor(index / columns) * CELL_HEIGHT,
+      x: padding + cellWidth * ((index % columns) + 0.5),
+      y: padding + CELL_HEIGHT / 2 + Math.floor(index / columns) * CELL_HEIGHT,
     })),
   };
 }
