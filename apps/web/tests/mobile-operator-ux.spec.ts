@@ -194,7 +194,7 @@ test("Command and Task expose compact mobile operator decisions without changing
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "AI World" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
 
   // Next App Router development runs mount Effects through React Strict Mode's
   // setup → cleanup → setup cycle. Capture that initial baseline instead of a
@@ -270,7 +270,16 @@ test("Command and Task expose compact mobile operator decisions without changing
   await expect(approve).toBeVisible();
   await expect(reject).toBeVisible();
   await expect(taskDialog.getByLabel("Причина отклонения")).toHaveCount(0);
-  if (viewportWidth === 320) await expect(approve).toBeInViewport();
+  if (viewportWidth <= 360) {
+    await expect(approve).toBeInViewport();
+    const lineMetrics = await approve.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const lineHeight = Number.parseFloat(style.lineHeight);
+      const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
+      return { contentHeight: element.getBoundingClientRect().height - padding, lineHeight };
+    });
+    expect(lineMetrics.contentHeight).toBeLessThanOrEqual(lineMetrics.lineHeight * 2.2);
+  }
 
   await reject.click();
   expect(decisions).toHaveLength(0);
