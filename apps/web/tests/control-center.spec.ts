@@ -147,6 +147,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   });
   let assignedTaskId: string | undefined;
   let memoryProposalPending = true;
+  let hubRequestCount = 0;
 
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -163,13 +164,14 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await page.route("**/api/world", (route) =>
     route.fulfill({ body: JSON.stringify(fixture), contentType: "application/json", status: 200 }),
   );
-  await page.route("**/api/hub", (route) =>
-    route.fulfill({
+  await page.route("**/api/hub", (route) => {
+    hubRequestCount += 1;
+    return route.fulfill({
       body: JSON.stringify(hubFixture),
       contentType: "application/json",
       status: 200,
-    }),
-  );
+    });
+  });
   await page.route("**/api/operations", (route) =>
     route.fulfill({ body: JSON.stringify(operationsFixture), contentType: "application/json" }),
   );
@@ -580,18 +582,48 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(hubTab).toBeFocused();
   await expect(hubTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { level: 1, name: "Canonical Hub" })).toBeVisible();
+
+  const registryTab = page.getByRole("tab", { name: "Реестр" });
+  const setupTab = page.getByRole("tab", { name: "Настройка" });
+  const runtimeTab = page.getByRole("tab", { name: "Runtime" });
+  const memoryTab = page.getByRole("tab", { name: "Memory" });
+  const automationTab = page.getByRole("tab", { name: "Автоматизация" });
+  const routingTab = page.getByRole("tab", { name: "Маршруты" });
+
+  await expect(registryTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2, name: "Execution preferences" })).toHaveCount(0);
+
+  await registryTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(setupTab).toBeFocused();
+  await expect(setupTab).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowLeft");
+  await expect(registryTab).toBeFocused();
+  await expect(registryTab).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("End");
+  await expect(routingTab).toBeFocused();
+  await expect(routingTab).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Home");
+  await expect(registryTab).toBeFocused();
+  await expect(registryTab).toHaveAttribute("aria-selected", "true");
+
+  await setupTab.click();
   await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Новая Mission" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Новый Agent" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: new RegExp(fixtureAgent) })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Execution preferences" }),
-  ).toBeVisible();
-  await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
-  await expect(page.getByRole("heading", { level: 2, name: "Интеграции" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "GPT-X" })).toHaveCount(0);
 
+  await runtimeTab.click();
+  await expect(page.getByRole("heading", { level: 2, name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Интеграции" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "ChatGPT Accounts" })).toHaveCount(0);
+
+  await memoryTab.click();
   const memorySection = page.locator("section.memory-center-launcher");
+  await expect(memorySection.getByRole("heading", { name: "Memory Center" })).toBeVisible();
   await memorySection.getByRole("button", { name: "Открыть Memory Center" }).click();
   const memoryDialog = page.getByRole("dialog", { name: "Memory Center · AI World" });
   await expect(memoryDialog).toBeVisible();
@@ -611,6 +643,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(memoryDialog).toBeHidden();
   await expect(memorySection.getByRole("button", { name: "Открыть Memory Center" })).toBeFocused();
 
+  await automationTab.click();
   const nativeChatSection = page.locator("section.native-chat-profile-panel");
   await expect(nativeChatSection.getByRole("heading", { name: "Native Plus Chat" })).toBeVisible();
   await expect(nativeChatSection.getByLabel("Browser profile alias")).toHaveCount(0);
@@ -632,6 +665,11 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await scheduleSection.getByRole("button", { name: "Advanced" }).click();
   await expect(scheduleSection.getByLabel("Cron (5 полей)")).toBeVisible();
 
+  await routingTab.click();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Execution preferences" }),
+  ).toBeVisible();
+  await expect(page.getByText("Источник: System Defaults")).toHaveCount(5);
   const providerKeySection = page
     .locator("section.hub-registry-section")
     .filter({ has: page.getByRole("heading", { name: "API provider key" }) });
@@ -653,6 +691,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(routeReceipt).toContainText("account_11111111-1111-1111-1111-111111111111");
   await expect(routeReceipt).toContainText("gpt-5-mini");
   await expect(routeReceipt).toContainText("7 tokens");
+  await expect(page.getByRole("heading", { level: 2, name: "Native Plus Chat" })).toHaveCount(0);
 
   const hubAccessibility = await new AxeBuilder({ page }).analyze();
   expect(hubAccessibility.violations).toEqual([]);
@@ -660,6 +699,7 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   const viewport = page.viewportSize();
   const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(documentWidth).toBeLessThanOrEqual(viewport?.width ?? documentWidth);
+  expect(hubRequestCount).toBe(1);
   expect(apiCursors.length).toBeGreaterThan(0);
   expect(new Set(apiCursors)).toEqual(new Set([3]));
   expect(consoleErrors).toEqual([]);
