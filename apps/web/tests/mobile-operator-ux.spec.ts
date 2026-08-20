@@ -15,12 +15,20 @@ type DecisionRequest = {
   reason?: string;
 };
 
+type WorldRequestRecord = {
+  sequence: number;
+  method: string;
+  url: string;
+  observedAtMs: number;
+};
+
 function approvalId(taskId: string) {
   return `approval_${taskId.slice("task_".length)}`;
 }
 
 async function installRoutes(page: Page, decisions: DecisionRequest[]) {
-  let worldRequests = 0;
+  const worldRequests: WorldRequestRecord[] = [];
+  const routeStartedAt = Date.now();
 
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
@@ -35,7 +43,13 @@ async function installRoutes(page: Page, decisions: DecisionRequest[]) {
     }),
   );
   await page.route("**/api/world", (route) => {
-    worldRequests += 1;
+    const request = route.request();
+    worldRequests.push({
+      sequence: worldRequests.length + 1,
+      method: request.method(),
+      url: request.url(),
+      observedAtMs: Date.now() - routeStartedAt,
+    });
     return route.fulfill({
       body: JSON.stringify(buildContractFixture()),
       contentType: "application/json",
@@ -140,7 +154,7 @@ async function installRoutes(page: Page, decisions: DecisionRequest[]) {
     });
   });
 
-  return { worldRequests: () => worldRequests };
+  return { worldRequests: () => [...worldRequests] };
 }
 
 async function assignTask(page: Page, title: string) {
@@ -181,14 +195,26 @@ test("Command and Task expose compact mobile operator decisions without changing
 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "AI World" })).toBeVisible();
-  expect(routes.worldRequests()).toBe(1);
+
+  // Next App Router development runs mount Effects through React Strict Mode's
+  // setup → cleanup → setup cycle. Capture that initial baseline instead of a
+  // magic request count, then require navigation/selection to add no refetches.
+  const initialWorldRequests = routes.worldRequests();
+  expect(initialWorldRequests.length).toBeGreaterThanOrEqual(1);
+  for (const request of initialWorldRequests) {
+    expect(request.method).toBe("GET");
+    expect(new URL(request.url).pathname).toBe("/api/world");
+    expect(request.sequence).toBeGreaterThanOrEqual(1);
+    expect(request.observedAtMs).toBeGreaterThanOrEqual(0);
+  }
+  const initialWorldRequestCount = initialWorldRequests.length;
 
   await page.getByRole("tab", { name: "Command" }).click();
   const researchRow = page.getByRole("row", { name: /Research Lead/ });
   const reviewerRow = page.getByRole("row", { name: /Reviewer/ });
   await researchRow.getByRole("button", { name: "Выбрать Research Lead" }).click();
   await expect(researchRow).toHaveAttribute("data-selected", "true");
-  expect(routes.worldRequests()).toBe(1);
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount);
 
   const viewportWidth = page.viewportSize()?.width ?? 1440;
   const inspector = page.getByRole("region", { name: "Research Lead" });
@@ -209,8 +235,10 @@ test("Command and Task expose compact mobile operator decisions without changing
   await expect(researchRow).toHaveAttribute("data-selected", "false");
   if (viewportWidth <= 640) {
     await expect(reviewerRow.getByText("Подтверждение: Требуется", { exact: true })).toBeVisible();
+  } else {
+    await expect(page.getByRole("region", { name: "Reviewer" })).toBeVisible();
   }
-  expect(routes.worldRequests()).toBe(1);
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
@@ -227,7 +255,9 @@ test("Command and Task expose compact mobile operator decisions without changing
   });
 
   await researchRow.getByRole("button", { name: "Задача" }).click();
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount);
   let taskDialog = await assignTask(page, "Проверить новый контракт");
+  await expect.poll(() => routes.worldRequests().length).toBe(initialWorldRequestCount + 1);
   const approve = taskDialog.getByRole("button", { name: "Подтвердить и запустить" });
   const reject = taskDialog.getByRole("button", { name: "Отклонить" });
   await expect(approve).toBeVisible();
@@ -237,6 +267,7 @@ test("Command and Task expose compact mobile operator decisions without changing
 
   await reject.click();
   expect(decisions).toHaveLength(0);
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount + 1);
   const rejectionReason = taskDialog.getByLabel("Причина отклонения");
   await expect(rejectionReason).toBeVisible();
   await expect(rejectionReason).toBeFocused();
@@ -248,25 +279,31 @@ test("Command and Task expose compact mobile operator decisions without changing
   await expect(taskDialog.getByLabel("Причина отклонения")).toHaveCount(0);
   await expect(reject).toBeFocused();
   expect(decisions).toHaveLength(0);
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount + 1);
 
   await reject.click();
   await taskDialog.getByLabel("Причина отклонения").fill("  Duplicate request  ");
   await taskDialog.getByRole("button", { name: "Подтвердить отклонение" }).click();
   await expect.poll(() => decisions.length).toBe(1);
   expect(decisions[0]).toMatchObject({ decision: "DENY", reason: "Duplicate request" });
+  await expect.poll(() => routes.worldRequests().length).toBe(initialWorldRequestCount + 2);
   await expect(taskDialog.getByText("Выполнение задачи отклонено.", { exact: true })).toBeVisible();
 
   await taskDialog.getByRole("button", { name: "Закрыть назначение задачи" }).click();
   await researchRow.getByRole("button", { name: "Задача" }).click();
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount + 2);
   taskDialog = await assignTask(page, "Повторно проверить контракт");
+  await expect.poll(() => routes.worldRequests().length).toBe(initialWorldRequestCount + 3);
   await taskDialog.getByRole("button", { name: "Подтвердить и запустить" }).click();
   await expect.poll(() => decisions.length).toBe(2);
   expect(decisions[1]).toMatchObject({ decision: "APPROVE" });
+  await expect.poll(() => routes.worldRequests().length).toBe(initialWorldRequestCount + 4);
   await expect(taskDialog.getByLabel("Причина отзыва")).toHaveCount(0);
 
   const revoke = taskDialog.getByRole("button", { name: "Отозвать разрешение" });
   await revoke.click();
   expect(decisions).toHaveLength(2);
+  expect(routes.worldRequests()).toHaveLength(initialWorldRequestCount + 4);
   const revokeReason = taskDialog.getByLabel("Причина отзыва");
   await expect(revokeReason).toBeVisible();
   await expect(revokeReason).toBeFocused();
@@ -276,6 +313,7 @@ test("Command and Task expose compact mobile operator decisions without changing
   await revokeConfirm.click();
   await expect.poll(() => decisions.length).toBe(3);
   expect(decisions[2]).toMatchObject({ decision: "REVOKE", reason: "Changed priorities" });
+  await expect.poll(() => routes.worldRequests().length).toBe(initialWorldRequestCount + 5);
 
   const taskAccessibility = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
   expect(taskAccessibility.violations).toEqual([]);
