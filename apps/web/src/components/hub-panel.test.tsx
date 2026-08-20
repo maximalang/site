@@ -126,7 +126,7 @@ describe("HubPanel", () => {
     const runtimeTab = screen.getByRole("tab", { name: "Runtime" });
     expect(document.activeElement).toBe(runtimeTab);
     expect(runtimeTab.getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("heading", { name: "Operations" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Интеграции" })).not.toBeNull();
 
     await user.keyboard("{ArrowLeft}");
     expect(document.activeElement).toBe(setupTab);
