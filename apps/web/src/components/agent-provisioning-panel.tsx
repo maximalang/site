@@ -72,11 +72,11 @@ export function AgentProvisioningPanel({
     <section className="agent-provisioning-panel" aria-labelledby="agent-provisioning-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Template → Instance</p>
-          <h2 id="agent-provisioning-title">Новый Agent</h2>
+          <p className="eyebrow">Шаблон → агент</p>
+          <h2 id="agent-provisioning-title">Новый агент</h2>
         </div>
       </div>
-      {state === "SAVED" ? <p role="status">Agent Instance создан</p> : null}
+      {state === "SAVED" ? <p role="status">Агент создан</p> : null}
       {createdAgentId ? (
         <button
           type="button"
@@ -91,13 +91,13 @@ export function AgentProvisioningPanel({
           Настроить расписание
         </button>
       ) : null}
-      {state === "ERROR" ? <p role="alert">Agent не создан.</p> : null}
+      {state === "ERROR" ? <p role="alert">Не удалось создать агента.</p> : null}
       {projects.length === 0 ? (
-        <p>Сначала создайте Project.</p>
+        <p>Сначала создайте проект.</p>
       ) : (
         <div className="agent-provisioning-form">
           <label>
-            Project
+            Проект
             <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
               {projects.map((item) => (
                 <option key={item.projectId} value={item.projectId}>
@@ -107,7 +107,7 @@ export function AgentProvisioningPanel({
             </select>
           </label>
           <label>
-            Имя Agent
+            Имя агента
             <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
           </label>
           <label>
@@ -119,14 +119,14 @@ export function AgentProvisioningPanel({
             <input value={role} onChange={(event) => setRole(event.target.value)} />
           </label>
           <label>
-            Instructions
+            Инструкции
             <textarea
               value={instructions}
               onChange={(event) => setInstructions(event.target.value)}
             />
           </label>
           <fieldset>
-            <legend>Skills</legend>
+            <legend>Навыки</legend>
             {skills.map((item) => (
               <label key={item.skillId}>
                 <input
@@ -141,7 +141,7 @@ export function AgentProvisioningPanel({
             ))}
           </fieldset>
           <fieldset>
-            <legend>Tools</legend>
+            <legend>Инструменты</legend>
             {tools.map((item) => (
               <label key={item.toolId}>
                 <input
@@ -156,9 +156,9 @@ export function AgentProvisioningPanel({
             ))}
           </fieldset>
           <details>
-            <summary>Advanced</summary>
+            <summary>Расширенные настройки</summary>
             <label>
-              Memory context
+              Контекст памяти
               <select
                 value={context}
                 onChange={(event) => setContext(event.target.value as typeof context)}
@@ -169,7 +169,7 @@ export function AgentProvisioningPanel({
               </select>
             </label>
             <label>
-              Token budget
+              Бюджет токенов
               <select
                 value={budget}
                 onChange={(event) => setBudget(event.target.value as typeof budget)}
@@ -180,7 +180,7 @@ export function AgentProvisioningPanel({
               </select>
             </label>
             <label>
-              Preferred execution
+              Предпочтительный режим выполнения
               <select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
                 {["AUTO", "CHAT", "WORK", "CODEX", "API", "LOCAL"].map((value) => (
                   <option key={value}>{value}</option>
@@ -196,7 +196,7 @@ export function AgentProvisioningPanel({
             }
             onClick={() => void submit()}
           >
-            {state === "SAVING" ? "Создаём…" : "Создать Agent"}
+            {state === "SAVING" ? "Создаём…" : "Создать агента"}
           </button>
         </div>
       )}
