@@ -68,18 +68,18 @@ export function MissionPanel({
     <section className="mission-panel" aria-labelledby="mission-panel-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Goal orchestration</p>
+          <p className="eyebrow">Оркестрация цели</p>
           <h2 id="mission-panel-title">Новая Mission</h2>
         </div>
       </div>
       {state === "SAVED" ? <p role="status">Mission создана</p> : null}
-      {state === "ERROR" ? <p role="alert">Mission не создана.</p> : null}
+      {state === "ERROR" ? <p role="alert">Не удалось создать Mission.</p> : null}
       {projects.length === 0 ? (
-        <p>Сначала создайте Project.</p>
+        <p>Сначала создайте проект.</p>
       ) : (
         <div className="mission-form">
           <label>
-            Project
+            Проект
             <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
               {projects.map((project) => (
                 <option key={project.projectId} value={project.projectId}>
@@ -106,22 +106,22 @@ export function MissionPanel({
               value={verification}
               onChange={(event) => setVerification(event.target.value as typeof verification)}
             >
-              <option value="TEST">Test</option>
-              <option value="ARTIFACT">Artifact</option>
-              <option value="METRIC">Metric</option>
-              <option value="OWNER_CONFIRMATION">Owner confirmation</option>
+              <option value="TEST">Тест</option>
+              <option value="ARTIFACT">Артефакт</option>
+              <option value="METRIC">Метрика</option>
+              <option value="OWNER_CONFIRMATION">Подтверждение владельца</option>
             </select>
           </label>
           <details>
-            <summary>Advanced</summary>
+            <summary>Расширенные настройки</summary>
             <label>
               Политика выполнения
               <select
                 value={policy}
                 onChange={(event) => setPolicy(event.target.value as typeof policy)}
               >
-                <option value="REVIEW_EACH_TASK">Review each task</option>
-                <option value="AUTO_SAFE_HANDOFF">Auto safe handoff</option>
+                <option value="REVIEW_EACH_TASK">Проверять каждую задачу</option>
+                <option value="AUTO_SAFE_HANDOFF">Автоматическая безопасная передача</option>
               </select>
             </label>
           </details>
