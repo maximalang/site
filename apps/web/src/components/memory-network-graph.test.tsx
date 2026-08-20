@@ -3,11 +3,7 @@
 import type { MemoryNetwork } from "@agent-world/domain";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  layoutVertices,
-  MemoryNetworkGraph,
-  type NetworkVertex,
-} from "./memory-network-graph";
+import { layoutVertices, MemoryNetworkGraph, type NetworkVertex } from "./memory-network-graph";
 
 const sourceId = "context_item_11111111-1111-1111-1111-111111111111";
 const firstId = "context_item_22222222-2222-2222-2222-222222222222";
@@ -100,11 +96,7 @@ describe("MemoryNetworkGraph", () => {
       const transforms = [...container.querySelectorAll("[data-memory-kind]")].map((element) =>
         element.getAttribute("transform"),
       );
-      expect(transforms).toEqual([
-        "translate(100 82)",
-        "translate(260 82)",
-        "translate(100 206)",
-      ]);
+      expect(transforms).toEqual(["translate(100 82)", "translate(260 82)", "translate(100 206)"]);
       expect(graph.getAttribute("height")).toBe("300");
     } finally {
       if (original) Object.defineProperty(HTMLElement.prototype, "clientWidth", original);
