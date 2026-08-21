@@ -11,7 +11,6 @@ import {
   type OfficeVisualStatus,
   resolveOfficeSkin,
 } from "../world/openclaw-office-adapter";
-import styles from "./openclaw-office-world.module.css";
 import {
   OfficeDesk,
   OfficeMeetingTable,
@@ -19,6 +18,7 @@ import {
   OfficePlant,
   OfficeSofa,
 } from "./openclaw-office-primitives";
+import styles from "./openclaw-office-world.module.css";
 
 type AgentId = WorldView["agents"][number]["core"]["agentId"];
 type OpenClawOfficeWorldProps = {
@@ -54,11 +54,21 @@ function AgentPawn({ agent }: { agent: OfficePresentationAgent }) {
 
 function EnvironmentDetails({ theme }: { theme: string }) {
   return (
-    <g className={styles.environmentDetails} aria-hidden="true" data-environment-theme={theme}>
+    <g className={styles.environmentDetails} data-environment-theme={theme}>
       <rect className={styles.window} x="84" y="90" width="168" height="54" rx="15" />
-      <path d="M104 117h128" stroke="rgb(211 236 226 / 10%)" strokeWidth="3" strokeLinecap="round" />
+      <path
+        d="M104 117h128"
+        stroke="rgb(211 236 226 / 10%)"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
       <rect className={styles.window} x="970" y="92" width="142" height="48" rx="14" />
-      <path d="M991 116h100" stroke="rgb(211 236 226 / 10%)" strokeWidth="3" strokeLinecap="round" />
+      <path
+        d="M991 116h100"
+        stroke="rgb(211 236 226 / 10%)"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
       <rect className={styles.rug} x="91" y="315" width="184" height="145" rx="52" />
       <rect className={styles.rug} x="822" y="278" width="107" height="145" rx="48" />
       <g opacity=".45">
@@ -170,10 +180,28 @@ export function OpenClawOfficeWorld({
             style={{ fill: skin.palette.floor }}
             width={office.width}
           />
-          <rect className={`${styles.floorGrid} office-floor-grid`} width={office.width} height={office.height} rx="30" />
-          <rect className={styles.perimeter} x="24" y="24" width={office.width - 48} height={office.height - 48} rx="34" />
-          <path className={styles.walkway} d="M188 350C314 296 389 351 504 351S702 296 830 351s181 8 245-42" />
-          <path className={styles.walkwayEdge} d="M188 350C314 296 389 351 504 351S702 296 830 351s181 8 245-42" />
+          <rect
+            className={`${styles.floorGrid} office-floor-grid`}
+            width={office.width}
+            height={office.height}
+            rx="30"
+          />
+          <rect
+            className={styles.perimeter}
+            x="24"
+            y="24"
+            width={office.width - 48}
+            height={office.height - 48}
+            rx="34"
+          />
+          <path
+            className={styles.walkway}
+            d="M188 350C314 296 389 351 504 351S702 296 830 351s181 8 245-42"
+          />
+          <path
+            className={styles.walkwayEdge}
+            d="M188 350C314 296 389 351 504 351S702 296 830 351s181 8 245-42"
+          />
           {office.zones.map((zone) => (
             <g data-testid="office-zone" key={zone.id}>
               <rect
@@ -185,7 +213,11 @@ export function OpenClawOfficeWorld({
                 x={zone.x}
                 y={zone.y}
               />
-              <text className={`${styles.zoneLabel} office-zone-label`} x={zone.x + 20} y={zone.y + 31}>
+              <text
+                className={`${styles.zoneLabel} office-zone-label`}
+                x={zone.x + 20}
+                y={zone.y + 31}
+              >
                 {zone.label}
               </text>
             </g>
@@ -249,7 +281,11 @@ export function OpenClawOfficeWorld({
           >
             <span className={styles.characterWrap}>
               <AgentPawn agent={agent} />
-              <span aria-hidden="true" className={styles.statusBubble} data-status={agent.visualStatus}>
+              <span
+                aria-hidden="true"
+                className={styles.statusBubble}
+                data-status={agent.visualStatus}
+              >
                 <span>{STATUS_SHORT[agent.visualStatus]}</span>
               </span>
             </span>
@@ -260,7 +296,10 @@ export function OpenClawOfficeWorld({
           </button>
         ))}
         {office.handoffs.length > 0 ? (
-          <ol aria-label="Последние передачи работы" className={`${styles.handoffFeed} office-handoff-feed`}>
+          <ol
+            aria-label="Последние передачи работы"
+            className={`${styles.handoffFeed} office-handoff-feed`}
+          >
             {office.handoffs.map((handoff) => (
               <li key={handoff.id}>
                 <span>
