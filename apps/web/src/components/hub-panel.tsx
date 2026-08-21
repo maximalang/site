@@ -10,8 +10,8 @@ import {
   type ExecutionPreferenceClient,
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
-import { HubRegistry } from "./hub-registry";
 import styles from "./hub-panel.module.css";
+import { HubRegistry } from "./hub-registry";
 import { type IntegrationClient, IntegrationPanel } from "./integration-panel";
 import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { MissionPanel } from "./mission-panel";
@@ -151,13 +151,7 @@ function HubSectionIcon({ section }: { section: HubSection }) {
     );
   }
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="6" cy="7" r="2" />
       <circle cx="18" cy="17" r="2" />
       <circle cx="18" cy="7" r="2" />
