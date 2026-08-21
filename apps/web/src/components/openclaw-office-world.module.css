@@ -254,7 +254,13 @@
   text-align: center;
 }
 
-.agentName,
+.agentName {
+  display: block;
+  max-height: 2.2em;
+  overflow: hidden;
+  white-space: normal;
+}
+
 .agentRole {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -478,6 +484,24 @@
   }
 
   .handoffFeed {
+    right: 0.35rem;
+    bottom: 0.35rem;
+    left: 0.35rem;
+    max-width: none;
+    gap: 0;
+    padding: 0.3rem 0.4rem;
+    border-radius: 0.65rem;
+  }
+
+  .handoffFeed li {
+    min-width: 0;
+    gap: 0.35rem;
+    font-size: 0.52rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .handoffFeed time {
     display: none;
   }
 
