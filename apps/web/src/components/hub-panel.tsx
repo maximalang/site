@@ -10,8 +10,8 @@ import {
   type ExecutionPreferenceClient,
   ExecutionPreferencesPanel,
 } from "./execution-preferences-panel";
-import styles from "./hub-panel.module.css";
 import { HubRegistry } from "./hub-registry";
+import styles from "./hub-panel.module.css";
 import { type IntegrationClient, IntegrationPanel } from "./integration-panel";
 import { MemoryCenter, type MemoryCenterClient } from "./memory-center";
 import { MissionPanel } from "./mission-panel";
@@ -30,13 +30,15 @@ const HUB_SECTIONS = [
     id: "registry",
     label: "Реестр",
     title: "Карта сущностей",
-    description: "Провайдеры, модели и агенты — в центре; вспомогательные реестры собраны компактно.",
+    description:
+      "Провайдеры, модели и агенты — в центре; вспомогательные реестры собраны компактно.",
   },
   {
     id: "setup",
     label: "Настройка",
     title: "Сборка конфигурации",
-    description: "Аккаунты, миссия, provisioning и connection собраны как последовательная рабочая зона.",
+    description:
+      "Аккаунты, миссия, provisioning и connection собраны как последовательная рабочая зона.",
   },
   {
     id: "runtime",
@@ -54,13 +56,15 @@ const HUB_SECTIONS = [
     id: "automation",
     label: "Автоматизация",
     title: "Ритм агентов",
-    description: "Native chat profile и расписания рядом, чтобы настройка переходила в повторяемое выполнение.",
+    description:
+      "Native chat profile и расписания рядом, чтобы настройка переходила в повторяемое выполнение.",
   },
   {
     id: "routing",
     label: "Маршруты",
     title: "Маршрутизация выполнения",
-    description: "Credentials, route check и execution preferences читаются как единый поток принятия решений.",
+    description:
+      "Credentials, route check и execution preferences читаются как единый поток принятия решений.",
   },
 ] as const;
 
@@ -75,7 +79,13 @@ type HubRequest = {
 function HubSectionIcon({ section }: { section: HubSection }) {
   if (section === "registry") {
     return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <rect x="4" y="4" width="6" height="6" rx="1.5" />
         <rect x="14" y="4" width="6" height="6" rx="1.5" />
         <rect x="4" y="14" width="6" height="6" rx="1.5" />
@@ -85,7 +95,13 @@ function HubSectionIcon({ section }: { section: HubSection }) {
   }
   if (section === "setup") {
     return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <path d="M5 7h14M5 17h14" strokeLinecap="round" />
         <circle cx="9" cy="7" r="2.2" fill="currentColor" stroke="none" />
         <circle cx="15" cy="17" r="2.2" fill="currentColor" stroke="none" />
@@ -94,7 +110,13 @@ function HubSectionIcon({ section }: { section: HubSection }) {
   }
   if (section === "runtime") {
     return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <path d="M4 15l4-5 4 3 4-7 4 3" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M4 20h16" strokeLinecap="round" />
       </svg>
@@ -102,7 +124,13 @@ function HubSectionIcon({ section }: { section: HubSection }) {
   }
   if (section === "memory") {
     return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <path d="M7 5h9a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V7a2 2 0 0 1 2-2Z" />
         <path d="M8 9h8M8 13h6" strokeLinecap="round" />
       </svg>
@@ -110,14 +138,26 @@ function HubSectionIcon({ section }: { section: HubSection }) {
   }
   if (section === "automation") {
     return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <circle cx="12" cy="12" r="7" />
         <path d="M12 8v4l3 2M5 5l2 2M19 5l-2 2" strokeLinecap="round" />
       </svg>
     );
   }
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <circle cx="6" cy="7" r="2" />
       <circle cx="18" cy="17" r="2" />
       <circle cx="18" cy="7" r="2" />
