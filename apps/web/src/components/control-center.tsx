@@ -18,8 +18,10 @@ import {
 import { loadWorldReadModel } from "../client/world-api";
 import { type ConversationClient, ConversationDrawer } from "./conversation-drawer";
 import { HubPanel } from "./hub-panel";
+import { OfficePawn } from "./openclaw-office-primitives";
 import { OpenClawOfficeWorld } from "./openclaw-office-world";
 import { type TaskClient, TaskDrawer } from "./task-drawer";
+import worldStyles from "./world-workspace.module.css";
 
 type Mode = "WORLD" | "COMMAND" | "HUB";
 type LoadReadModel = (attempt: number) => Promise<WorldReadModel>;
@@ -63,6 +65,16 @@ function StatusBadge({ status }: { status: AgentProjectionCore["status"] }) {
   );
 }
 
+function AgentAvatar({ agent }: { agent: AgentProjectionCore }) {
+  return (
+    <OfficePawn
+      reviewing={agent.status === "WAITING_APPROVAL"}
+      seed={agent.agentId}
+      working={agent.status === "RUNNING"}
+    />
+  );
+}
+
 function AgentInspector({
   agent,
   onOpenConversation,
@@ -74,7 +86,10 @@ function AgentInspector({
 }) {
   if (!agent) {
     return (
-      <section className="inspector empty-inspector" aria-label="Карточка агента">
+      <section
+        className={`${worldStyles.inspector} ${worldStyles.emptyInspector} inspector empty-inspector`}
+        aria-label="Карточка агента"
+      >
         <p className="eyebrow">Контекст</p>
         <h2>Выберите агента</h2>
         <p>Карта и таблица открывают одну и ту же каноническую карточку.</p>
@@ -83,46 +98,60 @@ function AgentInspector({
   }
 
   return (
-    <section className="inspector" aria-labelledby="agent-inspector-title">
-      <div className="inspector-heading">
+    <section
+      className={`${worldStyles.inspector} inspector`}
+      aria-labelledby="agent-inspector-title"
+    >
+      <div className={worldStyles.inspectorHero}>
+        <div className={worldStyles.inspectorPortrait} aria-hidden="true">
+          <AgentAvatar agent={agent} />
+        </div>
         <div>
           <p className="eyebrow">Агент</p>
           <h2 id="agent-inspector-title">{agent.displayName}</h2>
         </div>
-        <StatusBadge status={agent.status} />
+        <p className={`${worldStyles.inspectorRole} agent-role`}>{agent.role}</p>
+        <div className={worldStyles.inspectorStatus}>
+          <StatusBadge status={agent.status} />
+        </div>
       </div>
-      <p className="agent-role">{agent.role}</p>
-      <dl className="agent-facts">
-        <div>
-          <dt>Состояние</dt>
-          <dd>{STATUS_COPY[agent.status]}</dd>
-        </div>
-        <div>
-          <dt>Текущая задача</dt>
-          <dd>{agent.currentTask?.title ?? "Нет активной задачи"}</dd>
-        </div>
-        {agent.currentTask ? (
+      <div className={worldStyles.inspectorBody}>
+        <dl className={`${worldStyles.inspectorFacts} agent-facts`}>
           <div>
-            <dt>Подтверждение</dt>
-            <dd>{APPROVAL_COPY[agent.currentTask.approval]}</dd>
+            <dt>Состояние</dt>
+            <dd>{STATUS_COPY[agent.status]}</dd>
           </div>
-        ) : null}
-      </dl>
-      <p className="inspector-note">Runtime-сессии и учётные данные не входят в эту проекцию.</p>
-      <button
-        className="primary-button inspector-chat-button"
-        onClick={() => onOpenConversation(agent.agentId)}
-        type="button"
-      >
-        Открыть диалог
-      </button>
-      <button
-        className="secondary-button inspector-chat-button"
-        onClick={() => onAssignTask(agent.agentId)}
-        type="button"
-      >
-        Назначить задачу
-      </button>
+          <div>
+            <dt>Текущая задача</dt>
+            <dd>{agent.currentTask?.title ?? "Нет активной задачи"}</dd>
+          </div>
+          {agent.currentTask ? (
+            <div>
+              <dt>Подтверждение</dt>
+              <dd>{APPROVAL_COPY[agent.currentTask.approval]}</dd>
+            </div>
+          ) : null}
+        </dl>
+        <p className={`${worldStyles.inspectorNote} inspector-note`}>
+          Runtime-сессии и учётные данные не входят в эту проекцию.
+        </p>
+        <div className={worldStyles.inspectorActions}>
+          <button
+            className="primary-button inspector-chat-button"
+            onClick={() => onOpenConversation(agent.agentId)}
+            type="button"
+          >
+            Открыть диалог
+          </button>
+          <button
+            className="secondary-button inspector-chat-button"
+            onClick={() => onAssignTask(agent.agentId)}
+            type="button"
+          >
+            Назначить задачу
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
@@ -139,29 +168,32 @@ function AgentRoster({
   onOpenConversation: (agentId: AgentId) => void;
 }) {
   return (
-    <section className="world-roster" aria-labelledby="world-roster-title">
-      <div className="section-heading">
+    <section className={`${worldStyles.roster} world-roster`} aria-labelledby="world-roster-title">
+      <div className={`${worldStyles.rosterHeader} section-heading`}>
         <div>
-          <p className="eyebrow">Команда</p>
+          <p className="eyebrow">Навигация по миру</p>
           <h2 id="world-roster-title">Агенты</h2>
         </div>
         <span className="count-badge">{agents.length}</span>
       </div>
-      <ul className="agent-list">
+      <ul className={`${worldStyles.rosterList} agent-list`}>
         {agents.map((agent) => (
           <li key={agent.agentId}>
             <button
-              className="agent-list-button"
+              className={`${worldStyles.rosterButton} agent-list-button`}
               data-selected={agent.agentId === selectedAgentId}
               onClick={() => onSelect(agent.agentId)}
               onDoubleClick={() => onOpenConversation(agent.agentId)}
               type="button"
             >
-              <span>
+              <span className={worldStyles.rosterAvatar} aria-hidden="true">
+                <AgentAvatar agent={agent} />
+              </span>
+              <span className={worldStyles.rosterCopy}>
                 <strong>{agent.displayName}</strong>
                 <small>{agent.role}</small>
+                <StatusBadge status={agent.status} />
               </span>
-              <StatusBadge status={agent.status} />
             </button>
           </li>
         ))}
@@ -527,25 +559,30 @@ export function ControlCenter({
         ) : null}
 
         {mode !== "HUB" && model && model.source !== "UNAVAILABLE" && world && command ? (
-          <div className="workspace-grid">
+          <div
+            className={
+              mode === "WORLD" ? `workspace-grid ${worldStyles.worldLayout}` : "workspace-grid"
+            }
+          >
             {mode === "WORLD" ? (
               <section
                 aria-labelledby={worldTabId}
-                className="primary-workspace"
+                className={`primary-workspace ${worldStyles.worldWorkspace}`}
                 id="world-panel"
                 role="tabpanel"
               >
-                <div className="workspace-intro">
+                <div className={`workspace-intro ${worldStyles.worldIntro}`}>
                   <div>
-                    <p className="eyebrow">Рабочая среда</p>
+                    <p className="eyebrow">Живое пространство агентов</p>
                     <h1>World</h1>
                   </div>
                   <p>
-                    Карта отражает реальные статусы агентов и не генерирует декоративную активность.
+                    Персонажи, окружение и передачи отражают только каноническое состояние — без
+                    вымышленной активности.
                   </p>
                 </div>
-                <div className="world-grid">
-                  <div className="canvas-frame">
+                <div className={`world-grid ${worldStyles.worldGrid}`}>
+                  <div className={`canvas-frame ${worldStyles.canvasFrame}`}>
                     <OpenClawOfficeWorld
                       world={world}
                       onOpenConversation={openConversation}

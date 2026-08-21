@@ -26,8 +26,10 @@ describe("ControlCenter", () => {
     expect(screen.getByText("Операторская среда")).not.toBeNull();
     expect(screen.getByText("Тестовые данные")).not.toBeNull();
     expect(screen.getByText(/Позиция \d+/)).not.toBeNull();
-    expect(screen.getByText("Рабочая среда")).not.toBeNull();
-    expect(screen.getByText(/Карта отражает реальные статусы агентов/i)).not.toBeNull();
+    expect(screen.getByText("Живое пространство агентов")).not.toBeNull();
+    expect(
+      screen.getByText(/Персонажи, окружение и передачи отражают только каноническое состояние/i),
+    ).not.toBeNull();
     expect(screen.queryByRole("heading", { level: 1, name: "AI World" })).toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Command" }));

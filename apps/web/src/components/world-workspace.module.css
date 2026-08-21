@@ -1,0 +1,350 @@
+.worldLayout {
+  grid-template-columns: minmax(0, 1fr) minmax(17.5rem, 19rem);
+  gap: 1rem;
+}
+
+.worldWorkspace {
+  overflow: hidden;
+  border-color: rgb(218 234 226 / 10%);
+  border-radius: 1.55rem;
+  background: #0e1916;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 14%);
+}
+
+.worldIntro {
+  min-height: 4.9rem;
+  padding: 1rem 1.2rem;
+  border-bottom-color: rgb(218 234 226 / 8%);
+}
+
+.worldIntro h1 {
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+  letter-spacing: -0.055em;
+}
+
+.worldIntro > p {
+  max-width: 31rem;
+  color: #91a79e;
+  font-size: 0.8rem;
+}
+
+.worldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.canvasFrame {
+  min-width: 0;
+  padding: 0.75rem 0.75rem 0;
+  border: 0;
+  background: transparent;
+}
+
+.roster {
+  margin: 0.7rem 0.75rem 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgb(219 235 227 / 9%);
+  border-radius: 1rem;
+  background: #111e1a;
+}
+
+.rosterHeader {
+  min-height: 3.15rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgb(219 235 227 / 8%);
+}
+
+.rosterHeader :global(.eyebrow) {
+  margin-bottom: 0;
+  color: #9eb2aa;
+  font-family: var(--font-sans);
+  font-size: 0.61rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.rosterHeader h2 {
+  font-size: 1rem;
+}
+
+.rosterList {
+  display: flex;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.55rem;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.rosterList > li {
+  flex: 0 0 auto;
+  min-width: 11.5rem;
+}
+
+.rosterButton {
+  display: grid;
+  width: 100%;
+  min-height: 4.8rem;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 2%);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rosterButton:hover {
+  border-color: rgb(221 236 229 / 11%);
+  background: rgb(255 255 255 / 4%);
+}
+
+.rosterButton[data-selected="true"] {
+  border-color: rgb(235 204 143 / 26%);
+  background: rgb(235 204 143 / 7%);
+}
+
+.rosterAvatar {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0.8rem;
+  background: rgb(230 208 161 / 7%);
+}
+
+.rosterAvatar :global(.office-pawn) {
+  width: 2.7rem;
+  height: 3.45rem;
+  transform: translateY(0.2rem);
+}
+
+.rosterCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.rosterCopy strong,
+.rosterCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rosterCopy strong {
+  font-size: 0.78rem;
+}
+
+.rosterCopy small {
+  color: #8fa39b;
+  font-size: 0.66rem;
+}
+
+.rosterCopy :global(.status-badge) {
+  width: fit-content;
+  margin-top: 0.12rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 0.59rem;
+}
+
+.inspector {
+  position: sticky;
+  top: 0.75rem;
+  overflow: hidden;
+  border-color: rgb(219 235 227 / 10%);
+  border-radius: 1.35rem;
+  background: #101c19;
+  box-shadow: 0 18px 38px rgb(0 0 0 / 14%);
+}
+
+.inspectorHero {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 1rem 1rem 0.8rem;
+  border-bottom: 1px solid rgb(219 235 227 / 8%);
+  background: linear-gradient(180deg, rgb(235 204 143 / 8%), transparent);
+  text-align: center;
+}
+
+.inspectorPortrait {
+  display: grid;
+  width: 6.2rem;
+  height: 6.2rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(235 204 143 / 16%);
+  border-radius: 1.55rem;
+  background: #17251f;
+}
+
+.inspectorPortrait :global(.office-pawn) {
+  width: 5.25rem;
+  height: 6.55rem;
+  transform: translateY(0.7rem);
+}
+
+.inspectorHero h2 {
+  font-size: 1.25rem;
+  letter-spacing: -0.035em;
+}
+
+.inspectorRole {
+  margin: 0;
+  color: #9db0a8;
+  font-size: 0.75rem;
+}
+
+.inspectorStatus {
+  margin-top: 0.15rem;
+}
+
+.inspectorBody {
+  padding: 0.85rem;
+}
+
+.inspectorFacts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.inspectorFacts > div {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgb(219 235 227 / 7%);
+}
+
+.inspectorFacts dt {
+  color: #80968d;
+  font-size: 0.62rem;
+}
+
+.inspectorFacts dd {
+  margin: 0;
+  color: #e3ece7;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.inspectorNote {
+  margin: 0.7rem 0 0;
+  color: #7f948c;
+  font-size: 0.65rem;
+  line-height: 1.45;
+}
+
+.inspectorActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+
+.emptyInspector {
+  padding: 1rem;
+}
+
+@media (max-width: 64rem) {
+  .worldLayout {
+    grid-template-columns: minmax(0, 1fr) 17rem;
+  }
+}
+
+@media (max-width: 48rem) {
+  .worldLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .worldWorkspace {
+    border-radius: 1.15rem;
+  }
+
+  .worldIntro {
+    min-height: 0;
+    align-items: flex-start;
+    padding: 0.85rem 0.9rem;
+  }
+
+  .worldIntro > p {
+    display: none;
+  }
+
+  .canvasFrame {
+    padding: 0.55rem 0.55rem 0;
+  }
+
+  .roster {
+    margin: 0.55rem;
+  }
+
+  .rosterHeader {
+    min-height: 2.85rem;
+  }
+
+  .rosterList {
+    padding: 0.45rem;
+  }
+
+  .rosterList > li {
+    min-width: 10.5rem;
+  }
+
+  .rosterButton {
+    min-height: 4.45rem;
+  }
+
+  .inspector {
+    position: static;
+    border-radius: 1.1rem;
+  }
+
+  .inspectorHero {
+    grid-template-columns: 4.9rem minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    text-align: left;
+  }
+
+  .inspectorPortrait {
+    grid-row: span 3;
+    width: 4.7rem;
+    height: 4.7rem;
+    border-radius: 1.15rem;
+  }
+
+  .inspectorPortrait :global(.office-pawn) {
+    width: 4rem;
+    height: 5rem;
+    transform: translateY(0.55rem);
+  }
+}
+
+@media (max-width: 24.5rem) {
+  .worldIntro h1 {
+    font-size: 1.65rem;
+  }
+
+  .rosterList > li {
+    min-width: 9.8rem;
+  }
+
+  .rosterButton {
+    min-height: 4.25rem;
+    grid-template-columns: 2.8rem minmax(0, 1fr);
+  }
+
+  .rosterAvatar {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+}
