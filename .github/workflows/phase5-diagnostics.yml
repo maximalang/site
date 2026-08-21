@@ -1,0 +1,162 @@
+name: Phase 5 diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24.15.0
+  AGENT_WORLD_PLAYWRIGHT_CHANNEL: chrome
+
+jobs:
+  phase5-diagnostics:
+    if: github.event.pull_request.number == 59
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - name: Verify preinstalled Google Chrome
+        run: google-chrome --version
+      - name: Build project references
+        run: npm exec -- tsc -b
+      - name: Same-head laptop evidence run A
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e --workspace @agent-world/web -- tests/control-center.spec.ts --project=laptop-chromium --grep "World, Command and Hub expose one canonical control surface"
+          mkdir -p "$RUNNER_TEMP/run-A"
+          find apps/web/test-results -name 'laptop-chromium-world.png' -exec cp {} "$RUNNER_TEMP/run-A/laptop-chromium-world.png" \;
+          find apps/web/test-results -name 'laptop-chromium-task.png' -exec cp {} "$RUNNER_TEMP/run-A/laptop-chromium-task.png" \;
+          test -f "$RUNNER_TEMP/run-A/laptop-chromium-world.png"
+          test -f "$RUNNER_TEMP/run-A/laptop-chromium-task.png"
+      - name: Same-head laptop evidence run B
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e --workspace @agent-world/web -- tests/control-center.spec.ts --project=laptop-chromium --grep "World, Command and Hub expose one canonical control surface"
+          mkdir -p "$RUNNER_TEMP/run-B"
+          find apps/web/test-results -name 'laptop-chromium-world.png' -exec cp {} "$RUNNER_TEMP/run-B/laptop-chromium-world.png" \;
+          find apps/web/test-results -name 'laptop-chromium-task.png' -exec cp {} "$RUNNER_TEMP/run-B/laptop-chromium-task.png" \;
+          test -f "$RUNNER_TEMP/run-B/laptop-chromium-world.png"
+          test -f "$RUNNER_TEMP/run-B/laptop-chromium-task.png"
+          sha256sum "$RUNNER_TEMP/run-A/"*.png "$RUNNER_TEMP/run-B/"*.png
+          cmp "$RUNNER_TEMP/run-A/laptop-chromium-world.png" "$RUNNER_TEMP/run-B/laptop-chromium-world.png"
+          cmp "$RUNNER_TEMP/run-A/laptop-chromium-task.png" "$RUNNER_TEMP/run-B/laptop-chromium-task.png"
+          echo "SAME_HEAD_DETERMINISM=exact"
+      - name: Capture current 1024 computed styles
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_dir="$RUNNER_TEMP/current-1024"
+          mkdir -p "$current_dir"
+          node apps/web/scripts/local-preview.mjs --no-open >"$RUNNER_TEMP/current-preview.log" 2>&1 &
+          preview_pid=$!
+          cleanup() {
+            kill "$preview_pid" 2>/dev/null || true
+            wait "$preview_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node <<'NODE'
+          const base = "http://127.0.0.1:3210";
+          for (let attempt = 0; attempt < 180; attempt += 1) {
+            try {
+              const response = await fetch(base, { signal: AbortSignal.timeout(750) });
+              if (response.ok) process.exit(0);
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          throw new Error("Current local preview did not become ready");
+          NODE
+          AGENT_WORLD_EVIDENCE_BASE_URL=http://127.0.0.1:3210 \
+          AGENT_WORLD_1024_OUTPUT_DIR="$current_dir" \
+          AGENT_WORLD_1024_DIAGNOSTIC_LABEL=current \
+            node apps/web/scripts/phase5-1024-evidence.mjs
+          cleanup
+          trap - EXIT
+      - name: Capture accepted reference 1024 computed styles
+        shell: bash
+        run: |
+          set -euo pipefail
+          reference_sha=219774e87f5a1f2f9956ae172c5f48a41a881139
+          reference_dir="$RUNNER_TEMP/reference-worktree"
+          reference_output="$RUNNER_TEMP/reference-1024"
+          git worktree add --detach "$reference_dir" "$reference_sha"
+          cp apps/web/scripts/phase5-1024-evidence.mjs "$RUNNER_TEMP/phase5-1024-evidence.mjs"
+          cp "$RUNNER_TEMP/phase5-1024-evidence.mjs" "$reference_dir/apps/web/scripts/phase5-1024-evidence.mjs"
+          cd "$reference_dir"
+          npm ci --ignore-scripts
+          node apps/web/scripts/local-preview.mjs --no-open >"$RUNNER_TEMP/reference-preview.log" 2>&1 &
+          preview_pid=$!
+          cleanup() {
+            kill "$preview_pid" 2>/dev/null || true
+            wait "$preview_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node <<'NODE'
+          const base = "http://127.0.0.1:3210";
+          for (let attempt = 0; attempt < 180; attempt += 1) {
+            try {
+              const response = await fetch(base, { signal: AbortSignal.timeout(750) });
+              if (response.ok) process.exit(0);
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          throw new Error("Reference local preview did not become ready");
+          NODE
+          mkdir -p "$reference_output"
+          AGENT_WORLD_EVIDENCE_BASE_URL=http://127.0.0.1:3210 \
+          AGENT_WORLD_1024_OUTPUT_DIR="$reference_output" \
+          AGENT_WORLD_1024_DIAGNOSTIC_LABEL=reference \
+            node apps/web/scripts/phase5-1024-evidence.mjs
+          cleanup
+          trap - EXIT
+      - name: Compare deterministic 1024 captures
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$RUNNER_TEMP/current-1024"
+          reference="$RUNNER_TEMP/reference-1024"
+          sha256sum "$current"/*.png "$reference"/*.png
+          for name in \
+            phase5-1024x768-world-default-top.png \
+            phase5-1024x768-world-selected-research-top.png \
+            phase5-1024x768-task-drawer.png
+          do
+            if cmp -s "$current/$name" "$reference/$name"; then
+              echo "$name REFERENCE_CURRENT=exact"
+            else
+              echo "$name REFERENCE_CURRENT=different"
+            fi
+          done
+      - name: Stage diagnostic artifact
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apps/web/test-results/phase5-diagnostics/run-A
+          mkdir -p apps/web/test-results/phase5-diagnostics/run-B
+          mkdir -p apps/web/test-results/phase5-diagnostics/current
+          mkdir -p apps/web/test-results/phase5-diagnostics/reference
+          cp -f "$RUNNER_TEMP/run-A/"*.png apps/web/test-results/phase5-diagnostics/run-A/ 2>/dev/null || true
+          cp -f "$RUNNER_TEMP/run-B/"*.png apps/web/test-results/phase5-diagnostics/run-B/ 2>/dev/null || true
+          cp -f "$RUNNER_TEMP/current-1024/"* apps/web/test-results/phase5-diagnostics/current/ 2>/dev/null || true
+          cp -f "$RUNNER_TEMP/reference-1024/"* apps/web/test-results/phase5-diagnostics/reference/ 2>/dev/null || true
+          cp -f "$RUNNER_TEMP/current-preview.log" apps/web/test-results/phase5-diagnostics/ 2>/dev/null || true
+          cp -f "$RUNNER_TEMP/reference-preview.log" apps/web/test-results/phase5-diagnostics/ 2>/dev/null || true
+      - name: Upload Phase 5 diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phase5-1024-diagnostics-${{ github.sha }}
+          path: apps/web/test-results/phase5-diagnostics/**
+          if-no-files-found: error
+          retention-days: 14
