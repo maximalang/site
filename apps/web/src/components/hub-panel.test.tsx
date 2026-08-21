@@ -117,7 +117,9 @@ describe("HubPanel", () => {
     expect(await screen.findByRole("heading", { name: "Canonical Hub" })).not.toBeNull();
     expect(screen.getByText("Управление")).not.toBeNull();
     expect(
-      screen.getByText("Рабочее пространство сущностей, Runtime, памяти, автоматизации и маршрутов."),
+      screen.getByText(
+        "Рабочее пространство сущностей, Runtime, памяти, автоматизации и маршрутов.",
+      ),
     ).not.toBeNull();
     expect(screen.getAllByRole("heading", { name: "GPT-X" })).toHaveLength(1);
     expect(screen.getByText("2 маршрута")).not.toBeNull();
