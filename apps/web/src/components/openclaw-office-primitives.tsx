@@ -6,12 +6,7 @@ export function OfficeDesk({ x, y, active = false }: Point & { active?: boolean 
       <ellipse cx="0" cy="42" rx="62" ry="13" fill="rgb(0 0 0 / 14%)" />
       <path d="M-56 9h112l-8 48h-96z" fill="#8f603f" />
       <path d="M-51 4h102l8 13H-59z" fill="#d19a62" stroke="#795137" strokeWidth="3" />
-      <path
-        d="M-43 57v20M43 57v20"
-        stroke="#6f4934"
-        strokeWidth="8"
-        strokeLinecap="round"
-      />
+      <path d="M-43 57v20M43 57v20" stroke="#6f4934" strokeWidth="8" strokeLinecap="round" />
       <g transform="translate(0 -8)">
         <rect
           x="-28"
@@ -33,22 +28,11 @@ export function OfficeDesk({ x, y, active = false }: Point & { active?: boolean 
           fill={active ? "#74d9c0" : "#60756e"}
         />
         <path d="M-14 2h28" stroke="#dff7ed" strokeOpacity=".45" strokeWidth="2" />
-        <path
-          d="M0 15v10M-13 25h26"
-          stroke="#1a2421"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
+        <path d="M0 15v10M-13 25h26" stroke="#1a2421" strokeWidth="4" strokeLinecap="round" />
       </g>
       <rect x="-25" y="28" width="50" height="12" rx="4" fill="#e4dcc8" />
       <circle cx="39" cy="33" r="7" fill="#b85e48" />
-      <path
-        d="M35 25q4-8 9-2"
-        fill="none"
-        stroke="#4f7f5d"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
+      <path d="M35 25q4-8 9-2" fill="none" stroke="#4f7f5d" strokeWidth="3" strokeLinecap="round" />
     </g>
   );
 }
@@ -64,39 +48,10 @@ export function OfficeMeetingTable({ x, y }: Point) {
         </linearGradient>
       </defs>
       <ellipse cy="54" rx="70" ry="16" fill="rgb(0 0 0 / 13%)" />
-      <ellipse
-        ry="48"
-        rx="74"
-        fill={`url(#${gradientId})`}
-        stroke="#754f35"
-        strokeWidth="4"
-      />
-      <ellipse
-        ry="32"
-        rx="54"
-        fill="none"
-        stroke="#754f35"
-        strokeOpacity=".25"
-        strokeWidth="2"
-      />
-      <rect
-        x="6"
-        y="-14"
-        width="28"
-        height="19"
-        rx="4"
-        fill="#29332f"
-        transform="rotate(-7)"
-      />
-      <rect
-        x="10"
-        y="-10"
-        width="20"
-        height="11"
-        rx="2"
-        fill="#87c7dc"
-        transform="rotate(-7)"
-      />
+      <ellipse ry="48" rx="74" fill={`url(#${gradientId})`} stroke="#754f35" strokeWidth="4" />
+      <ellipse ry="32" rx="54" fill="none" stroke="#754f35" strokeOpacity=".25" strokeWidth="2" />
+      <rect x="6" y="-14" width="28" height="19" rx="4" fill="#29332f" transform="rotate(-7)" />
+      <rect x="10" y="-10" width="20" height="11" rx="2" fill="#87c7dc" transform="rotate(-7)" />
       {Array.from({ length: 6 }, (_, index) => {
         const angle = (Math.PI * 2 * index) / 6;
         return (
@@ -114,12 +69,7 @@ export function OfficeMeetingTable({ x, y }: Point) {
               stroke="#294b44"
               strokeWidth="2"
             />
-            <path
-              d="M-8 9v11M8 9v11"
-              stroke="#294b44"
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
+            <path d="M-8 9v11M8 9v11" stroke="#294b44" strokeWidth="4" strokeLinecap="round" />
           </g>
         );
       })}
@@ -212,13 +162,7 @@ export function OfficePawn({
     >
       <ellipse cx="0" cy="28" rx="18" ry="5" fill="rgb(0 0 0 / 24%)" />
       <g
-        className={
-          working
-            ? "office-pawn-working"
-            : reviewing
-              ? "office-pawn-reviewing"
-              : "office-pawn-idle"
-        }
+        className={working ? "office-pawn-working" : reviewing ? "office-pawn-reviewing" : "office-pawn-idle"}
       >
         <g className="office-pawn-legs">
           <path d="M-13 12h11v15H-13zM2 12h11v15H2z" fill="#293b4d" />
@@ -258,17 +202,11 @@ export function OfficePawn({
         {colors.variant === 0 ? (
           <path d="M-13-30q4-12 13-12t13 12q-7-5-13-5t-13 5" fill={colors.hair} />
         ) : colors.variant === 1 ? (
-          <path
-            d="M-14-31q4-12 14-11 10-1 14 11l-5-2-4-7-5 7-6-5-3 6z"
-            fill={colors.hair}
-          />
+          <path d="M-14-31q4-12 14-11 10-1 14 11l-5-2-4-7-5 7-6-5-3 6z" fill={colors.hair} />
         ) : colors.variant === 2 ? (
           <path d="M-13-32q2-10 13-10t13 10v5l-6-8-7 3-8-4-5 9z" fill={colors.hair} />
         ) : (
-          <path
-            d="M-12-31q4-11 12-11 12 0 14 13l-6-5-4-5-5 6-8-3-3 5z"
-            fill={colors.hair}
-          />
+          <path d="M-12-31q4-11 12-11 12 0 14 13l-6-5-4-5-5 6-8-3-3 5z" fill={colors.hair} />
         )}
         <g className="office-pawn-eyes" fill="#2b2927">
           <rect x="-7" y="-26" width="4" height="3" rx="1.5" />
