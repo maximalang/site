@@ -234,14 +234,24 @@
 }
 
 @media (max-width: 70rem) {
-  .workspace { grid-template-columns: 11.5rem minmax(0, 1fr); }
-  .sectionCanvas[data-hub-section="routing"] { grid-template-columns: 1fr; }
+  .workspace {
+    grid-template-columns: 11.5rem minmax(0, 1fr);
+  }
+
+  .sectionCanvas[data-hub-section="routing"] {
+    grid-template-columns: 1fr;
+  }
+
   .sectionCanvas[data-hub-section="runtime"],
-  .sectionCanvas[data-hub-section="automation"] { grid-template-columns: 1fr; }
+  .sectionCanvas[data-hub-section="automation"] {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 48rem) {
-  .panel { border-radius: 1.15rem; }
+  .panel {
+    border-radius: 1.15rem;
+  }
 
   .intro {
     min-height: 0;
@@ -249,9 +259,14 @@
     padding: 0.85rem 0.9rem;
   }
 
-  .intro > p { display: none; }
+  .intro > p {
+    display: none;
+  }
 
-  .workspace { display: block; min-height: 0; }
+  .workspace {
+    display: block;
+    min-height: 0;
+  }
 
   .navigation {
     position: sticky;
@@ -291,14 +306,39 @@
     height: 3px;
   }
 
-  .tabIcon { width: 1.55rem; height: 1.55rem; border-radius: 0.48rem; }
-  .tabIcon svg { width: 0.9rem; height: 0.9rem; }
-  .tabLabel { font-size: 0.68rem; }
+  .tabIcon {
+    width: 1.55rem;
+    height: 1.55rem;
+    border-radius: 0.48rem;
+  }
 
-  .sectionPanel { padding: 0.55rem; }
-  .sectionLead { min-height: 4.5rem; padding: 0.6rem; }
-  .sectionLeadIcon { width: 2.65rem; height: 2.65rem; border-radius: 0.8rem; }
-  .sectionLead p { font-size: 0.67rem; }
+  .tabIcon svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  .tabLabel {
+    font-size: 0.68rem;
+  }
+
+  .sectionPanel {
+    padding: 0.55rem;
+  }
+
+  .sectionLead {
+    min-height: 4.5rem;
+    padding: 0.6rem;
+  }
+
+  .sectionLeadIcon {
+    width: 2.65rem;
+    height: 2.65rem;
+    border-radius: 0.8rem;
+  }
+
+  .sectionLead p {
+    font-size: 0.67rem;
+  }
 
   .sectionCanvas[data-hub-section="setup"],
   .sectionCanvas[data-hub-section="runtime"],
@@ -309,8 +349,19 @@
 }
 
 @media (max-width: 24.5rem) {
-  .tab { min-width: 6.65rem; }
-  .sectionPanel { padding-inline: 0.42rem; }
-  .sectionLeadIcon { display: none; }
-  .sectionLead { grid-template-columns: minmax(0, 1fr); }
+  .tab {
+    min-width: 6.65rem;
+  }
+
+  .sectionPanel {
+    padding-inline: 0.42rem;
+  }
+
+  .sectionLeadIcon {
+    display: none;
+  }
+
+  .sectionLead {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
