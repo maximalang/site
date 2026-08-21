@@ -44,11 +44,14 @@
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr) minmax(0, 0.9fr);
   gap: 0.7rem;
+  padding: 0;
+  border-bottom: 0;
 }
 
 .primarySection {
   min-width: 0;
   overflow: hidden;
+  padding: 0;
   border: 1px solid rgb(218 234 226 / 9%);
   border-radius: 1rem;
   background: #101c19;
@@ -194,7 +197,11 @@
 .agentArrow { color: #70867d; font-size: 0.9rem; }
 
 .secondaryShelf {
+  display: block;
   overflow: hidden;
+  grid-template-columns: none;
+  gap: 0;
+  padding: 0;
   border: 1px solid rgb(218 234 226 / 8%);
   border-radius: 1rem;
   background: #0f1a17;
@@ -243,11 +250,13 @@
 
 .empty {
   margin: 0;
-  padding: 0.2rem 0;
+  padding: 0.55rem 0.7rem;
   color: #6f857c;
   font-size: 0.6rem;
   line-height: 1.35;
 }
+
+.secondarySection .empty { padding: 0.2rem 0; }
 
 @media (max-width: 70rem) {
   .primaryGrid { grid-template-columns: 1fr 1.2fr; }
