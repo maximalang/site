@@ -53,7 +53,13 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 18%, transparent 78%, rgb(0 0 0 / 12%));
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 4%),
+    transparent 18%,
+    transparent 78%,
+    rgb(0 0 0 / 12%)
+  );
   pointer-events: none;
   content: "";
 }
@@ -159,7 +165,11 @@
   background: transparent;
   color: #eef5f0;
   transform: translate(-50%, -58%);
-  transition: left 420ms ease, top 420ms ease, filter 150ms ease, transform 150ms ease;
+  transition:
+    left 420ms ease,
+    top 420ms ease,
+    filter 150ms ease,
+    transform 150ms ease;
   cursor: pointer;
 }
 
@@ -172,7 +182,9 @@
   background: rgb(105 214 181 / 7%);
   transform: translateY(-0.45rem) scale(0.84);
   opacity: 0;
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
   content: "";
 }
 
@@ -289,12 +301,26 @@
   content: "";
 }
 
-.statusBubble[data-status="WORKING"]::before { background: #62d0ad; }
-.statusBubble[data-status="REVIEWING"]::before { background: #75b5df; }
-.statusBubble[data-status="QUEUED"]::before { background: #e5bf69; }
+.statusBubble[data-status="WORKING"]::before {
+  background: #62d0ad;
+}
+
+.statusBubble[data-status="REVIEWING"]::before {
+  background: #75b5df;
+}
+
+.statusBubble[data-status="QUEUED"]::before {
+  background: #e5bf69;
+}
+
 .statusBubble[data-status="BLOCKED"]::before,
-.statusBubble[data-status="ERROR"]::before { background: #e77869; }
-.statusBubble[data-status="OFFLINE"]::before { background: #6e7e79; }
+.statusBubble[data-status="ERROR"]::before {
+  background: #e77869;
+}
+
+.statusBubble[data-status="OFFLINE"]::before {
+  background: #6e7e79;
+}
 
 .handoffPath {
   fill: none;
@@ -364,11 +390,16 @@
 }
 
 @keyframes status-aura {
-  50% { transform: translateY(-0.45rem) scale(1.08); opacity: 0.72; }
+  50% {
+    transform: translateY(-0.45rem) scale(1.08);
+    opacity: 0.72;
+  }
 }
 
 @keyframes handoff-flow {
-  to { stroke-dashoffset: -0.31; }
+  to {
+    stroke-dashoffset: -0.31;
+  }
 }
 
 @media (max-width: 48rem) {
@@ -387,7 +418,10 @@
     white-space: nowrap;
   }
 
-  .skinControls select { flex: 1; max-width: none; }
+  .skinControls select {
+    flex: 1;
+    max-width: none;
+  }
 
   .scene {
     min-height: 20.5rem;
@@ -410,7 +444,9 @@
     padding-inline: 0.4rem;
   }
 
-  .agentRole { display: none; }
+  .agentRole {
+    display: none;
+  }
 
   .statusBubble {
     top: 0;
@@ -421,9 +457,13 @@
     padding: 0.15rem;
   }
 
-  .statusBubble span { display: none; }
+  .statusBubble span {
+    display: none;
+  }
 
-  .handoffPacket { display: none; }
+  .handoffPacket {
+    display: none;
+  }
 
   .handoffFeed {
     right: 0.45rem;
@@ -433,9 +473,17 @@
 }
 
 @media (max-width: 24.5rem) {
-  .scene { min-height: 18.75rem; }
-  .handoffFeed { display: none; }
-  .agentName { font-size: 0.62rem; }
+  .scene {
+    min-height: 18.75rem;
+  }
+
+  .handoffFeed {
+    display: none;
+  }
+
+  .agentName {
+    font-size: 0.62rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -447,7 +495,7 @@
   .scene :global(.office-pawn-reviewing),
   .scene :global(.office-pawn-eyes),
   .scene :global(.office-monitor-active) {
-    animation: none !important;
-    transition: none !important;
+    animation: none;
+    transition: none;
   }
 }
