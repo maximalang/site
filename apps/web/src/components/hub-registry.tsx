@@ -100,13 +100,7 @@ function EntityIcon({ kind }: { kind: EntityKind }) {
     );
   }
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M5 7h14M5 12h14M5 17h14" strokeLinecap="round" />
     </svg>
   );
@@ -364,10 +358,7 @@ export function HubRegistry({
         </section>
       </section>
 
-      <section
-        className={`${styles.secondaryShelf} hub-secondary-grid`}
-        aria-label="Реестры Hub"
-      >
+      <section className={`${styles.secondaryShelf} hub-secondary-grid`} aria-label="Реестры Hub">
         <header className={styles.secondaryHeader}>
           <h2>Связанные реестры</h2>
           <p>Вторичные сущности не конкурируют с провайдерами, моделями и агентами.</p>
