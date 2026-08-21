@@ -127,7 +127,9 @@ async function collectDiagnostics(page, stage) {
           selector,
           tagName: element.tagName,
           className:
-            typeof element.className === "string" ? element.className : element.getAttribute("class"),
+            typeof element.className === "string"
+              ? element.className
+              : element.getAttribute("class"),
           rect: rectValue(element),
           computed: Object.fromEntries(
             properties.map((property) => [property, styleValue(style, property)]),
