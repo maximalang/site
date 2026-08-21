@@ -1,0 +1,1006 @@
+.worldSurface,
+.hubPanel {
+  --p5-ink: #0b1413;
+  --p5-panel: #101d1b;
+  --p5-panel-raised: #162725;
+  --p5-panel-soft: #1a2d29;
+  --p5-line: rgb(202 226 216 / 13%);
+  --p5-line-strong: rgb(220 238 230 / 24%);
+  --p5-text: #f2f6f3;
+  --p5-muted: #9fb5ad;
+  --p5-warm: #f0cf8e;
+  --p5-mint: #76e6c6;
+  --p5-blue: #76bfe9;
+  --p5-danger: #f08b80;
+  --p5-shadow: 0 28px 70px rgb(0 0 0 / 28%);
+  --p5-radius-lg: 24px;
+  --p5-radius-md: 17px;
+  --p5-radius-sm: 12px;
+}
+
+/* World shell ------------------------------------------------------------- */
+
+.worldSurface {
+  position: relative;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.skinToolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--p5-line);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 4%), transparent),
+    rgb(12 23 21 / 88%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.skinToolbar label {
+  color: #bdd0c8;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.skinToolbar select,
+.skinToolbar button {
+  min-height: 2.15rem;
+  border-color: var(--p5-line-strong);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.skinToolbar select {
+  min-width: 0;
+  max-width: 14rem;
+  color: var(--p5-text);
+}
+
+.skinToolbar button {
+  margin-inline-start: auto;
+  color: #d8e3de;
+}
+
+.worldScene {
+  position: relative;
+  overflow: hidden;
+  min-height: 26rem;
+  border: 1px solid rgb(220 238 230 / 13%);
+  border-radius: var(--p5-radius-lg);
+  background:
+    radial-gradient(circle at 18% 12%, rgb(118 230 198 / 10%), transparent 28%),
+    radial-gradient(circle at 88% 80%, rgb(240 207 142 / 8%), transparent 31%),
+    #0c1715;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    inset 0 -36px 90px rgb(0 0 0 / 20%),
+    0 24px 55px rgb(0 0 0 / 24%);
+}
+
+.worldAtmosphere {
+  pointer-events: none;
+}
+
+.worldAtmosphereGlow {
+  opacity: 0.8;
+  filter: blur(2px);
+}
+
+.worldPath {
+  fill: none;
+  stroke: rgb(232 243 238 / 8%);
+  stroke-linecap: round;
+  stroke-width: 56;
+}
+
+.worldPathEdge {
+  fill: none;
+  stroke: rgb(255 255 255 / 5%);
+  stroke-dasharray: 3 17;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.worldZoneGroup {
+  filter: drop-shadow(0 10px 22px rgb(0 0 0 / 18%));
+}
+
+.worldHud {
+  position: absolute;
+  z-index: 5;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  max-width: calc(100% - 1.5rem);
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.worldHudGroup {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem;
+  border: 1px solid rgb(229 242 236 / 14%);
+  border-radius: 999px;
+  background: rgb(9 18 16 / 72%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+  backdrop-filter: blur(12px);
+}
+
+.worldStatusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.48rem;
+  border-radius: 999px;
+  color: #c7d8d1;
+  font-family: var(--font-mono);
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.worldStatusChip::before {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: var(--p5-mint);
+  box-shadow: 0 0 0 3px rgb(118 230 198 / 10%);
+  content: "";
+}
+
+.worldStatusChip[data-tone="warm"]::before {
+  background: var(--p5-warm);
+  box-shadow: 0 0 0 3px rgb(240 207 142 / 10%);
+}
+
+.agentCharacter {
+  width: 7.4rem;
+  min-height: 6.7rem;
+  place-items: center;
+  border-radius: 20px;
+  transform: translate(-50%, -58%);
+  transition:
+    left 520ms cubic-bezier(.2, .8, .2, 1),
+    top 520ms cubic-bezier(.2, .8, .2, 1),
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.agentCharacter::before {
+  position: absolute;
+  z-index: -1;
+  top: 0.75rem;
+  left: 50%;
+  width: 4.9rem;
+  height: 4.9rem;
+  border: 1px solid rgb(219 239 230 / 10%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(118 230 198 / 10%), transparent 68%);
+  opacity: 0.55;
+  transform: translateX(-50%) scale(0.9);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    border-color 160ms ease;
+  content: "";
+}
+
+.agentCharacter:hover {
+  filter: brightness(1.08);
+  transform: translate(-50%, -60%);
+}
+
+.agentCharacter:hover::before {
+  opacity: 0.9;
+  transform: translateX(-50%) scale(1);
+}
+
+.agentCharacter[data-visual-status="WORKING"]::before {
+  border-color: rgb(118 230 198 / 32%);
+  background: radial-gradient(circle, rgb(118 230 198 / 18%), transparent 68%);
+}
+
+.agentCharacter[data-visual-status="REVIEWING"]::before,
+.agentCharacter[data-visual-status="QUEUED"]::before {
+  border-color: rgb(240 207 142 / 28%);
+  background: radial-gradient(circle, rgb(240 207 142 / 16%), transparent 68%);
+}
+
+.agentCharacter[data-visual-status="ERROR"]::before,
+.agentCharacter[data-visual-status="BLOCKED"]::before {
+  border-color: rgb(240 139 128 / 32%);
+  background: radial-gradient(circle, rgb(240 139 128 / 16%), transparent 68%);
+}
+
+.agentCharacter:global(.is-selected)::before {
+  border-color: rgb(240 207 142 / 68%);
+  opacity: 1;
+  transform: translateX(-50%) scale(1.1);
+  box-shadow:
+    0 0 0 7px rgb(240 207 142 / 7%),
+    0 0 34px rgb(240 207 142 / 18%);
+}
+
+.agentIdentity {
+  display: grid;
+  width: min(7.2rem, 100%);
+  gap: 0.05rem;
+  justify-items: center;
+  margin-top: -0.25rem;
+  padding: 0.34rem 0.48rem 0.38rem;
+  border: 1px solid rgb(223 239 231 / 12%);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), transparent),
+    rgb(8 17 15 / 86%);
+  box-shadow: 0 10px 22px rgb(0 0 0 / 18%);
+  backdrop-filter: blur(10px);
+}
+
+.agentIdentity :global(.office-agent-name) {
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  color: #f7faf8;
+  font-size: 0.7rem;
+  font-weight: 760;
+  letter-spacing: -0.01em;
+}
+
+.agentRole {
+  overflow: hidden;
+  max-width: 100%;
+  color: #9fb5ad;
+  font-size: 0.56rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentCharacter :global(.office-agent-status) {
+  top: 0.38rem;
+  right: 0.8rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 1px solid rgb(255 255 255 / 25%);
+  background: #d9f1e9;
+  box-shadow:
+    0 5px 15px rgb(0 0 0 / 25%),
+    inset 0 1px 0 rgb(255 255 255 / 45%);
+  font-size: 0.74rem;
+}
+
+.agentCharacter[data-visual-status="REVIEWING"] :global(.office-agent-status),
+.agentCharacter[data-visual-status="QUEUED"] :global(.office-agent-status) {
+  background: #f2d99f;
+}
+
+.agentCharacter[data-visual-status="ERROR"] :global(.office-agent-status),
+.agentCharacter[data-visual-status="BLOCKED"] :global(.office-agent-status) {
+  background: #f5a39b;
+}
+
+.agentCharacter[data-visual-status="OFFLINE"] :global(.office-agent-status) {
+  background: #9aa9a4;
+}
+
+/* World-owned global surfaces, scoped through :has() to avoid touching Command. */
+
+:global(.primary-workspace):has(.worldSurface) {
+  overflow: visible;
+  border-color: rgb(211 232 222 / 13%);
+  border-radius: var(--p5-radius-lg);
+  background:
+    radial-gradient(circle at 12% 0%, rgb(118 230 198 / 7%), transparent 26%),
+    linear-gradient(180deg, rgb(255 255 255 / 2%), transparent),
+    #0e1917;
+  box-shadow: var(--p5-shadow);
+}
+
+:global(.primary-workspace):has(.worldSurface) :global(.workspace-intro) {
+  min-height: 6.4rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom-color: rgb(211 232 222 / 10%);
+  background:
+    linear-gradient(90deg, rgb(118 230 198 / 6%), transparent 38%),
+    transparent;
+}
+
+:global(.primary-workspace):has(.worldSurface) :global(.workspace-intro h1) {
+  color: #f5f8f6;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  letter-spacing: -0.05em;
+}
+
+:global(.primary-workspace):has(.worldSurface) :global(.workspace-intro > p) {
+  max-width: 30rem;
+  color: #9fb5ad;
+  line-height: 1.55;
+}
+
+:global(.world-grid):has(.worldSurface) {
+  grid-template-columns: minmax(0, 1fr) 16.5rem;
+  background: #0a1412;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.canvas-frame) {
+  padding: 0.8rem;
+  border-right-color: rgb(211 232 222 / 10%);
+  background:
+    radial-gradient(circle at 50% 10%, rgb(118 230 198 / 4%), transparent 32%),
+    #091210;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.world-roster) {
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 2%), transparent),
+    #0f1b18;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.world-roster .section-heading) {
+  padding: 1rem;
+  border-bottom-color: rgb(211 232 222 / 10%);
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list) {
+  display: grid;
+  gap: 0.48rem;
+  padding: 0.7rem;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list li) {
+  border: 0;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list-button) {
+  min-height: 4rem;
+  padding: 0.72rem 0.75rem;
+  border: 1px solid rgb(211 232 222 / 9%);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 2%), transparent),
+    rgb(255 255 255 / 2%);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list-button:hover) {
+  border-color: rgb(118 230 198 / 24%);
+  background: rgb(118 230 198 / 5%);
+  transform: translateY(-1px);
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list-button[data-selected="true"]) {
+  border-color: rgb(240 207 142 / 34%);
+  background:
+    linear-gradient(90deg, rgb(240 207 142 / 8%), transparent),
+    rgb(255 255 255 / 3%);
+  box-shadow: inset 3px 0 0 var(--p5-warm);
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list-button strong) {
+  color: #f1f6f3;
+}
+
+:global(.world-grid):has(.worldSurface) :global(.agent-list-button small) {
+  color: #8fa69e;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector) {
+  overflow: hidden;
+  min-height: 22rem;
+  padding: 1.1rem;
+  border-color: rgb(211 232 222 / 13%);
+  border-radius: var(--p5-radius-lg);
+  background:
+    radial-gradient(circle at 0% 0%, rgb(240 207 142 / 9%), transparent 35%),
+    linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 34%),
+    #101c19;
+  box-shadow: var(--p5-shadow);
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector)::before {
+  display: block;
+  width: 2.8rem;
+  height: 0.22rem;
+  margin-bottom: 1rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--p5-warm), var(--p5-mint));
+  content: "";
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector-heading) {
+  align-items: flex-start;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector h2) {
+  margin-top: 0.08rem;
+  color: #f7faf8;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.agent-role) {
+  margin: 0.45rem 0 1rem;
+  color: #b4c8c0;
+  font-size: 0.84rem;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.agent-facts) {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.agent-facts > div) {
+  padding: 0.72rem 0.78rem;
+  border: 1px solid rgb(211 232 222 / 9%);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 2.4%);
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.agent-facts dt) {
+  color: #7f9890;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 730;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.agent-facts dd) {
+  color: #e5eeea;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector-note) {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgb(211 232 222 / 9%);
+  color: #7f9890;
+  line-height: 1.5;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector-chat-button) {
+  min-height: 2.8rem;
+  border-radius: 12px;
+}
+
+:global(.workspace-grid):has(.worldSurface) :global(.inspector-chat-button + .inspector-chat-button) {
+  margin-top: 0.55rem;
+}
+
+/* Hub -------------------------------------------------------------------- */
+
+.hubPanel {
+  overflow: visible;
+  border: 1px solid rgb(211 232 222 / 13%);
+  border-radius: var(--p5-radius-lg);
+  background:
+    radial-gradient(circle at 0% 0%, rgb(118 230 198 / 7%), transparent 25%),
+    radial-gradient(circle at 92% 0%, rgb(118 191 233 / 6%), transparent 23%),
+    #0d1816;
+  box-shadow: var(--p5-shadow);
+}
+
+.hubIntro {
+  min-height: 8.4rem;
+  align-items: flex-end;
+  padding: 1.3rem 1.4rem;
+  border-bottom: 1px solid rgb(211 232 222 / 10%);
+  background:
+    linear-gradient(115deg, rgb(118 230 198 / 6%), transparent 44%),
+    linear-gradient(180deg, rgb(255 255 255 / 2%), transparent);
+}
+
+.hubIntroCopy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.hubIntroCopy h1 {
+  color: #f6f9f7;
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+  letter-spacing: -0.055em;
+}
+
+.hubIntroCopy > p {
+  max-width: 36rem;
+  margin: 0;
+  color: #9fb5ad;
+  font-size: 0.87rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.hubStats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.hubStat {
+  display: grid;
+  min-width: 5.4rem;
+  gap: 0.08rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgb(215 235 225 / 11%);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 2.5%);
+}
+
+.hubStat strong {
+  color: #eef5f1;
+  font-size: 0.98rem;
+  letter-spacing: -0.03em;
+}
+
+.hubStat span {
+  color: #829a92;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.hubPanel :global(.hub-workspace-shell) {
+  grid-template-columns: minmax(12.5rem, 14rem) minmax(0, 1fr);
+  min-height: 35rem;
+}
+
+.hubPanel :global(.hub-section-nav) {
+  top: 0.75rem;
+  padding: 0.78rem;
+  border-right: 1px solid rgb(211 232 222 / 10%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 2%), transparent),
+    rgb(7 15 13 / 34%);
+}
+
+.hubPanel :global(.hub-section-tabs) {
+  gap: 0.42rem;
+}
+
+.hubPanel :global(.hub-section-tabs button) {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  min-height: 3.7rem;
+  align-items: center;
+  gap: 0.58rem;
+  padding: 0.58rem 0.62rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.hubPanel :global(.hub-section-tabs button:hover) {
+  border-color: rgb(211 232 222 / 11%);
+  background: rgb(255 255 255 / 3%);
+  transform: translateX(2px);
+}
+
+.hubPanel :global(.hub-section-tabs button[aria-selected="true"]) {
+  border-color: rgb(118 230 198 / 24%);
+  background:
+    linear-gradient(90deg, rgb(118 230 198 / 9%), transparent 90%),
+    rgb(255 255 255 / 3%);
+  box-shadow: inset 3px 0 0 var(--p5-mint);
+}
+
+.hubTabGlyph {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid rgb(212 233 223 / 10%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 3%);
+  color: #98b2a8;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 780;
+}
+
+:global(.hub-section-tabs button[aria-selected="true"]) .hubTabGlyph {
+  border-color: rgb(118 230 198 / 26%);
+  background: rgb(118 230 198 / 9%);
+  color: #c6f3e5;
+}
+
+.hubTabCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+.hubTabLabel {
+  color: #dce7e2;
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.hubTabHint {
+  overflow: hidden;
+  color: #738b83;
+  font-size: 0.58rem;
+  font-weight: 560;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hubPanel :global(.hub-section-tabs button[aria-selected="true"]) .hubTabLabel {
+  color: #f2f7f4;
+}
+
+.hubPanel :global(.hub-section-panel) {
+  padding: 1rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(118 191 233 / 3.5%), transparent 25%),
+    transparent;
+}
+
+.hubPanel :global(.hub-section-content) {
+  gap: 0.85rem;
+}
+
+.hubPanel :global(.hub-section-content) > section,
+.hubPanel :global(.hub-section-content) > form {
+  border-color: rgb(211 232 222 / 11%);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 2.8%), transparent 30%),
+    #111f1c;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 3%),
+    0 14px 30px rgb(0 0 0 / 12%);
+}
+
+.hubPanel :global(.hub-primary-grid),
+.hubPanel :global(.hub-secondary-grid) {
+  gap: 0.8rem;
+}
+
+.hubPanel :global(.hub-registry-section) {
+  border-color: rgb(211 232 222 / 10%);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 2.6%), transparent),
+    #111f1c;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.hubPanel :global(.hub-section-heading) {
+  min-height: 3.5rem;
+  padding-inline: 0.95rem;
+  border-bottom-color: rgb(211 232 222 / 9%);
+}
+
+.hubPanel :global(.hub-section-heading h2) {
+  color: #edf4f0;
+  letter-spacing: -0.025em;
+}
+
+.hubPanel :global(.count-badge),
+.hubPanel :global(.route-count) {
+  border-color: rgb(118 230 198 / 18%);
+  background: rgb(118 230 198 / 7%);
+  color: #bfeadd;
+}
+
+.hubPanel :global(.hub-compact-list),
+.hubPanel :global(.hub-agent-list),
+.hubPanel :global(.hub-model-list),
+.hubPanel :global(.hub-route-list) {
+  gap: 0.42rem;
+}
+
+.hubPanel :global(.hub-compact-list li),
+.hubPanel :global(.hub-agent-list li),
+.hubPanel :global(.hub-model-list > li),
+.hubPanel :global(.hub-route-list li) {
+  border-color: rgb(211 232 222 / 9%);
+  background: rgb(255 255 255 / 2%);
+}
+
+.hubPanel :global(.hub-agent-list button) {
+  border-radius: 12px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.hubPanel :global(.hub-agent-list button:hover) {
+  background: rgb(118 230 198 / 5%);
+  transform: translateY(-1px);
+}
+
+.hubPanel :global(input),
+.hubPanel :global(select),
+.hubPanel :global(textarea) {
+  border-color: rgb(211 232 222 / 14%);
+  border-radius: 11px;
+  background: rgb(5 12 11 / 48%);
+}
+
+.hubPanel :global(.primary-button),
+.hubPanel :global(.secondary-button) {
+  border-radius: 11px;
+}
+
+.hubPanel :global(details) {
+  border-color: rgb(211 232 222 / 9%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 1.5%);
+}
+
+@media (max-width: 72rem) {
+  :global(.workspace-grid):has(.worldSurface) :global(.inspector) {
+    box-shadow: 0 18px 42px rgb(0 0 0 / 20%);
+  }
+}
+
+@media (max-width: 48rem) {
+  .worldSurface {
+    gap: 0.5rem;
+  }
+
+  .skinToolbar {
+    padding: 0.45rem 0.5rem;
+  }
+
+  .skinToolbar label {
+    display: none;
+  }
+
+  .skinToolbar select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .worldScene {
+    min-height: 21.5rem;
+    border-radius: 18px;
+  }
+
+  .worldHud {
+    top: 0.5rem;
+    left: 0.5rem;
+    max-width: calc(100% - 1rem);
+  }
+
+  .worldHudGroup {
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  .worldStatusChip {
+    font-size: 0.55rem;
+  }
+
+  .agentCharacter {
+    width: 5.4rem;
+    min-height: 5.7rem;
+  }
+
+  .agentCharacter::before {
+    top: 0.7rem;
+    width: 4.1rem;
+    height: 4.1rem;
+  }
+
+  .agentIdentity {
+    width: 5.35rem;
+    padding-inline: 0.34rem;
+  }
+
+  .agentRole {
+    display: none;
+  }
+
+  .agentCharacter :global(.office-agent-status) {
+    right: 0.2rem;
+  }
+
+  :global(.primary-workspace):has(.worldSurface) {
+    border-radius: 18px;
+  }
+
+  :global(.primary-workspace):has(.worldSurface) :global(.workspace-intro) {
+    min-height: 0;
+    padding: 0.9rem 0.95rem;
+  }
+
+  :global(.world-grid):has(.worldSurface) {
+    display: block;
+  }
+
+  :global(.world-grid):has(.worldSurface) :global(.canvas-frame) {
+    padding: 0.55rem;
+    border-right: 0;
+    border-bottom: 1px solid rgb(211 232 222 / 10%);
+  }
+
+  :global(.world-grid):has(.worldSurface) :global(.world-roster) {
+    border-bottom: 0;
+  }
+
+  :global(.world-grid):has(.worldSurface) :global(.agent-list) {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.45rem;
+    padding: 0.6rem;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  :global(.world-grid):has(.worldSurface) :global(.agent-list li) {
+    flex: 0 0 min(13rem, 78vw);
+  }
+
+  :global(.workspace-grid):has(.worldSurface) :global(.inspector) {
+    border-radius: 18px;
+  }
+
+  .hubIntro {
+    min-height: 0;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  .hubIntroCopy > p {
+    max-width: none;
+  }
+
+  .hubStats {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .hubStat {
+    min-width: 0;
+    flex: 1 1 5rem;
+  }
+
+  .hubPanel {
+    border-radius: 18px;
+  }
+
+  .hubPanel :global(.hub-workspace-shell) {
+    display: block;
+    min-height: 0;
+  }
+
+  .hubPanel :global(.hub-section-nav) {
+    top: 0;
+    padding: 0.5rem;
+    border-right: 0;
+    border-bottom: 1px solid rgb(211 232 222 / 10%);
+    background: rgb(10 19 17 / 92%);
+    backdrop-filter: blur(14px);
+  }
+
+  .hubPanel :global(.hub-section-tabs) {
+    display: flex;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .hubPanel :global(.hub-section-tabs button) {
+    display: flex;
+    flex: 0 0 auto;
+    min-height: 2.8rem;
+    gap: 0.4rem;
+    padding: 0.4rem 0.52rem;
+    white-space: nowrap;
+  }
+
+  .hubPanel :global(.hub-section-tabs button:hover) {
+    transform: none;
+  }
+
+  .hubPanel :global(.hub-section-tabs button[aria-selected="true"]) {
+    box-shadow: inset 0 -2px 0 var(--p5-mint);
+  }
+
+  .hubTabGlyph {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
+  .hubTabHint {
+    display: none;
+  }
+
+  .hubPanel :global(.hub-section-panel) {
+    padding: 0.65rem;
+  }
+}
+
+@media (max-width: 25rem) {
+  .worldScene {
+    min-height: 18.5rem;
+  }
+
+  .worldHudGroup {
+    padding: 0.28rem;
+  }
+
+  .worldStatusChip {
+    padding-inline: 0.34rem;
+  }
+
+  .worldStatusChip:last-child {
+    display: none;
+  }
+
+  .agentCharacter {
+    width: 4.8rem;
+    min-height: 5rem;
+  }
+
+  .agentCharacter::before {
+    width: 3.6rem;
+    height: 3.6rem;
+  }
+
+  .agentIdentity {
+    width: 4.75rem;
+  }
+
+  .agentIdentity :global(.office-agent-name) {
+    font-size: 0.61rem;
+  }
+
+  .hubIntro {
+    padding: 0.85rem;
+  }
+
+  .hubIntroCopy h1 {
+    font-size: 1.65rem;
+  }
+
+  .hubStat {
+    padding: 0.48rem;
+  }
+
+  .hubPanel :global(.hub-section-nav) {
+    padding-inline: 0.4rem;
+  }
+
+  .hubPanel :global(.hub-section-panel) {
+    padding: 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agentCharacter,
+  .hubPanel :global(.hub-section-tabs button),
+  :global(.world-grid):has(.worldSurface) :global(.agent-list-button),
+  .hubPanel :global(.hub-agent-list button) {
+    transition: none;
+  }
+}
