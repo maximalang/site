@@ -128,7 +128,10 @@ try {
 
   const taskButton = researchInspector.getByRole("button", { name: "Назначить задачу" });
   const beforeTaskScrollY = await page.evaluate(() => window.scrollY);
-  assert(beforeTaskScrollY === 0, `Expected scrollY=0 before opening task drawer, received ${beforeTaskScrollY}`);
+  assert(
+    beforeTaskScrollY === 0,
+    `Expected scrollY=0 before opening task drawer, received ${beforeTaskScrollY}`,
+  );
   await taskButton.click();
 
   const taskDialog = page.getByRole("dialog", { name: "Задача для Research Lead" });
