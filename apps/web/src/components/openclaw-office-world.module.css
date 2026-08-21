@@ -256,8 +256,6 @@
 
 .agentName {
   display: block;
-  max-height: 2.2em;
-  overflow: hidden;
   font-size: 0.69rem;
   font-weight: 760;
   line-height: 1.1;
