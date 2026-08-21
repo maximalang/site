@@ -1,10 +1,11 @@
-import { chromium } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { chromium } from "@playwright/test";
 
 const baseUrl = process.env.AGENT_WORLD_EVIDENCE_BASE_URL ?? "http://127.0.0.1:3210";
 const outputDir = join(process.cwd(), "apps/web/test-results/phase5-visual-evidence");
-const chromeChannel = process.env.AGENT_WORLD_PLAYWRIGHT_CHANNEL === "chrome" ? "chrome" : undefined;
+const chromeChannel =
+  process.env.AGENT_WORLD_PLAYWRIGHT_CHANNEL === "chrome" ? "chrome" : undefined;
 
 const targets = [
   {
@@ -37,12 +38,7 @@ const hubLabels = {
 };
 
 function overlaps(a, b) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 async function capture(page, label, name) {
@@ -123,7 +119,9 @@ async function selectWorldAgent(page, name) {
 
 async function openHub(page) {
   await page.getByRole("tab", { name: "Hub", exact: true }).click();
-  await page.getByRole("heading", { level: 1, name: "Canonical Hub" }).waitFor({ state: "visible" });
+  await page
+    .getByRole("heading", { level: 1, name: "Canonical Hub" })
+    .waitFor({ state: "visible" });
 }
 
 async function selectHubSection(page, key) {
@@ -152,7 +150,8 @@ async function captureWorldEvidence(page, target) {
   await assertNoHorizontalOverflow(page, `${target.label} World default`);
   await assertAgentNameReadable(page, "Research Lead", `${target.label} World default`);
   await assertAgentNameReadable(page, "Reviewer", `${target.label} World default`);
-  if (target.viewport.width <= 390) await assertMobileHandoff(page, `${target.label} World default`);
+  if (target.viewport.width <= 390)
+    await assertMobileHandoff(page, `${target.label} World default`);
 
   if (target.world.includes("default")) await capture(page, target.label, "world-default");
   if (target.world.includes("handoff")) await capture(page, target.label, "world-handoff-visible");
