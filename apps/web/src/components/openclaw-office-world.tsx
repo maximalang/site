@@ -253,7 +253,7 @@ export function OpenClawOfficeWorld({
           <span
             aria-hidden="true"
             className={styles.handoffPacket}
-            data-handoff-cue={handoff.id}
+            data-handoff-packet={handoff.id}
             key={`packet-${handoff.id}`}
             style={{
               left: `${((handoff.fromX + handoff.toX) / 2 / office.width) * 100}%`,
