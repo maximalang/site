@@ -258,25 +258,19 @@
   display: block;
   max-height: 2.2em;
   overflow: hidden;
+  font-size: 0.69rem;
+  font-weight: 760;
+  line-height: 1.1;
   white-space: normal;
 }
 
 .agentRole {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agentName {
-  font-size: 0.69rem;
-  font-weight: 760;
-  line-height: 1.1;
-}
-
-.agentRole {
   color: #95aaa2;
   font-size: 0.55rem;
   line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .statusBubble {
