@@ -168,7 +168,10 @@ function AgentRoster({
   onOpenConversation: (agentId: AgentId) => void;
 }) {
   return (
-    <section className={`${worldStyles.roster} world-roster`} aria-labelledby="world-roster-title">
+    <section
+      className={`${worldStyles.roster} world-roster`}
+      aria-labelledby="world-roster-title"
+    >
       <div className={`${worldStyles.rosterHeader} section-heading`}>
         <div>
           <p className="eyebrow">Навигация по миру</p>
@@ -559,7 +562,11 @@ export function ControlCenter({
         ) : null}
 
         {mode !== "HUB" && model && model.source !== "UNAVAILABLE" && world && command ? (
-          <div className={mode === "WORLD" ? `workspace-grid ${worldStyles.worldLayout}` : "workspace-grid"}>
+          <div
+            className={
+              mode === "WORLD" ? `workspace-grid ${worldStyles.worldLayout}` : "workspace-grid"
+            }
+          >
             {mode === "WORLD" ? (
               <section
                 aria-labelledby={worldTabId}
@@ -573,7 +580,8 @@ export function ControlCenter({
                     <h1>World</h1>
                   </div>
                   <p>
-                    Персонажи, окружение и передачи отражают только каноническое состояние — без вымышленной активности.
+                    Персонажи, окружение и передачи отражают только каноническое состояние — без
+                    вымышленной активности.
                   </p>
                 </div>
                 <div className={`world-grid ${worldStyles.worldGrid}`}>
