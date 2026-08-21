@@ -162,7 +162,13 @@ export function OfficePawn({
     >
       <ellipse cx="0" cy="28" rx="18" ry="5" fill="rgb(0 0 0 / 24%)" />
       <g
-        className={working ? "office-pawn-working" : reviewing ? "office-pawn-reviewing" : "office-pawn-idle"}
+        className={
+          working
+            ? "office-pawn-working"
+            : reviewing
+              ? "office-pawn-reviewing"
+              : "office-pawn-idle"
+        }
       >
         <g className="office-pawn-legs">
           <path d="M-13 12h11v15H-13zM2 12h11v15H2z" fill="#293b4d" />
