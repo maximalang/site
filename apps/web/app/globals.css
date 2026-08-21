@@ -1614,7 +1614,6 @@ button:disabled {
   white-space: nowrap;
 }
 
-
 /* Shared controls / forms / interactive states */
 .app-shell button:not([class]) {
   min-height: 2.5rem;
@@ -1804,7 +1803,6 @@ button:disabled {
   font: inherit;
   resize: vertical;
 }
-
 
 /* Hub */
 .hub-workspace,
