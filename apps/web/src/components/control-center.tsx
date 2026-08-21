@@ -168,10 +168,7 @@ function AgentRoster({
   onOpenConversation: (agentId: AgentId) => void;
 }) {
   return (
-    <section
-      className={`${worldStyles.roster} world-roster`}
-      aria-labelledby="world-roster-title"
-    >
+    <section className={`${worldStyles.roster} world-roster`} aria-labelledby="world-roster-title">
       <div className={`${worldStyles.rosterHeader} section-heading`}>
         <div>
           <p className="eyebrow">Навигация по миру</p>
