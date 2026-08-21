@@ -115,6 +115,16 @@
   letter-spacing: 0.02em;
 }
 
+.floor :global(.office-zone-collaboration) + .zoneLabel {
+  font-size: 12.5px;
+  letter-spacing: 0.005em;
+}
+
+.floor :global(.office-zone-review_ops) + .zoneLabel {
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+
 .environmentDetails {
   opacity: 0.92;
 }
@@ -359,18 +369,22 @@
 
 .handoffFeed {
   position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
+  inset-block-start: auto;
+  inset-block-end: 0.75rem;
+  inset-inline-start: auto;
+  inset-inline-end: 0.75rem;
   z-index: 5;
   display: grid;
+  min-inline-size: 0;
   gap: 0.2rem;
-  max-width: min(23rem, calc(100% - 1.5rem));
+  max-inline-size: min(23rem, calc(100% - 1.5rem));
   margin: 0;
   padding: 0.48rem 0.58rem;
   border: 1px solid rgb(221 234 228 / 10%);
   border-radius: 0.85rem;
   background: rgb(11 20 17 / 88%);
   list-style: none;
+  translate: none;
 }
 
 .handoffFeed li {
@@ -464,9 +478,12 @@
   }
 
   .handoffFeed {
-    right: 0.45rem;
-    bottom: 0.45rem;
-    max-width: calc(100% - 0.9rem);
+    inset-block-end: 0.45rem;
+    inset-inline-start: auto;
+    inset-inline-end: 0.45rem;
+    max-inline-size: calc(100% - 0.9rem);
+    min-inline-size: 0;
+    translate: none;
   }
 }
 
@@ -476,13 +493,16 @@
   }
 
   .handoffFeed {
-    right: 0.35rem;
-    bottom: 0.35rem;
-    left: 0.35rem;
-    max-width: none;
+    inset-block-end: 0.35rem;
+    inset-inline-start: 0.35rem;
+    inset-inline-end: 0.35rem;
+    inline-size: auto;
+    max-inline-size: none;
+    min-inline-size: 0;
     gap: 0;
     padding: 0.3rem 0.4rem;
     border-radius: 0.65rem;
+    translate: none;
   }
 
   .handoffFeed li {
