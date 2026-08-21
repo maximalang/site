@@ -177,6 +177,52 @@
   min-width: 0;
 }
 
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-card) {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > label {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+  color: #8fa39b;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > label:nth-of-type(3),
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > p,
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > details {
+  grid-column: 1 / -1;
+}
+
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > p {
+  margin: 0;
+  color: #8fa39b;
+  font-size: 0.75rem;
+}
+
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) select,
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding-inline: 0.7rem;
+}
+
+.sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > button {
+  justify-self: start;
+}
+
 .sectionCanvas[data-hub-section="runtime"] {
   grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
 }
@@ -186,7 +232,20 @@
 }
 
 .sectionCanvas[data-hub-section="routing"] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(14rem, 0.7fr) minmax(14rem, 0.7fr) minmax(32rem, 1.6fr);
+}
+
+.sectionCanvas[data-hub-section="routing"] > :global(.preference-panel) {
+  margin: 0;
+}
+
+.sectionCanvas[data-hub-section="routing"] :global(.preference-fields) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sectionCanvas[data-hub-section="routing"] :global(.preference-field) > span,
+.sectionCanvas[data-hub-section="routing"] :global(.preference-field) > button {
+  overflow-wrap: anywhere;
 }
 
 .sectionCanvas[data-hub-section="memory"] {
@@ -345,6 +404,15 @@
   .sectionCanvas[data-hub-section="automation"],
   .sectionCanvas[data-hub-section="routing"] {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sectionCanvas[data-hub-section="setup"] :global(.hub-control-form),
+  .sectionCanvas[data-hub-section="routing"] :global(.preference-fields) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sectionCanvas[data-hub-section="setup"] :global(.hub-control-form) > label:nth-of-type(3) {
+    grid-column: auto;
   }
 }
 
