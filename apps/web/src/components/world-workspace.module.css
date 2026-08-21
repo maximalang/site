@@ -265,7 +265,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .worldWorkspace { border-radius: 1.15rem; }
+  .worldWorkspace {
+    border-radius: 1.15rem;
+  }
 
   .worldIntro {
     min-height: 0;
@@ -273,15 +275,33 @@
     padding: 0.85rem 0.9rem;
   }
 
-  .worldIntro > p { display: none; }
+  .worldIntro > p {
+    display: none;
+  }
 
-  .canvasFrame { padding: 0.55rem 0.55rem 0; }
+  .canvasFrame {
+    padding: 0.55rem 0.55rem 0;
+  }
 
-  .roster { margin: 0.55rem; }
-  .rosterHeader { min-height: 2.85rem; }
-  .rosterList { padding: 0.45rem; }
-  .rosterList > li { min-width: 10.5rem; }
-  .rosterButton { min-height: 4.45rem; }
+  .roster {
+    margin: 0.55rem;
+  }
+
+  .rosterHeader {
+    min-height: 2.85rem;
+  }
+
+  .rosterList {
+    padding: 0.45rem;
+  }
+
+  .rosterList > li {
+    min-width: 10.5rem;
+  }
+
+  .rosterButton {
+    min-height: 4.45rem;
+  }
 
   .inspector {
     position: static;
@@ -310,8 +330,21 @@
 }
 
 @media (max-width: 24.5rem) {
-  .worldIntro h1 { font-size: 1.65rem; }
-  .rosterList > li { min-width: 9.8rem; }
-  .rosterButton { min-height: 4.25rem; grid-template-columns: 2.8rem minmax(0, 1fr); }
-  .rosterAvatar { width: 2.65rem; height: 2.65rem; }
+  .worldIntro h1 {
+    font-size: 1.65rem;
+  }
+
+  .rosterList > li {
+    min-width: 9.8rem;
+  }
+
+  .rosterButton {
+    min-height: 4.25rem;
+    grid-template-columns: 2.8rem minmax(0, 1fr);
+  }
+
+  .rosterAvatar {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
 }
