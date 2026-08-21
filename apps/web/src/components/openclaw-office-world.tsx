@@ -256,7 +256,7 @@ export function OpenClawOfficeWorld({
             data-handoff-cue={handoff.id}
             key={`packet-${handoff.id}`}
             style={{
-              left: `${(((handoff.fromX + handoff.toX) / 2) / office.width) * 100}%`,
+              left: `${((handoff.fromX + handoff.toX) / 2 / office.width) * 100}%`,
               top: `${((Math.min(handoff.fromY, handoff.toY) - 42) / office.height) * 100}%`,
             }}
           >
