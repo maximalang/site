@@ -571,7 +571,7 @@ export function OpenClawOfficeWorld({
             <p>
               <strong>{selected.displayName}</strong> · {STATUS_COPY[selected.status]}
             </p>
-            <p>{selected.currentTask?.title ?? "Нет активной задача"}</p>
+            <p>{selected.currentTask?.title ?? "Нет активной задачи"}</p>
             {selectedHandoff && selectedPeer ? <p>Передача с {selectedPeer.displayName}</p> : null}
           </div>
         ) : null}
