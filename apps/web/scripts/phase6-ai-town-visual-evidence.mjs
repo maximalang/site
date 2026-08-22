@@ -20,8 +20,13 @@ const targets = [
   { label: "320x720", viewport: { width: 320, height: 720 }, states: ["default", "research"] },
 ];
 
+let screenshotCount = 0;
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+function overlaps(a, b) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 async function capture(page, target, name) {
   await page.screenshot({
@@ -30,6 +35,7 @@ async function capture(page, target, name) {
     fullPage: false,
     path: join(outputDir, `phase6-${target.label}-${name}.png`),
   });
+  screenshotCount += 1;
 }
 async function assertNoOverflow(page, label) {
   const metrics = await page.evaluate(() => ({
@@ -42,7 +48,30 @@ async function assertNoOverflow(page, label) {
     `${label}: horizontal overflow ${JSON.stringify(metrics)}`,
   );
 }
-async function assertWorldDominant(page, target) {
+async function boxOf(locator, label) {
+  await locator.waitFor({ state: "visible" });
+  const box = await locator.boundingBox();
+  assert(box, `${label}: no geometry`);
+  return box;
+}
+async function assertFixtureStrip(page, target) {
+  const fixture = page.locator(".fixture-banner");
+  const renderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
+  if ((await fixture.count()) === 0) return;
+  const fixtureBox = await boxOf(fixture, `${target.label} fixture warning`);
+  const rendererBox = await boxOf(renderer, `${target.label} renderer`);
+  assert(
+    fixtureBox.y + fixtureBox.height <= rendererBox.y + 1,
+    `${target.label}: fixture warning overlaps the World HUD`,
+  );
+  const worldTitle = renderer.getByText("Agent World", { exact: true });
+  const wholeWorld = renderer.getByRole("button", { name: "Весь мир" });
+  const titleBox = await boxOf(worldTitle, `${target.label} World title`);
+  const controlBox = await boxOf(wholeWorld, `${target.label} whole-world control`);
+  assert(!overlaps(fixtureBox, titleBox), `${target.label}: fixture warning covers Agent World title`);
+  assert(!overlaps(fixtureBox, controlBox), `${target.label}: fixture warning covers World controls`);
+}
+async function assertWorldDominant(page, target, selected = false) {
   const renderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
   const canvas = page.getByTestId("agent-world-canvas");
   await renderer.waitFor({ state: "visible" });
@@ -50,24 +79,62 @@ async function assertWorldDominant(page, target) {
   const box = await canvas.boundingBox();
   assert(box, `${target.label}: canvas has no geometry`);
   const mobile = target.viewport.width <= 720;
+  const minimumWidth = selected && !mobile ? 0.68 : mobile ? 0.98 : 0.98;
   assert(
-    box.width >= target.viewport.width * (mobile ? 0.92 : 0.64),
+    box.width >= target.viewport.width * minimumWidth,
     `${target.label}: World is not horizontally dominant (${box.width}px)`,
   );
   assert(
-    box.height >= target.viewport.height * (mobile ? 0.68 : 0.56),
+    box.height >= target.viewport.height * (mobile ? 0.68 : 0.7),
     `${target.label}: World is not vertically dominant (${box.height}px)`,
+  );
+  assert(
+    box.y + box.height >= target.viewport.height - 2,
+    `${target.label}: World leaves a lower dead region (${box.y + box.height}px bottom)`,
   );
   assert(
     (await page.getByLabel("Вид карты").count()) === 0,
     `${target.label}: rejected Phase 5 map selector is still visible`,
   );
+  await assertFixtureStrip(page, target);
+}
+async function assertSelectedGeometry(page, target, name) {
+  const agentButton = page.getByRole("button", { name: new RegExp(`^${name}:`) });
+  const inspector = page.getByRole("region", { name });
+  const agentRail = page.getByRole("navigation", { name: "Агенты мира" });
+  const inspectorBox = await boxOf(inspector, `${target.label} inspector`);
+  const railBox = await boxOf(agentRail, `${target.label} agent rail`);
+  assert(
+    !overlaps(inspectorBox, railBox),
+    `${target.label}: selected inspector intersects the agent rail`,
+  );
+  if (target.viewport.width <= 720) {
+    assert(
+      inspectorBox.y + inspectorBox.height <= railBox.y - 4,
+      `${target.label}: bottom sheet does not reserve the bottom HUD rail`,
+    );
+    assert(
+      inspectorBox.y > target.viewport.height * 0.35,
+      `${target.label}: selected agent is not presented as a bottom sheet`,
+    );
+    assert(
+      inspectorBox.width >= target.viewport.width - 24,
+      `${target.label}: bottom sheet is too narrow`,
+    );
+  }
+  const actionable = await agentButton.evaluate((button) => {
+    const rect = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return hit === button || (hit instanceof Node && button.contains(hit));
+  });
+  assert(actionable, `${target.label}: selected agent control is covered after opening inspector`);
 }
 async function select(page, name) {
-  await page.getByRole("button", { name: new RegExp(`^${name}:`) }).click();
+  const agent = page.getByRole("button", { name: new RegExp(`^${name}:`) });
+  await agent.click();
   const inspector = page.getByRole("region", { name });
   await inspector.waitFor({ state: "visible" });
-  return inspector;
+  return { agent, inspector };
 }
 async function reset(page) {
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -92,22 +159,17 @@ try {
       });
       await assertNoOverflow(page, `${target.label} default`);
       await assertWorldDominant(page, target);
+      assert(
+        await page.locator(".empty-inspector").isHidden(),
+        `${target.label}: empty inspector still reserves default World width`,
+      );
       if (target.states.includes("default")) await capture(page, target, "world-default");
 
       if (target.states.includes("research")) {
-        const inspector = await select(page, "Research Lead");
+        const { agent } = await select(page, "Research Lead");
         await assertNoOverflow(page, `${target.label} selected`);
-        if (target.viewport.width <= 720) {
-          const box = await inspector.boundingBox();
-          assert(
-            box && box.y > target.viewport.height * 0.35,
-            `${target.label}: selected agent is not presented as a bottom sheet`,
-          );
-          assert(
-            box.width >= target.viewport.width - 24,
-            `${target.label}: bottom sheet is too narrow`,
-          );
-        }
+        await assertWorldDominant(page, target, true);
+        await assertSelectedGeometry(page, target, "Research Lead");
         await capture(
           page,
           target,
@@ -115,10 +177,14 @@ try {
             ? "world-research-lead-bottom-sheet"
             : "world-research-lead-selected",
         );
+        await agent.dblclick();
+        await page.getByRole("dialog", { name: "Research Lead" }).waitFor({ state: "visible" });
+        await reset(page);
       }
 
       if (target.states.includes("reviewer")) {
         await select(page, "Reviewer");
+        await assertSelectedGeometry(page, target, "Reviewer");
         await capture(page, target, "world-reviewer-selected");
       }
 
@@ -130,6 +196,7 @@ try {
           (await page.locator("[data-handoff-cue]").count()) === 1,
           `${target.label}: expected exactly one canonical handoff cue`,
         );
+        await assertFixtureStrip(page, target);
         await capture(page, target, "world-active-handoff");
       }
 
@@ -140,6 +207,7 @@ try {
           .getByText("Verify protocol contract", { exact: true })
           .first()
           .waitFor({ state: "visible" });
+        await assertSelectedGeometry(page, target, "Research Lead");
         await capture(page, target, "world-active-activity");
       }
     } finally {
@@ -149,4 +217,5 @@ try {
 } finally {
   await browser.close();
 }
-console.log(`Phase 6 AI Town visual evidence written to ${outputDir}`);
+assert(screenshotCount === 12, `Expected exactly 12 Phase 6 screenshots, received ${screenshotCount}`);
+console.log(`Phase 6 AI Town visual evidence written to ${outputDir} (${screenshotCount} screenshots)`);
