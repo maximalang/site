@@ -1,11 +1,17 @@
 import type { AgentProjectionCore, WorldHandoff } from "@agent-world/read-model";
 
 export type WorldPoint = { x: number; y: number };
+export type WorldCamera = WorldPoint & { zoom: number };
 export type PresentationZone = "COMMONS" | "WORK" | "REVIEW" | "OPERATIONS" | "COLLABORATION";
 export type SpriteIdentity = { variant: number; coat: string; accent: string; hair: string };
 
 export const WORLD_SIZE = { width: 1536, height: 960 } as const;
 export const COLLABORATION_POINT: WorldPoint = { x: 786, y: 492 };
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 2.4;
+const WORLD_FIT_PADDING = 20;
+const AGENT_FIT_PADDING = 92;
+const AGENT_CLUSTER_MIN_SIZE = { width: 520, height: 360 } as const;
 const ZONE_CENTERS = {
   COMMONS: { x: 430, y: 690 },
   WORK: { x: 410, y: 300 },
@@ -28,6 +34,12 @@ function hashText(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+function fitZoom(content: { width: number; height: number }, viewport: WorldPoint, padding: number) {
+  const availableWidth = Math.max(1, viewport.x - padding * 2);
+  const availableHeight = Math.max(1, viewport.y - padding * 2);
+  return Math.min(availableWidth / content.width, availableHeight / content.height);
 }
 
 export function statusTargetZone(
@@ -116,8 +128,9 @@ export function advancePosition(
 }
 
 export function clampZoom(value: number): number {
-  return Math.min(2.4, Math.max(0.55, value));
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
+
 export function clampCamera(point: WorldPoint, zoom: number, viewport: WorldPoint): WorldPoint {
   const halfWidth = viewport.x / (2 * zoom);
   const halfHeight = viewport.y / (2 * zoom);
@@ -129,4 +142,36 @@ export function clampCamera(point: WorldPoint, zoom: number, viewport: WorldPoin
     x: Math.min(maxX, Math.max(minX, point.x)),
     y: Math.min(maxY, Math.max(minY, point.y)),
   };
+}
+
+export function fitWorldCamera(viewport: WorldPoint): WorldCamera {
+  const zoom = clampZoom(fitZoom(WORLD_SIZE, viewport, WORLD_FIT_PADDING));
+  return {
+    x: WORLD_SIZE.width / 2,
+    y: WORLD_SIZE.height / 2,
+    zoom,
+  };
+}
+
+export function initialCameraForAgents(
+  agents: AgentProjectionCore[],
+  viewport: WorldPoint,
+): WorldCamera {
+  if (agents.length === 0) return fitWorldCamera(viewport);
+
+  const targets = agents.map((agent, index) => targetForAgent(agent, index));
+  const xs = targets.map((target) => target.x);
+  const ys = targets.map((target) => target.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  const content = {
+    width: Math.max(AGENT_CLUSTER_MIN_SIZE.width, maxX - minX),
+    height: Math.max(AGENT_CLUSTER_MIN_SIZE.height, maxY - minY),
+  };
+  const zoom = clampZoom(Math.min(1.15, fitZoom(content, viewport, AGENT_FIT_PADDING)));
+  const clamped = clampCamera(center, zoom, viewport);
+  return { ...clamped, zoom };
 }
