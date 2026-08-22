@@ -124,13 +124,8 @@ export function clampCamera(point: WorldPoint, zoom: number, viewport: WorldPoin
   const maxX = Math.max(WORLD_SIZE.width - halfWidth, WORLD_SIZE.width / 2);
   const minY = Math.min(halfHeight, WORLD_SIZE.height / 2);
   const maxY = Math.max(WORLD_SIZE.height - halfHeight, WORLD_SIZE.height / 2);
-  return { x: Math.min(maxX, Math.max(minX, point.x)), y: Math.min(maxY, Math.max(minY, point.y)) };
-}
-export function latestHandoffForAgent(
-  handoffs: WorldHandoff[],
-  agentId: string,
-): WorldHandoff | undefined {
-  return [...handoffs]
-    .reverse()
-    .find((handoff) => handoff.fromAgentId === agentId || handoff.toAgentId === agentId);
+  return {
+    x: Math.min(maxX, Math.max(minX, point.x)),
+    y: Math.min(maxY, Math.max(minY, point.y)),
+  };
 }

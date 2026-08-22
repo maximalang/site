@@ -13,7 +13,7 @@ Town tilesheets, character artwork, branded UI, names, Convex simulation code,
 or generated media assets are copied into Agent World.
 
 All Phase 6 terrain, props and character sprites are generated from
-project-owned code in `ai-town-world.tsx`.
+project-owned code in `apps/web/src/components/openclaw-office-world.tsx`.
 
 ## WW-AI-Lab/openclaw-office
 

@@ -31,8 +31,6 @@ type OpenClawOfficeWorldProps = {
   selectedAgentId: AgentId | undefined;
   onSelectAgent: (id: AgentId) => void;
   onOpenConversation: (id: AgentId) => void;
-  systemSkinId?: string;
-  projectSkinId?: string;
 };
 
 const STATUS_COPY: Record<AgentProjectionCore["status"], string> = {
@@ -524,7 +522,8 @@ export function OpenClawOfficeWorld({
         />
         <div className={styles.hud}>
           <p className={styles.title}>Agent World</p>
-          <div aria-label="Управление картой" className={styles.controls} role="group">
+          <fieldset className={styles.controls}>
+            <legend className={styles.srOnly}>Управление картой</legend>
             {latestHandoff ? (
               <button
                 className={styles.handoff}
@@ -545,7 +544,7 @@ export function OpenClawOfficeWorld({
             <button className={styles.control} onClick={resetCamera} type="button">
               Весь мир
             </button>
-          </div>
+          </fieldset>
         </div>
         {replay && replayFrom && replayTo ? (
           <div className={styles.handoffToast} data-handoff-cue role="status">
