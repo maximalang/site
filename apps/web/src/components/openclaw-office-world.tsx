@@ -15,6 +15,8 @@ import {
   advancePosition,
   clampCamera,
   clampZoom,
+  fitWorldCamera,
+  initialCameraForAgents,
   spriteIdentity,
   statusVisual,
   targetForAgent,
@@ -42,7 +44,6 @@ const STATUS_COPY: Record<AgentProjectionCore["status"], string> = {
   FAILED: "Ошибка",
   OFFLINE: "Не в сети",
 };
-const CAMERA_DEFAULT: Camera = { x: WORLD_SIZE.width / 2, y: WORLD_SIZE.height / 2, zoom: 0.78 };
 
 function rect(
   ctx: CanvasRenderingContext2D,
@@ -283,7 +284,12 @@ export function OpenClawOfficeWorld({
   const shellRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLCanvasElement | undefined>(undefined);
   const motionsRef = useRef(new Map<AgentId, Motion>());
-  const cameraRef = useRef<Camera>({ ...CAMERA_DEFAULT });
+  const cameraRef = useRef<Camera>({
+    x: WORLD_SIZE.width / 2,
+    y: WORLD_SIZE.height / 2,
+    zoom: 1,
+  });
+  const cameraInitializedRef = useRef(false);
   const sizeRef = useRef<WorldPoint>({ x: 900, y: 700 });
   const pointersRef = useRef(new Map<number, WorldPoint>());
   const dragRef = useRef<
@@ -318,7 +324,15 @@ export function OpenClawOfficeWorld({
     const resize = () => {
       const bounds = shell.getBoundingClientRect();
       const ratio = Math.min(2, window.devicePixelRatio || 1);
-      sizeRef.current = { x: Math.max(1, bounds.width), y: Math.max(1, bounds.height) };
+      const viewport = { x: Math.max(1, bounds.width), y: Math.max(1, bounds.height) };
+      sizeRef.current = viewport;
+      if (!cameraInitializedRef.current && bounds.width > 1 && bounds.height > 1) {
+        cameraRef.current = initialCameraForAgents(agents, viewport);
+        cameraInitializedRef.current = true;
+      } else if (cameraInitializedRef.current) {
+        const zoom = clampZoom(cameraRef.current.zoom);
+        cameraRef.current = { ...clampCamera(cameraRef.current, zoom, viewport), zoom };
+      }
       canvas.width = Math.max(1, Math.round(bounds.width * ratio));
       canvas.height = Math.max(1, Math.round(bounds.height * ratio));
       canvas.style.width = `${bounds.width}px`;
@@ -328,7 +342,7 @@ export function OpenClawOfficeWorld({
     observer.observe(shell);
     resize();
     return () => observer.disconnect();
-  }, []);
+  }, [agents]);
 
   useEffect(() => {
     let frame = 0;
@@ -389,10 +403,11 @@ export function OpenClawOfficeWorld({
   }, [agents, replay, selectedAgentId, speakingAgentId]);
 
   const setCamera = (next: Camera) => {
-    const clamped = clampCamera(next, next.zoom, sizeRef.current);
-    cameraRef.current = { ...clamped, zoom: clampZoom(next.zoom) };
+    const zoom = clampZoom(next.zoom);
+    const clamped = clampCamera(next, zoom, sizeRef.current);
+    cameraRef.current = { ...clamped, zoom };
   };
-  const resetCamera = () => setCamera({ ...CAMERA_DEFAULT });
+  const resetCamera = () => setCamera(fitWorldCamera(sizeRef.current));
   const focusSelected = () => {
     if (!selectedAgentId) return;
     const motion = motionsRef.current.get(selectedAgentId);
@@ -556,7 +571,7 @@ export function OpenClawOfficeWorld({
             <p>
               <strong>{selected.displayName}</strong> · {STATUS_COPY[selected.status]}
             </p>
-            <p>{selected.currentTask?.title ?? "Нет активной задачи"}</p>
+            <p>{selected.currentTask?.title ?? "Нет активной задача"}</p>
             {selectedHandoff && selectedPeer ? <p>Передача с {selectedPeer.displayName}</p> : null}
           </div>
         ) : null}
