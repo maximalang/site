@@ -36,7 +36,11 @@ function hashText(value: string): number {
   return hash >>> 0;
 }
 
-function fitZoom(content: { width: number; height: number }, viewport: WorldPoint, padding: number) {
+function fitZoom(
+  content: { width: number; height: number },
+  viewport: WorldPoint,
+  padding: number,
+) {
   const availableWidth = Math.max(1, viewport.x - padding * 2);
   const availableHeight = Math.max(1, viewport.y - padding * 2);
   return Math.min(availableWidth / content.width, availableHeight / content.height);
