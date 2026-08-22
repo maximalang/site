@@ -124,7 +124,7 @@ jobs:
       - name: Verify preinstalled Google Chrome
         run: google-chrome --version
       - run: npm run test:e2e
-      - name: Verify local laptop preview and capture Phase 5 evidence
+      - name: Verify local laptop preview and capture Phase 6 AI Town evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -165,10 +165,7 @@ jobs:
           }
           NODE
           AGENT_WORLD_EVIDENCE_BASE_URL=http://127.0.0.1:3210 \
-            node apps/web/scripts/phase5-visual-evidence.mjs
-          AGENT_WORLD_EVIDENCE_BASE_URL=http://127.0.0.1:3210 \
-          AGENT_WORLD_1024_DIAGNOSTIC_LABEL=exact-head \
-            node apps/web/scripts/phase5-1024-evidence.mjs
+            node apps/web/scripts/phase6-ai-town-visual-evidence.mjs
       - name: Upload browser visual evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
