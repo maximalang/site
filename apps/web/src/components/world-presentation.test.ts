@@ -4,6 +4,8 @@ import {
   advancePosition,
   clampCamera,
   clampZoom,
+  fitWorldCamera,
+  initialCameraForAgents,
   spriteIdentity,
   statusTargetZone,
   statusVisual,
@@ -70,10 +72,42 @@ describe("Phase 6 World presentation model", () => {
   });
 
   it("clamps zoom and camera bounds", () => {
-    expect(clampZoom(0.1)).toBe(0.55);
+    expect(clampZoom(0.1)).toBe(0.15);
     expect(clampZoom(4)).toBe(2.4);
     const point = clampCamera({ x: -900, y: WORLD_SIZE.height + 900 }, 1, { x: 390, y: 844 });
     expect(point.x).toBeGreaterThanOrEqual(0);
     expect(point.y).toBeLessThanOrEqual(WORLD_SIZE.height);
+  });
+
+  it.each([
+    { x: 1440, y: 918 },
+    { x: 1024, y: 686 },
+    { x: 390, y: 770 },
+    { x: 320, y: 646 },
+  ])("fits the whole world inside a $x px viewport", (viewport) => {
+    const camera = fitWorldCamera(viewport);
+    expect(WORLD_SIZE.width * camera.zoom).toBeLessThanOrEqual(viewport.x - 40 + 0.001);
+    expect(WORLD_SIZE.height * camera.zoom).toBeLessThanOrEqual(viewport.y - 40 + 0.001);
+    expect(camera).toMatchObject({ x: WORLD_SIZE.width / 2, y: WORLD_SIZE.height / 2 });
+  });
+
+  it("derives the initial camera deterministically from agent presentation targets", () => {
+    const agents: AgentProjectionCore[] = [
+      { ...agent, status: "RUNNING" },
+      {
+        ...agent,
+        agentId: "agent_22222222-2222-2222-2222-222222222222" as AgentProjectionCore["agentId"],
+        displayName: "Reviewer",
+        status: "WAITING_APPROVAL",
+      },
+    ];
+    const viewport = { x: 390, y: 770 };
+    const first = initialCameraForAgents(agents, viewport);
+    expect(initialCameraForAgents(agents, viewport)).toEqual(first);
+    expect(first.zoom).toBeGreaterThan(fitWorldCamera(viewport).zoom);
+    expect(first.x).toBeGreaterThan(0);
+    expect(first.x).toBeLessThan(WORLD_SIZE.width);
+    expect(first.y).toBeGreaterThan(0);
+    expect(first.y).toBeLessThan(WORLD_SIZE.height);
   });
 });
