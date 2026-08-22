@@ -64,58 +64,45 @@ jobs:
 
           presentation_test = Path("apps/web/src/components/world-presentation.test.ts")
           text = presentation_test.read_text()
-          branded = {
-              'agentId: "agent_11111111-1111-1111-1111-111111111111",':
-                  'agentId: "agent_11111111-1111-1111-1111-111111111111" as AgentProjectionCore["agentId"],',
-              'id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",':
-                  'id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" as WorldHandoff["id"],',
-              'missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc",':
-                  'missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc" as WorldHandoff["missionId"],',
-              'fromTaskId: "task_44444444-4444-4444-4444-444444444444",':
-                  'fromTaskId: "task_44444444-4444-4444-4444-444444444444" as WorldHandoff["fromTaskId"],',
-              'toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",':
-                  'toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" as WorldHandoff["toTaskId"],',
-              'fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd",':
-                  'fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd" as WorldHandoff["fromRunId"],',
-              'toAgentId: "agent_22222222-2222-2222-2222-222222222222",':
-                  'toAgentId: "agent_22222222-2222-2222-2222-222222222222" as WorldHandoff["toAgentId"],',
+          replacements = {
+              'agentId: "agent_11111111-1111-1111-1111-111111111111",': 'agentId: "agent_11111111-1111-1111-1111-111111111111" as AgentProjectionCore["agentId"],',
+              'id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",': 'id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" as WorldHandoff["id"],',
+              'missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc",': 'missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc" as WorldHandoff["missionId"],',
+              'fromTaskId: "task_44444444-4444-4444-4444-444444444444",': 'fromTaskId: "task_44444444-4444-4444-4444-444444444444" as WorldHandoff["fromTaskId"],',
+              'toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",': 'toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" as WorldHandoff["toTaskId"],',
+              'fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd",': 'fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd" as WorldHandoff["fromRunId"],',
+              'toAgentId: "agent_22222222-2222-2222-2222-222222222222",': 'toAgentId: "agent_22222222-2222-2222-2222-222222222222" as WorldHandoff["toAgentId"],',
           }
-          for old, new in branded.items():
+          for old, new in replacements.items():
               text = text.replace(old, new)
           presentation_test.write_text(text)
 
           control = Path("apps/web/tests/control-center.spec.ts")
           text = control.read_text()
-          old = '''  const brandSubtitle = page.getByText("Операторская среда", { exact: true });
-          if ((page.viewportSize()?.width ?? 1440) <= 640) {
-            await expect(brandSubtitle).toBeHidden();
-          } else {
-            await expect(brandSubtitle).toBeVisible();
-          }
-          await expect(page.getByText("Тестовые данные", { exact: true })).toBeVisible();
-          await expect(page.getByRole("note")).toContainText("тестовые данные");
-          await expect(page.getByRole("note")).toContainText("не отражает состояние Runtime");
-          await expect(page.locator("main")).toHaveCount(1);
-          await expect(page.getByText("Research Lead → Reviewer", { exact: true })).toBeVisible();
-          await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
-          '''
-          new = '''  const brandSubtitle = page.getByText("Операторская среда", { exact: true });
-          await expect(brandSubtitle).toBeHidden();
-          await expect(page.getByRole("note")).toContainText("тестовые данные");
-          await expect(page.getByRole("note")).toContainText("не отражает состояние Runtime");
-          await expect(page.locator("main")).toHaveCount(1);
-          const worldRenderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
-          await expect(worldRenderer).toBeVisible();
-          await expect(page.getByTestId("agent-world-canvas")).toBeVisible();
-          await expect(page.getByLabel("Вид карты")).toHaveCount(0);
-          await expect(page.locator("[data-handoff-cue]")).toHaveCount(0);
-          await page.getByRole("button", { name: "Показать передачу" }).click();
-          await expect(page.getByText("Передача: Research Lead → Reviewer", { exact: true })).toBeVisible();
-          await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
-          '''
-          if old not in text:
-              raise SystemExit("control-center Phase 5 assertion block not found")
-          control.write_text(text.replace(old, new))
+          start = '  const brandSubtitle = page.getByText("Операторская среда", { exact: true });\n'
+          end = '  const skipLink = page.getByRole("link", { name: "К содержанию" });\n'
+          if start not in text or end not in text:
+              raise SystemExit("control-center Phase 5 block not found")
+          before, rest = text.split(start, 1)
+          _, after = rest.split(end, 1)
+          lines = [
+              '  const brandSubtitle = page.getByText("Операторская среда", { exact: true });',
+              '  await expect(brandSubtitle).toBeHidden();',
+              '  await expect(page.getByRole("note")).toContainText("тестовые данные");',
+              '  await expect(page.getByRole("note")).toContainText("не отражает состояние Runtime");',
+              '  await expect(page.locator("main")).toHaveCount(1);',
+              '  const worldRenderer = page.locator(\'[data-renderer="agent-world-canvas-v1"]\');',
+              '  await expect(worldRenderer).toBeVisible();',
+              '  await expect(page.getByTestId("agent-world-canvas")).toBeVisible();',
+              '  await expect(page.getByLabel("Вид карты")).toHaveCount(0);',
+              '  await expect(page.locator("[data-handoff-cue]")).toHaveCount(0);',
+              '  await page.getByRole("button", { name: "Показать передачу" }).click();',
+              '  await expect(page.getByText("Передача: Research Lead → Reviewer", { exact: true })).toBeVisible();',
+              '  await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);',
+              '',
+              '  const skipLink = page.getByRole("link", { name: "К содержанию" });',
+          ]
+          control.write_text(before + "\n".join(lines) + "\n" + after)
 
           memory = Path("apps/web/tests/world-memory.spec.ts")
           text = memory.read_text().replace(
@@ -128,28 +115,29 @@ jobs:
               raise SystemExit("world-memory Phase 5 skin block not found")
           before, rest = text.split(start, 1)
           _, after = rest.split(end, 1)
-          replacement = '''  const worldRenderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
-          await expect(worldRenderer).toBeVisible();
-          await expect(page.getByTestId("agent-world-canvas")).toBeVisible();
-          await expect(page.getByLabel("Вид карты")).toHaveCount(0);
-          await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);
-          await expect(page.getByRole("button", { name: /^Research Lead:/ })).toBeVisible();
-          expect(
-            await page.evaluate(
-              () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-            ),
-          ).toBe(true);
-          expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBeNull();
-          await page.screenshot({
-            animations: "disabled",
-            caret: "hide",
-            fullPage: true,
-            path: testInfo.outputPath(`${testInfo.project.name}-world-ai-town.png`),
-          });
-
-          await page.getByRole("tab", { name: "Hub" }).click();
-          '''
-          memory.write_text(before + replacement + after)
+          lines = [
+              '  const worldRenderer = page.locator(\'[data-renderer="agent-world-canvas-v1"]\');',
+              '  await expect(worldRenderer).toBeVisible();',
+              '  await expect(page.getByTestId("agent-world-canvas")).toBeVisible();',
+              '  await expect(page.getByLabel("Вид карты")).toHaveCount(0);',
+              '  await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);',
+              '  await expect(page.getByRole("button", { name: /^Research Lead:/ })).toBeVisible();',
+              '  expect(',
+              '    await page.evaluate(',
+              '      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,',
+              '    ),',
+              '  ).toBe(true);',
+              '  expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBeNull();',
+              '  await page.screenshot({',
+              '    animations: "disabled",',
+              '    caret: "hide",',
+              '    fullPage: true,',
+              '    path: testInfo.outputPath(`${testInfo.project.name}-world-ai-town.png`),',
+              '  });',
+              '',
+              '  await page.getByRole("tab", { name: "Hub" }).click();',
+          ]
+          memory.write_text(before + "\n".join(lines) + "\n" + after)
           PY
           npm run format
           git diff --check
