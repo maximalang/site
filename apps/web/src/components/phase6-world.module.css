@@ -10,7 +10,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 620px;
+  min-height: 0;
   overflow: hidden;
   background: #6f9d57;
   isolation: isolate;
@@ -19,7 +19,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 620px;
+  min-height: 0;
   touch-action: none;
   cursor: grab;
   image-rendering: pixelated;
@@ -210,10 +210,20 @@
   border: 0;
 }
 :global(.app-shell:has(.phase6-world)) {
+  --phase6-topbar-height: 44px;
+  --phase6-mode-nav-height: 38px;
+  --phase6-agent-rail-height: 48px;
+  --phase6-agent-rail-bottom: 9px;
+  --phase6-agent-sheet-gap: 8px;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
   background: #142019;
 }
 :global(.app-shell:has(.phase6-world) .topbar) {
-  min-height: 44px;
+  box-sizing: border-box;
+  height: var(--phase6-topbar-height);
+  min-height: var(--phase6-topbar-height);
   padding: 7px 12px;
   background: #17231d;
   border-bottom: 1px solid rgb(255 255 255 / 8%);
@@ -231,7 +241,9 @@
   font-size: 10px;
 }
 :global(.app-shell:has(.phase6-world) .mode-navigation) {
-  min-height: 38px;
+  box-sizing: border-box;
+  height: var(--phase6-mode-nav-height);
+  min-height: var(--phase6-mode-nav-height);
   padding: 4px 12px;
   background: #17231d;
   border-bottom: 1px solid rgb(255 255 255 / 8%);
@@ -248,33 +260,55 @@
   display: none;
 }
 :global(.app-shell:has(.phase6-world) main) {
+  display: flex;
+  flex-direction: column;
   max-width: none;
   width: 100%;
+  height: calc(100dvh - var(--phase6-topbar-height) - var(--phase6-mode-nav-height));
+  min-height: 0;
   padding: 0;
   position: relative;
+  overflow: hidden;
 }
 :global(.app-shell:has(.phase6-world) .fixture-banner) {
-  position: absolute;
+  position: relative;
   z-index: 20;
-  left: 50%;
-  top: 8px;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: 70vw;
-  padding: 5px 9px;
+  left: auto;
+  top: auto;
+  transform: none;
+  flex: none;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 4px 12px;
   font-size: 10px;
+  line-height: 1.25;
+  text-align: center;
   opacity: 0.9;
   pointer-events: none;
 }
 :global(.app-shell:has(.phase6-world) .workspace-grid) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(270px, 26vw);
+  flex: 1 1 auto;
   gap: 0;
   max-width: none;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   align-items: stretch;
+  overflow: hidden;
+}
+:global(.app-shell:has(.phase6-world) .workspace-grid:has(> .empty-inspector)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+:global(.app-shell:has(.phase6-world) .workspace-grid:has(> .empty-inspector) > .empty-inspector) {
+  display: none;
 }
 :global(.app-shell:has(.phase6-world) .primary-workspace) {
+  height: 100%;
+  min-height: 0;
   padding: 0;
   margin: 0;
   border: 0;
@@ -292,9 +326,16 @@
 }
 :global(.app-shell:has(.phase6-world) .world-grid) {
   display: block;
+  width: 100%;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 :global(.app-shell:has(.phase6-world) .canvas-frame) {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 0;
   margin: 0;
   border: 0;
@@ -307,13 +348,14 @@
   display: none;
 }
 :global(.app-shell:has(.phase6-world) .inspector) {
+  box-sizing: border-box;
   margin: 0;
   border: 0;
   border-radius: 0;
   background: #1d2a22;
   color: #f7efd2;
-  min-height: 620px;
-  height: calc(100vh - 82px);
+  min-height: 0;
+  height: 100%;
   overflow: auto;
   box-shadow: inset 5px 0 0 #111a15;
 }
@@ -330,9 +372,9 @@
   border-radius: 0;
 }
 @media (max-width: 720px) {
-  .scene,
-  .canvas {
-    min-height: calc(100dvh - 82px);
+  :global(.app-shell:has(.phase6-world)) {
+    --phase6-topbar-height: 39px;
+    --phase6-mode-nav-height: 35px;
   }
   .hud {
     inset: 8px 8px auto 8px;
@@ -351,10 +393,14 @@
     padding: 5px 7px;
   }
   .agentNav {
+    box-sizing: border-box;
     left: 8px;
     right: 8px;
-    bottom: 9px;
+    bottom: var(--phase6-agent-rail-bottom);
+    height: var(--phase6-agent-rail-height);
     max-width: none;
+    align-items: center;
+    pointer-events: auto;
   }
   .agentButton {
     padding: 5px 7px;
@@ -364,7 +410,9 @@
   }
   .eventFeed {
     right: 8px;
-    bottom: 62px;
+    bottom: calc(
+      var(--phase6-agent-rail-bottom) + var(--phase6-agent-rail-height) + var(--phase6-agent-sheet-gap)
+    );
     width: min(270px, 70%);
   }
   .handoffToast {
@@ -375,25 +423,31 @@
   }
   :global(.app-shell:has(.phase6-world) .topbar) {
     padding: 5px 8px;
-    min-height: 39px;
   }
   :global(.app-shell:has(.phase6-world) .topbar-meta) {
     display: none;
   }
   :global(.app-shell:has(.phase6-world) .mode-navigation) {
     padding: 3px 8px;
-    min-height: 35px;
+  }
+  :global(.app-shell:has(.phase6-world) .fixture-banner) {
+    padding: 3px 8px;
+    font-size: 9px;
   }
   :global(.app-shell:has(.phase6-world) .workspace-grid) {
     display: block;
     position: relative;
+    height: 100%;
+    min-height: 0;
   }
   :global(.app-shell:has(.phase6-world) .inspector) {
     position: fixed;
     z-index: 45;
     left: 8px;
     right: 8px;
-    bottom: 8px;
+    bottom: calc(
+      var(--phase6-agent-rail-bottom) + var(--phase6-agent-rail-height) + var(--phase6-agent-sheet-gap)
+    );
     top: auto;
     width: auto;
     height: auto;
@@ -405,11 +459,6 @@
   }
   :global(.app-shell:has(.phase6-world) .empty-inspector) {
     display: none;
-  }
-  :global(.app-shell:has(.phase6-world) .fixture-banner) {
-    top: 3px;
-    max-width: 78vw;
-    font-size: 9px;
   }
   :global(.app-shell:has(.phase6-world) .inspector:has(h2)) {
     animation: sheet-in 0.18s ease-out;
