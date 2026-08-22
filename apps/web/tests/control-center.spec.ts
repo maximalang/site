@@ -510,9 +510,9 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
 
   await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
+    document.body.tabIndex = -1;
+    document.body.focus();
+    document.body.removeAttribute("tabindex");
   });
   const skipLink = page.getByRole("link", { name: "К содержанию" });
   await page.keyboard.press("Tab");
