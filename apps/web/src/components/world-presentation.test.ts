@@ -12,20 +12,20 @@ import {
 } from "./world-presentation";
 
 const agent: AgentProjectionCore = {
-  agentId: "agent_11111111-1111-1111-1111-111111111111",
+  agentId: "agent_11111111-1111-1111-1111-111111111111" as AgentProjectionCore["agentId"],
   displayName: "Research Lead",
   role: "Research",
   isEnabled: true,
   status: "IDLE",
 };
 const handoff: WorldHandoff = {
-  id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-  missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc",
-  fromTaskId: "task_44444444-4444-4444-4444-444444444444",
-  toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-  fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd",
+  id: "event_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" as WorldHandoff["id"],
+  missionId: "mission_cccccccc-cccc-cccc-cccc-cccccccccccc" as WorldHandoff["missionId"],
+  fromTaskId: "task_44444444-4444-4444-4444-444444444444" as WorldHandoff["fromTaskId"],
+  toTaskId: "task_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" as WorldHandoff["toTaskId"],
+  fromRunId: "run_dddddddd-dddd-dddd-dddd-dddddddddddd" as WorldHandoff["fromRunId"],
   fromAgentId: agent.agentId,
-  toAgentId: "agent_22222222-2222-2222-2222-222222222222",
+  toAgentId: "agent_22222222-2222-2222-2222-222222222222" as WorldHandoff["toAgentId"],
   occurredAt: "2026-08-13T06:00:03.500Z",
 };
 

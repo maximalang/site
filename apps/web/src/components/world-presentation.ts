@@ -30,7 +30,9 @@ function hashText(value: string): number {
   return hash >>> 0;
 }
 
-export function statusTargetZone(status: AgentProjectionCore["status"]): PresentationZone {
+export function statusTargetZone(
+  status: AgentProjectionCore["status"],
+): Exclude<PresentationZone, "COLLABORATION"> {
   switch (status) {
     case "RUNNING":
     case "QUEUED":

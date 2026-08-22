@@ -283,13 +283,15 @@ export function OpenClawOfficeWorld({
   const agents = useMemo(() => world.agents.map((entry) => entry.core), [world.agents]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<HTMLCanvasElement>();
+  const mapRef = useRef<HTMLCanvasElement | undefined>(undefined);
   const motionsRef = useRef(new Map<AgentId, Motion>());
   const cameraRef = useRef<Camera>({ ...CAMERA_DEFAULT });
   const sizeRef = useRef<WorldPoint>({ x: 900, y: 700 });
   const pointersRef = useRef(new Map<number, WorldPoint>());
-  const dragRef = useRef<{ id: number; start: WorldPoint; camera: Camera; moved: boolean }>();
-  const pinchRef = useRef<{ distance: number; zoom: number }>();
+  const dragRef = useRef<
+    { id: number; start: WorldPoint; camera: Camera; moved: boolean } | undefined
+  >(undefined);
+  const pinchRef = useRef<{ distance: number; zoom: number } | undefined>(undefined);
   const [replayId, setReplayId] = useState<string>();
   const [speakingAgentId, setSpeakingAgentId] = useState<AgentId>();
   const reducedMotionRef = useRef(false);
