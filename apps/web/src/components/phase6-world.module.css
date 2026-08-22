@@ -443,7 +443,7 @@
     min-height: 0;
   }
   :global(.app-shell:has(.phase6-world) .inspector) {
-    position: fixed;
+    position: absolute;
     z-index: 45;
     left: 8px;
     right: 8px;
