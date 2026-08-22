@@ -2,49 +2,46 @@
 
 import { projectWorldView } from "@agent-world/read-model";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildContractFixture } from "../test-fixtures";
 import { OpenClawOfficeWorld } from "./openclaw-office-world";
 
-afterEach(() => {
-  cleanup();
-  window.localStorage.clear();
+class ResizeObserverStub {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+  });
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 });
 
-describe("OpenClaw Office World presentation", () => {
-  it("renders canonical agents in one four-zone open floor without a canvas", () => {
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("Phase 6 living World renderer", () => {
+  it("renders a game canvas and removes the rejected map selector", () => {
     const world = projectWorldView(buildContractFixture());
     const { container } = render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={vi.fn()}
-        onOpenConversation={vi.fn()}
-      />,
+      <OpenClawOfficeWorld world={world} selectedAgentId={undefined} onSelectAgent={vi.fn()} onOpenConversation={vi.fn()} />,
     );
-    expect(container.querySelector("canvas")).toBeNull();
-    expect(screen.getAllByTestId("office-zone")).toHaveLength(4);
-    for (const agent of world.agents) {
-      expect(screen.getByRole("button", { name: new RegExp(agent.core.displayName) })).toBeTruthy();
-    }
-    expect(
-      screen.getByRole("button", { name: /Research Lead.*Открыть карточку агента/i }),
-    ).toBeTruthy();
-    expect(container.querySelectorAll("[data-openclaw-primitive='desk']").length).toBeGreaterThan(
-      1,
-    );
-    expect(container.querySelector("[data-openclaw-primitive='meeting-table']")).toBeTruthy();
-    expect(container.querySelector("[data-openclaw-primitive='sofa']")).toBeTruthy();
-    expect(container.querySelector("[data-openclaw-primitive='plant']")).toBeTruthy();
-    expect(container.querySelectorAll("[data-openclaw-primitive='pawn']")).toHaveLength(
-      world.agents.length,
-    );
-    expect(container.querySelectorAll(".office-monitor-active")).toHaveLength(
-      world.agents.filter((agent) => agent.core.status === "RUNNING").length,
-    );
+    expect(screen.getByLabelText(/Интерактивная пиксельная карта мира агентов/i)).toBeTruthy();
+    expect(container.querySelector('[data-renderer="agent-world-canvas-v1"]')).toBeTruthy();
+    expect(screen.queryByLabelText("Вид карты")).toBeNull();
+    expect(container.querySelector("svg.office-floor")).toBeNull();
   });
 
-  it("keeps selection and conversation actions on native agent controls", () => {
+  it("provides native keyboard-accessible selection and conversation controls", () => {
     const world = projectWorldView(buildContractFixture());
     const first = world.agents[0];
     expect(first).toBeDefined();
@@ -52,111 +49,35 @@ describe("OpenClaw Office World presentation", () => {
     const onSelectAgent = vi.fn();
     const onOpenConversation = vi.fn();
     render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={onSelectAgent}
-        onOpenConversation={onOpenConversation}
-      />,
+      <OpenClawOfficeWorld world={world} selectedAgentId={undefined} onSelectAgent={onSelectAgent} onOpenConversation={onOpenConversation} />,
     );
-    const control = screen.getByRole("button", { name: new RegExp(first.core.displayName) });
+    const control = screen.getByRole("button", { name: new RegExp(`^${first.core.displayName}:`) });
     fireEvent.click(control);
     fireEvent.doubleClick(control);
     expect(onSelectAgent).toHaveBeenCalledWith(first.core.agentId);
     expect(onOpenConversation).toHaveBeenCalledWith(first.core.agentId);
   });
 
-  it("renders only canonical action cues and keeps them inert", () => {
+  it("replays exactly the supplied canonical handoff in-world", () => {
     const world = projectWorldView(buildContractFixture());
     const { container } = render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={vi.fn()}
-        onOpenConversation={vi.fn()}
-      />,
+      <OpenClawOfficeWorld world={world} selectedAgentId={undefined} onSelectAgent={vi.fn()} onOpenConversation={vi.fn()} />,
     );
-    const cues = [...container.querySelectorAll("[data-action-cue]")].map((element) =>
-      element.getAttribute("data-action-cue"),
-    );
-    expect(cues.every((cue) => ["NONE", "WORK", "REVIEW"].includes(cue ?? ""))).toBe(true);
-    expect(container.querySelector("[data-action-cue='HANDOFF']")).toBeNull();
-    expect(container.querySelector("[data-action-cue='MEETING']")).toBeNull();
-  });
-
-  it("exposes a canonical handoff as text as well as a decorative map cue", () => {
-    const world = projectWorldView(buildContractFixture());
-    const { container } = render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={vi.fn()}
-        onOpenConversation={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("Research Lead → Reviewer")).toBeTruthy();
+    expect(container.querySelector("[data-handoff-cue]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Показать передачу" }));
+    expect(screen.getByRole("status").textContent).toContain("Research Lead → Reviewer");
     expect(container.querySelectorAll("[data-handoff-cue]")).toHaveLength(1);
   });
 
-  it("does not render reset when the configured skin is active", () => {
+  it("shows selected canonical task/activity context over the world", () => {
     const world = projectWorldView(buildContractFixture());
+    const research = world.agents.find((entry) => entry.core.displayName === "Research Lead");
+    expect(research).toBeDefined();
+    if (!research) return;
     render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={vi.fn()}
-        onOpenConversation={vi.fn()}
-        projectSkinId="minimal-grid-v1"
-      />,
+      <OpenClawOfficeWorld world={world} selectedAgentId={research.core.agentId} onSelectAgent={vi.fn()} onOpenConversation={vi.fn()} />,
     );
-
-    expect((screen.getByLabelText("Вид карты") as HTMLSelectElement).value).toBe("minimal-grid-v1");
-    expect(screen.queryByRole("button", { name: "Сбросить" })).toBeNull();
-  });
-
-  it("persists a user skin override and reveals reset", () => {
-    const world = projectWorldView(buildContractFixture());
-    const { container } = render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={vi.fn()}
-        onOpenConversation={vi.fn()}
-        projectSkinId="minimal-grid-v1"
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Вид карты"), {
-      target: { value: "space-station-v1" },
-    });
-
-    const worldSurface = container.querySelector("[data-skin]");
-    expect(worldSurface?.getAttribute("data-skin")).toBe("space-station-v1");
-    expect(worldSurface?.getAttribute("data-theme")).toBe("SPACE_STATION");
-    expect(window.localStorage.getItem("agent-world.office-skin.v1")).toBe("space-station-v1");
-    expect(screen.getByRole("button", { name: "Сбросить" })).toBeTruthy();
-  });
-
-  it("removes the user preference and applies configured skin on reset", () => {
-    const world = projectWorldView(buildContractFixture());
-    window.localStorage.setItem("agent-world.office-skin.v1", "space-station-v1");
-    const { container } = render(
-      <OpenClawOfficeWorld
-        world={world}
-        selectedAgentId={undefined}
-        onSelectAgent={vi.fn()}
-        onOpenConversation={vi.fn()}
-        projectSkinId="minimal-grid-v1"
-      />,
-    );
-
-    const worldSurface = container.querySelector("[data-skin]");
-    expect(screen.getByRole("button", { name: "Сбросить" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Сбросить" }));
-    expect(worldSurface?.getAttribute("data-skin")).toBe("minimal-grid-v1");
-    expect(worldSurface?.getAttribute("data-theme")).toBe("MINIMAL_GRID");
-    expect(window.localStorage.getItem("agent-world.office-skin.v1")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Сбросить" })).toBeNull();
+    expect(screen.getByText("Verify protocol contract")).toBeTruthy();
+    expect(screen.getByText(/Передача с Reviewer/)).toBeTruthy();
   });
 });
