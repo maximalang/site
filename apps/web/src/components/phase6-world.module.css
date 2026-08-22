@@ -411,7 +411,9 @@
   .eventFeed {
     right: 8px;
     bottom: calc(
-      var(--phase6-agent-rail-bottom) + var(--phase6-agent-rail-height) + var(--phase6-agent-sheet-gap)
+      var(--phase6-agent-rail-bottom) +
+      var(--phase6-agent-rail-height) +
+      var(--phase6-agent-sheet-gap)
     );
     width: min(270px, 70%);
   }
@@ -446,7 +448,9 @@
     left: 8px;
     right: 8px;
     bottom: calc(
-      var(--phase6-agent-rail-bottom) + var(--phase6-agent-rail-height) + var(--phase6-agent-sheet-gap)
+      var(--phase6-agent-rail-bottom) +
+      var(--phase6-agent-rail-height) +
+      var(--phase6-agent-sheet-gap)
     );
     top: auto;
     width: auto;
