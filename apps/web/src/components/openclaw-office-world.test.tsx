@@ -14,11 +14,18 @@ class ResizeObserverStub {
 
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+  vi.stubGlobal(
+    "requestAnimationFrame",
+    vi.fn(() => 1),
+  );
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
-    value: vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    value: vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
   });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 });
@@ -33,7 +40,12 @@ describe("Phase 6 living World renderer", () => {
   it("renders a game canvas and removes the rejected map selector", () => {
     const world = projectWorldView(buildContractFixture());
     const { container } = render(
-      <OpenClawOfficeWorld world={world} selectedAgentId={undefined} onSelectAgent={vi.fn()} onOpenConversation={vi.fn()} />,
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+      />,
     );
     expect(screen.getByLabelText(/Интерактивная пиксельная карта мира агентов/i)).toBeTruthy();
     expect(container.querySelector('[data-renderer="agent-world-canvas-v1"]')).toBeTruthy();
@@ -49,7 +61,12 @@ describe("Phase 6 living World renderer", () => {
     const onSelectAgent = vi.fn();
     const onOpenConversation = vi.fn();
     render(
-      <OpenClawOfficeWorld world={world} selectedAgentId={undefined} onSelectAgent={onSelectAgent} onOpenConversation={onOpenConversation} />,
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={onSelectAgent}
+        onOpenConversation={onOpenConversation}
+      />,
     );
     const control = screen.getByRole("button", { name: new RegExp(`^${first.core.displayName}:`) });
     fireEvent.click(control);
@@ -61,7 +78,12 @@ describe("Phase 6 living World renderer", () => {
   it("replays exactly the supplied canonical handoff in-world", () => {
     const world = projectWorldView(buildContractFixture());
     const { container } = render(
-      <OpenClawOfficeWorld world={world} selectedAgentId={undefined} onSelectAgent={vi.fn()} onOpenConversation={vi.fn()} />,
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+      />,
     );
     expect(container.querySelector("[data-handoff-cue]")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Показать передачу" }));
@@ -75,7 +97,12 @@ describe("Phase 6 living World renderer", () => {
     expect(research).toBeDefined();
     if (!research) return;
     render(
-      <OpenClawOfficeWorld world={world} selectedAgentId={research.core.agentId} onSelectAgent={vi.fn()} onOpenConversation={vi.fn()} />,
+      <OpenClawOfficeWorld
+        world={world}
+        selectedAgentId={research.core.agentId}
+        onSelectAgent={vi.fn()}
+        onOpenConversation={vi.fn()}
+      />,
     );
     expect(screen.getByText("Verify protocol contract")).toBeTruthy();
     expect(screen.getByText(/Передача с Reviewer/)).toBeTruthy();

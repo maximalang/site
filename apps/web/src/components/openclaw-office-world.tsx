@@ -46,7 +46,14 @@ const STATUS_COPY: Record<AgentProjectionCore["status"], string> = {
 };
 const CAMERA_DEFAULT: Camera = { x: WORLD_SIZE.width / 2, y: WORLD_SIZE.height / 2, zoom: 0.78 };
 
-function rect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: string) {
+function rect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+) {
   ctx.fillStyle = fill;
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
 }
@@ -59,7 +66,16 @@ function tree(ctx: CanvasRenderingContext2D, x: number, y: number, alternate: bo
   rect(ctx, x + 11, y + 7, 15, 15, "#315d37");
 }
 
-function building(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, roof: string, wall: string, label: string) {
+function building(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  roof: string,
+  wall: string,
+  label: string,
+) {
   rect(ctx, x + 7, y + 10, w, h, "#3d563e");
   rect(ctx, x, y, w, h, wall);
   rect(ctx, x - 8, y - 24, w + 16, 34, roof);
@@ -125,12 +141,36 @@ function createMap(): HTMLCanvasElement {
   ctx.textAlign = "center";
   ctx.fillText("COMMONS", 430, 832);
   rect(ctx, 570, 175, 150, 152, "#5b6e43");
-  for (let row = 0; row < 4; row += 1) for (let col = 0; col < 4; col += 1) {
-    rect(ctx, 588 + col * 31, 194 + row * 31, 18, 18, "#80603d");
-    rect(ctx, 594 + col * 31, 191 + row * 31, 6, 12, row % 2 ? "#d78852" : "#7fb857");
-  }
-  const trees: Array<[number, number]> = [[92,100],[145,172],[90,300],[175,366],[90,680],[150,820],[660,82],[900,92],[930,356],[930,695],[660,744],[614,862],[940,850],[1205,95],[1200,355],[1208,840],[214,92],[555,94],[550,390],[915,585]];
-  trees.forEach(([x, y], index) => tree(ctx, x, y, index % 2 === 0));
+  for (let row = 0; row < 4; row += 1)
+    for (let col = 0; col < 4; col += 1) {
+      rect(ctx, 588 + col * 31, 194 + row * 31, 18, 18, "#80603d");
+      rect(ctx, 594 + col * 31, 191 + row * 31, 6, 12, row % 2 ? "#d78852" : "#7fb857");
+    }
+  const trees: Array<[number, number]> = [
+    [92, 100],
+    [145, 172],
+    [90, 300],
+    [175, 366],
+    [90, 680],
+    [150, 820],
+    [660, 82],
+    [900, 92],
+    [930, 356],
+    [930, 695],
+    [660, 744],
+    [614, 862],
+    [940, 850],
+    [1205, 95],
+    [1200, 355],
+    [1208, 840],
+    [214, 92],
+    [555, 94],
+    [550, 390],
+    [915, 585],
+  ];
+  trees.forEach(([x, y], index) => {
+    tree(ctx, x, y, index % 2 === 0);
+  });
   for (let index = 0; index < 28; index += 1) {
     const x = 120 + ((index * 137) % 1070);
     const y = 95 + ((index * 211) % 760);
@@ -147,7 +187,14 @@ function facingFrom(dx: number, dy: number, previous: Facing): Facing {
   return dy < 0 ? "up" : "down";
 }
 
-function drawAgent(ctx: CanvasRenderingContext2D, agent: AgentProjectionCore, motion: Motion, selected: boolean, speaking: boolean, time: number) {
+function drawAgent(
+  ctx: CanvasRenderingContext2D,
+  agent: AgentProjectionCore,
+  motion: Motion,
+  selected: boolean,
+  speaking: boolean,
+  time: number,
+) {
   const identity = spriteIdentity(agent.agentId);
   const visual = statusVisual(agent.status);
   const frame = motion.moving ? Math.floor(time / 170) % 2 : 0;
@@ -156,9 +203,13 @@ function drawAgent(ctx: CanvasRenderingContext2D, agent: AgentProjectionCore, mo
   ctx.globalAlpha = visual.opacity;
   if (selected) {
     ctx.fillStyle = "#fff4a8";
-    ctx.beginPath(); ctx.ellipse(motion.x, motion.y + 25, 27, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(motion.x, motion.y + 25, 27, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = "#45533f";
-    ctx.beginPath(); ctx.ellipse(motion.x, motion.y + 25, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(motion.x, motion.y + 25, 20, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
   const x = Math.round(motion.x - 18);
   const y = Math.round(motion.y - 44 - bob);
@@ -171,28 +222,64 @@ function drawAgent(ctx: CanvasRenderingContext2D, agent: AgentProjectionCore, mo
   if (motion.facing === "up") rect(ctx, x + 10, y + 10, 20, 15, identity.hair);
   else if (motion.facing === "left") rect(ctx, x + 12, y + 18, 3, 3, "#273129");
   else if (motion.facing === "right") rect(ctx, x + 27, y + 18, 3, 3, "#273129");
-  else { rect(ctx, x + 15, y + 18, 3, 3, "#273129"); rect(ctx, x + 25, y + 18, 3, 3, "#273129"); }
-  if (visual.state === "blocked") { ctx.strokeStyle = "#d9664a"; ctx.lineWidth = 4; ctx.strokeRect(x + 3, y + 2, 35, 59); }
+  else {
+    rect(ctx, x + 15, y + 18, 3, 3, "#273129");
+    rect(ctx, x + 25, y + 18, 3, 3, "#273129");
+  }
+  if (visual.state === "blocked") {
+    ctx.strokeStyle = "#d9664a";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x + 3, y + 2, 35, 59);
+  }
   const bubble = speaking ? "speech" : agent.status === "RUNNING" ? "thought" : undefined;
   if (bubble) {
-    ctx.fillStyle = "#fff8d8"; ctx.strokeStyle = "#39483b"; ctx.lineWidth = 3;
-    if (bubble === "speech") { ctx.fillRect(motion.x - 24, motion.y - 83, 48, 29); ctx.strokeRect(motion.x - 24, motion.y - 83, 48, 29); rect(ctx, motion.x - 12, motion.y - 54, 8, 8, "#fff8d8"); }
-    else { ctx.beginPath(); ctx.arc(motion.x, motion.y - 68, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); rect(ctx, motion.x - 7, motion.y - 46, 6, 6, "#fff8d8"); }
-    for (let dot = 0; dot < 3; dot += 1) rect(ctx, motion.x - 11 + dot * 10, bubble === "speech" ? motion.y - 72 : motion.y - 71, 4, 4, "#50614e");
+    ctx.fillStyle = "#fff8d8";
+    ctx.strokeStyle = "#39483b";
+    ctx.lineWidth = 3;
+    if (bubble === "speech") {
+      ctx.fillRect(motion.x - 24, motion.y - 83, 48, 29);
+      ctx.strokeRect(motion.x - 24, motion.y - 83, 48, 29);
+      rect(ctx, motion.x - 12, motion.y - 54, 8, 8, "#fff8d8");
+    } else {
+      ctx.beginPath();
+      ctx.arc(motion.x, motion.y - 68, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      rect(ctx, motion.x - 7, motion.y - 46, 6, 6, "#fff8d8");
+    }
+    for (let dot = 0; dot < 3; dot += 1)
+      rect(
+        ctx,
+        motion.x - 11 + dot * 10,
+        bubble === "speech" ? motion.y - 72 : motion.y - 71,
+        4,
+        4,
+        "#50614e",
+      );
   }
   ctx.globalAlpha = visual.opacity;
   ctx.fillStyle = "rgb(24 35 28 / 88%)";
   ctx.fillRect(motion.x - 60, motion.y + 34, 120, 21);
-  ctx.fillStyle = "#fff8db"; ctx.font = "700 12px ui-monospace, SFMono-Regular, Menlo, monospace"; ctx.textAlign = "center";
+  ctx.fillStyle = "#fff8db";
+  ctx.font = "700 12px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textAlign = "center";
   ctx.fillText(agent.displayName.slice(0, 18), motion.x, motion.y + 49);
   ctx.restore();
 }
 
 function toWorld(point: WorldPoint, camera: Camera, viewport: WorldPoint): WorldPoint {
-  return { x: (point.x - viewport.x / 2) / camera.zoom + camera.x, y: (point.y - viewport.y / 2) / camera.zoom + camera.y };
+  return {
+    x: (point.x - viewport.x / 2) / camera.zoom + camera.x,
+    y: (point.y - viewport.y / 2) / camera.zoom + camera.y,
+  };
 }
 
-export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onOpenConversation }: OpenClawOfficeWorldProps) {
+export function OpenClawOfficeWorld({
+  world,
+  selectedAgentId,
+  onSelectAgent,
+  onOpenConversation,
+}: OpenClawOfficeWorldProps) {
   const agents = useMemo(() => world.agents.map((entry) => entry.core), [world.agents]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -217,7 +304,10 @@ export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onO
 
   useEffect(() => {
     if (!replayId) return;
-    const timer = window.setTimeout(() => setReplayId(undefined), reducedMotionRef.current ? 2400 : 6500);
+    const timer = window.setTimeout(
+      () => setReplayId(undefined),
+      reducedMotionRef.current ? 2400 : 6500,
+    );
     return () => window.clearTimeout(timer);
   }, [replayId]);
 
@@ -231,9 +321,12 @@ export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onO
       sizeRef.current = { x: Math.max(1, bounds.width), y: Math.max(1, bounds.height) };
       canvas.width = Math.max(1, Math.round(bounds.width * ratio));
       canvas.height = Math.max(1, Math.round(bounds.height * ratio));
-      canvas.style.width = `${bounds.width}px`; canvas.style.height = `${bounds.height}px`;
+      canvas.style.width = `${bounds.width}px`;
+      canvas.style.height = `${bounds.height}px`;
     };
-    const observer = new ResizeObserver(resize); observer.observe(shell); resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(shell);
+    resize();
     return () => observer.disconnect();
   }, []);
 
@@ -245,22 +338,47 @@ export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onO
       const map = mapRef.current;
       const ctx = canvas?.getContext("2d");
       if (canvas && map && ctx) {
-        const delta = Math.min(50, now - previous); previous = now;
+        const delta = Math.min(50, now - previous);
+        previous = now;
         const ratio = canvas.width / Math.max(1, sizeRef.current.x);
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, sizeRef.current.x, sizeRef.current.y);
         const camera = cameraRef.current;
         ctx.save();
-        ctx.translate(sizeRef.current.x / 2, sizeRef.current.y / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
+        ctx.translate(sizeRef.current.x / 2, sizeRef.current.y / 2);
+        ctx.scale(camera.zoom, camera.zoom);
+        ctx.translate(-camera.x, -camera.y);
         ctx.drawImage(map, 0, 0);
         agents.forEach((agent, index) => {
           const target = targetForAgent(agent, index, replay);
-          const existing = motionsRef.current.get(agent.agentId) ?? { x: target.x, y: target.y, facing: "down" as Facing, moving: false };
+          const existing = motionsRef.current.get(agent.agentId) ?? {
+            x: target.x,
+            y: target.y,
+            facing: "down" as Facing,
+            moving: false,
+          };
           const advanced = advancePosition(existing, target, delta, reducedMotionRef.current);
-          const dx = advanced.point.x - existing.x; const dy = advanced.point.y - existing.y;
-          const motion: Motion = { ...advanced.point, facing: facingFrom(dx, dy, existing.facing), moving: advanced.moving };
+          const dx = advanced.point.x - existing.x;
+          const dy = advanced.point.y - existing.y;
+          const motion: Motion = {
+            ...advanced.point,
+            facing: facingFrom(dx, dy, existing.facing),
+            moving: advanced.moving,
+          };
           motionsRef.current.set(agent.agentId, motion);
-          drawAgent(ctx, agent, motion, selectedAgentId === agent.agentId, speakingAgentId === agent.agentId || Boolean(replay && (replay.fromAgentId === agent.agentId || replay.toAgentId === agent.agentId)), now);
+          drawAgent(
+            ctx,
+            agent,
+            motion,
+            selectedAgentId === agent.agentId,
+            speakingAgentId === agent.agentId ||
+              Boolean(
+                replay &&
+                  (replay.fromAgentId === agent.agentId || replay.toAgentId === agent.agentId),
+              ),
+            now,
+          );
         });
         ctx.restore();
       }
@@ -286,28 +404,52 @@ export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onO
   };
   const pointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    const point = local(event); pointersRef.current.set(event.pointerId, point);
-    dragRef.current = { id: event.pointerId, start: point, camera: { ...cameraRef.current }, moved: false };
+    const point = local(event);
+    pointersRef.current.set(event.pointerId, point);
+    dragRef.current = {
+      id: event.pointerId,
+      start: point,
+      camera: { ...cameraRef.current },
+      moved: false,
+    };
     if (pointersRef.current.size === 2) {
       const [a, b] = [...pointersRef.current.values()];
-      if (a && b) pinchRef.current = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: cameraRef.current.zoom };
+      if (a && b)
+        pinchRef.current = {
+          distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+          zoom: cameraRef.current.zoom,
+        };
     }
   };
   const pointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!pointersRef.current.has(event.pointerId)) return;
-    const point = local(event); pointersRef.current.set(event.pointerId, point);
+    const point = local(event);
+    pointersRef.current.set(event.pointerId, point);
     if (pointersRef.current.size === 2 && pinchRef.current) {
       const [a, b] = [...pointersRef.current.values()];
-      if (a && b) setCamera({ ...cameraRef.current, zoom: pinchRef.current.zoom * Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)) / pinchRef.current.distance });
+      if (a && b)
+        setCamera({
+          ...cameraRef.current,
+          zoom:
+            (pinchRef.current.zoom * Math.max(1, Math.hypot(a.x - b.x, a.y - b.y))) /
+            pinchRef.current.distance,
+        });
       return;
     }
-    const drag = dragRef.current; if (!drag || drag.id !== event.pointerId) return;
-    const dx = point.x - drag.start.x; const dy = point.y - drag.start.y;
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = point.x - drag.start.x;
+    const dy = point.y - drag.start.y;
     if (Math.hypot(dx, dy) > 5) drag.moved = true;
-    setCamera({ x: drag.camera.x - dx / cameraRef.current.zoom, y: drag.camera.y - dy / cameraRef.current.zoom, zoom: cameraRef.current.zoom });
+    setCamera({
+      x: drag.camera.x - dx / cameraRef.current.zoom,
+      y: drag.camera.y - dy / cameraRef.current.zoom,
+      zoom: cameraRef.current.zoom,
+    });
   };
   const pointerEnd = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const point = local(event); const drag = dragRef.current;
+    const point = local(event);
+    const drag = dragRef.current;
     if (drag && drag.id === event.pointerId && !drag.moved && pointersRef.current.size === 1) {
       const worldPoint = toWorld(point, cameraRef.current, sizeRef.current);
       let hit: { id: AgentId; distance: number } | undefined;
@@ -317,7 +459,8 @@ export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onO
       }
       if (hit) onSelectAgent(hit.id);
     }
-    pointersRef.current.delete(event.pointerId); if (pointersRef.current.size < 2) pinchRef.current = undefined;
+    pointersRef.current.delete(event.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = undefined;
     if (drag?.id === event.pointerId) dragRef.current = undefined;
   };
   const wheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
@@ -327,37 +470,128 @@ export function OpenClawOfficeWorld({ world, selectedAgentId, onSelectAgent, onO
     const before = toWorld(cursor, cameraRef.current, sizeRef.current);
     const zoom = clampZoom(cameraRef.current.zoom * Math.exp(-event.deltaY * 0.0012));
     const after = toWorld(cursor, { ...cameraRef.current, zoom }, sizeRef.current);
-    setCamera({ x: cameraRef.current.x + before.x - after.x, y: cameraRef.current.y + before.y - after.y, zoom });
+    setCamera({
+      x: cameraRef.current.x + before.x - after.x,
+      y: cameraRef.current.y + before.y - after.y,
+      zoom,
+    });
   };
-  const openConversation = (id: AgentId) => { setSpeakingAgentId(id); onOpenConversation(id); };
+  const openConversation = (id: AgentId) => {
+    setSpeakingAgentId(id);
+    onOpenConversation(id);
+  };
   const replayFrom = replay ? byId.get(replay.fromAgentId) : undefined;
   const replayTo = replay ? byId.get(replay.toAgentId) : undefined;
   const selected = selectedAgentId ? byId.get(selectedAgentId) : undefined;
-  const selectedHandoff = selected ? [...world.handoffs].reverse().find((handoff) => handoff.fromAgentId === selected.agentId || handoff.toAgentId === selected.agentId) : undefined;
-  const selectedPeer = selectedHandoff ? byId.get(selectedHandoff.fromAgentId === selectedAgentId ? selectedHandoff.toAgentId : selectedHandoff.fromAgentId) : undefined;
+  const selectedHandoff = selected
+    ? [...world.handoffs]
+        .reverse()
+        .find(
+          (handoff) =>
+            handoff.fromAgentId === selected.agentId || handoff.toAgentId === selected.agentId,
+        )
+    : undefined;
+  const selectedPeer = selectedHandoff
+    ? byId.get(
+        selectedHandoff.fromAgentId === selectedAgentId
+          ? selectedHandoff.toAgentId
+          : selectedHandoff.fromAgentId,
+      )
+    : undefined;
 
   return (
-    <section aria-label="Карта World" className={`${styles.sceneShell} phase6-world`} data-renderer="agent-world-canvas-v1" data-skin="openclaw-office-open-floor-v1" data-testid="openclaw-office-world">
+    <section
+      aria-label="Карта World"
+      className={`${styles.sceneShell} phase6-world`}
+      data-renderer="agent-world-canvas-v1"
+      data-skin="openclaw-office-open-floor-v1"
+      data-testid="openclaw-office-world"
+    >
       <div className={styles.scene} ref={shellRef}>
-        <canvas aria-label="Интерактивная пиксельная карта мира агентов. Перетаскивайте для панорамирования, колесо или жест щипка меняет масштаб. Для клавиатуры используйте список агентов." className={styles.canvas} data-testid="agent-world-canvas" onPointerCancel={pointerEnd} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onWheel={wheel} ref={canvasRef} tabIndex={0} />
+        <canvas
+          aria-label="Интерактивная пиксельная карта мира агентов. Перетаскивайте для панорамирования, колесо или жест щипка меняет масштаб. Для клавиатуры используйте список агентов."
+          className={styles.canvas}
+          data-testid="agent-world-canvas"
+          onPointerCancel={pointerEnd}
+          onPointerDown={pointerDown}
+          onPointerMove={pointerMove}
+          onPointerUp={pointerEnd}
+          onWheel={wheel}
+          ref={canvasRef}
+          tabIndex={0}
+        />
         <div className={styles.hud}>
           <p className={styles.title}>Agent World</p>
-          <div aria-label="Управление картой" className={styles.controls}>
-            {latestHandoff ? <button className={styles.handoff} onClick={() => setReplayId(latestHandoff.id)} type="button">Показать передачу</button> : null}
-            <button className={styles.control} disabled={!selectedAgentId} onClick={focusSelected} type="button">К агенту</button>
-            <button className={styles.control} onClick={resetCamera} type="button">Весь мир</button>
+          <div aria-label="Управление картой" className={styles.controls} role="group">
+            {latestHandoff ? (
+              <button
+                className={styles.handoff}
+                onClick={() => setReplayId(latestHandoff.id)}
+                type="button"
+              >
+                Показать передачу
+              </button>
+            ) : null}
+            <button
+              className={styles.control}
+              disabled={!selectedAgentId}
+              onClick={focusSelected}
+              type="button"
+            >
+              К агенту
+            </button>
+            <button className={styles.control} onClick={resetCamera} type="button">
+              Весь мир
+            </button>
           </div>
         </div>
-        {replay && replayFrom && replayTo ? <div className={styles.handoffToast} data-handoff-cue role="status">Передача: {replayFrom.displayName} → {replayTo.displayName}</div> : null}
-        {selected ? <div className={styles.eventFeed} aria-live="polite"><p><strong>{selected.displayName}</strong> · {STATUS_COPY[selected.status]}</p><p>{selected.currentTask?.title ?? "Нет активной задачи"}</p>{selectedHandoff && selectedPeer ? <p>Передача с {selectedPeer.displayName}</p> : null}</div> : null}
+        {replay && replayFrom && replayTo ? (
+          <div className={styles.handoffToast} data-handoff-cue role="status">
+            Передача: {replayFrom.displayName} → {replayTo.displayName}
+          </div>
+        ) : null}
+        {selected ? (
+          <div className={styles.eventFeed} aria-live="polite">
+            <p>
+              <strong>{selected.displayName}</strong> · {STATUS_COPY[selected.status]}
+            </p>
+            <p>{selected.currentTask?.title ?? "Нет активной задачи"}</p>
+            {selectedHandoff && selectedPeer ? <p>Передача с {selectedPeer.displayName}</p> : null}
+          </div>
+        ) : null}
         <nav aria-label="Агенты мира" className={styles.agentNav}>
           {agents.map((agent) => {
             const identity = spriteIdentity(agent.agentId);
-            const style = { "--coat": identity.coat, "--accent": identity.accent, "--hair": identity.hair } as CSSProperties;
-            return <button aria-label={`${agent.displayName}: ${STATUS_COPY[agent.status]}`} aria-pressed={agent.agentId === selectedAgentId} className={styles.agentButton} data-selected={agent.agentId === selectedAgentId} key={agent.agentId} onClick={() => onSelectAgent(agent.agentId)} onDoubleClick={() => openConversation(agent.agentId)} style={style} type="button"><span aria-hidden="true" className={styles.miniSprite} /><span className={styles.agentCopy}><strong>{agent.displayName}</strong><small>{STATUS_COPY[agent.status]}</small></span></button>;
+            const style = {
+              "--coat": identity.coat,
+              "--accent": identity.accent,
+              "--hair": identity.hair,
+            } as CSSProperties;
+            return (
+              <button
+                aria-label={`${agent.displayName}: ${STATUS_COPY[agent.status]}`}
+                aria-pressed={agent.agentId === selectedAgentId}
+                className={styles.agentButton}
+                data-selected={agent.agentId === selectedAgentId}
+                key={agent.agentId}
+                onClick={() => onSelectAgent(agent.agentId)}
+                onDoubleClick={() => openConversation(agent.agentId)}
+                style={style}
+                type="button"
+              >
+                <span aria-hidden="true" className={styles.miniSprite} />
+                <span className={styles.agentCopy}>
+                  <strong>{agent.displayName}</strong>
+                  <small>{STATUS_COPY[agent.status]}</small>
+                </span>
+              </button>
+            );
           })}
         </nav>
-        <span className={styles.srOnly}>Двойной клик по кнопке агента открывает диалог. Каноническое состояние и передачи не изменяются движением персонажей.</span>
+        <span className={styles.srOnly}>
+          Двойной клик по кнопке агента открывает диалог. Каноническое состояние и передачи не
+          изменяются движением персонажей.
+        </span>
       </div>
     </section>
   );

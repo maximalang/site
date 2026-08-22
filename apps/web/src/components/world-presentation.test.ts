@@ -1,6 +1,15 @@
 import type { AgentProjectionCore, WorldHandoff } from "@agent-world/read-model";
 import { describe, expect, it } from "vitest";
-import { advancePosition, clampCamera, clampZoom, spriteIdentity, statusTargetZone, statusVisual, targetForAgent, WORLD_SIZE } from "./world-presentation";
+import {
+  advancePosition,
+  clampCamera,
+  clampZoom,
+  spriteIdentity,
+  statusTargetZone,
+  statusVisual,
+  targetForAgent,
+  WORLD_SIZE,
+} from "./world-presentation";
 
 const agent: AgentProjectionCore = {
   agentId: "agent_11111111-1111-1111-1111-111111111111",
@@ -53,7 +62,10 @@ describe("Phase 6 World presentation model", () => {
   });
 
   it("suppresses ambient interpolation for reduced motion", () => {
-    expect(advancePosition({ x: 0, y: 0 }, { x: 100, y: 50 }, 16, true)).toEqual({ point: { x: 100, y: 50 }, moving: false });
+    expect(advancePosition({ x: 0, y: 0 }, { x: 100, y: 50 }, 16, true)).toEqual({
+      point: { x: 100, y: 50 },
+      moving: false,
+    });
     expect(advancePosition({ x: 0, y: 0 }, { x: 100, y: 0 }, 16, false).moving).toBe(true);
   });
 
