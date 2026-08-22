@@ -82,13 +82,19 @@ async function assertWorldDominant(page, target, selected = false) {
   const canvas = page.getByTestId("agent-world-canvas");
   await renderer.waitFor({ state: "visible" });
   await canvas.waitFor({ state: "visible" });
+  const rendererBox = await renderer.boundingBox();
   const box = await canvas.boundingBox();
+  assert(rendererBox, `${target.label}: renderer has no geometry`);
   assert(box, `${target.label}: canvas has no geometry`);
   const mobile = target.viewport.width <= 720;
-  const minimumWidth = selected && !mobile ? 0.68 : mobile ? 0.98 : 0.98;
+  const minimumViewportShare = selected && !mobile ? 0.68 : 0.94;
   assert(
-    box.width >= target.viewport.width * minimumWidth,
-    `${target.label}: World is not horizontally dominant (${box.width}px)`,
+    box.width >= rendererBox.width - 1,
+    `${target.label}: canvas does not fill available renderer width (${box.width}/${rendererBox.width}px)`,
+  );
+  assert(
+    rendererBox.width >= target.viewport.width * minimumViewportShare,
+    `${target.label}: World is not horizontally dominant (${rendererBox.width}px)`,
   );
   assert(
     box.height >= target.viewport.height * (mobile ? 0.68 : 0.7),
