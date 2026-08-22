@@ -68,8 +68,14 @@ async function assertFixtureStrip(page, target) {
   const wholeWorld = renderer.getByRole("button", { name: "Весь мир" });
   const titleBox = await boxOf(worldTitle, `${target.label} World title`);
   const controlBox = await boxOf(wholeWorld, `${target.label} whole-world control`);
-  assert(!overlaps(fixtureBox, titleBox), `${target.label}: fixture warning covers Agent World title`);
-  assert(!overlaps(fixtureBox, controlBox), `${target.label}: fixture warning covers World controls`);
+  assert(
+    !overlaps(fixtureBox, titleBox),
+    `${target.label}: fixture warning covers Agent World title`,
+  );
+  assert(
+    !overlaps(fixtureBox, controlBox),
+    `${target.label}: fixture warning covers World controls`,
+  );
 }
 async function assertWorldDominant(page, target, selected = false) {
   const renderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
@@ -217,5 +223,10 @@ try {
 } finally {
   await browser.close();
 }
-assert(screenshotCount === 12, `Expected exactly 12 Phase 6 screenshots, received ${screenshotCount}`);
-console.log(`Phase 6 AI Town visual evidence written to ${outputDir} (${screenshotCount} screenshots)`);
+assert(
+  screenshotCount === 12,
+  `Expected exactly 12 Phase 6 screenshots, received ${screenshotCount}`,
+);
+console.log(
+  `Phase 6 AI Town visual evidence written to ${outputDir} (${screenshotCount} screenshots)`,
+);
