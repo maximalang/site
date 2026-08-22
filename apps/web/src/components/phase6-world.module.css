@@ -264,6 +264,7 @@
   padding: 5px 9px;
   font-size: 10px;
   opacity: 0.9;
+  pointer-events: none;
 }
 :global(.app-shell:has(.phase6-world) .workspace-grid) {
   display: grid;
