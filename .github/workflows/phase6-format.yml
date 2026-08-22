@@ -1,0 +1,61 @@
+name: Phase 6 formatter
+
+on:
+  push:
+    branches:
+      - codex/phase-6-ai-town-world-ui
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: codex/phase-6-ai-town-world-ui
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.15.0
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - name: Apply Phase 6 lint corrections and formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          css = Path("apps/web/src/components/phase6-world.module.css")
+          text = css.read_text()
+          text = text.replace("!important", "")
+          css.write_text(text)
+
+          renderer = Path("apps/web/src/components/openclaw-office-world.tsx")
+          text = renderer.read_text()
+          text = text.replace(
+              "trees.forEach(([x, y], index) => tree(ctx, x, y, index % 2 === 0));",
+              "trees.forEach(([x, y], index) => { tree(ctx, x, y, index % 2 === 0); });",
+          )
+          text = text.replace(
+              '<div aria-label="Управление картой" className={styles.controls}>',
+              '<div aria-label="Управление картой" className={styles.controls} role="group">',
+          )
+          renderer.write_text(text)
+          PY
+          npm run format
+          git diff --check
+      - name: Commit formatter output
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/components apps/web/scripts
+          git commit -m "Phase 6: format living World UI"
+          git push origin HEAD:codex/phase-6-ai-town-world-ui
