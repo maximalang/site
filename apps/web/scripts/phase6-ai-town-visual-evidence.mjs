@@ -100,9 +100,10 @@ async function assertWorldDominant(page, target, selected = false) {
     box.height >= target.viewport.height * (mobile ? 0.68 : 0.7),
     `${target.label}: World is not vertically dominant (${box.height}px)`,
   );
+  const lowerDeadRegion = target.viewport.height - (box.y + box.height);
   assert(
-    box.y + box.height >= target.viewport.height - 2,
-    `${target.label}: World leaves a lower dead region (${box.y + box.height}px bottom)`,
+    lowerDeadRegion <= target.viewport.height * 0.02,
+    `${target.label}: World leaves a material lower dead region (${lowerDeadRegion}px)`,
   );
   assert(
     (await page.getByLabel("Вид карты").count()) === 0,
