@@ -49,7 +49,8 @@ export function statusTargetZone(
 }
 
 export function spriteIdentity(agentId: string): SpriteIdentity {
-  const variant = hashText(agentId) % PALETTES.length;
+  const hash = hashText(agentId);
+  const variant = ((hash ^ (hash >>> 16)) >>> 0) % PALETTES.length;
   const palette = PALETTES[variant] ?? PALETTES[0];
   return { variant, coat: palette[0], accent: palette[1], hair: palette[2] };
 }
