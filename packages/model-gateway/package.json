@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test:live": "node scripts/verify-litellm-live.mjs"
+    "test:live": "node scripts/verify-litellm-live.mjs && node scripts/verify-openrouter-litellm-live.mjs"
   },
   "dependencies": {
     "@agent-world/conversation-service": "0.0.0",
