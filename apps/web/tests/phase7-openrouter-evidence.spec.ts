@@ -94,7 +94,7 @@ test("Phase 7 OpenRouter Hub evidence", async ({ page }, testInfo) => {
     agents: [
       {
         agentId: agent.agentId,
-        slug: agent.slug,
+        slug: "researcher",
         displayName: agent.displayName,
         role: agent.role,
         isEnabled: true,
