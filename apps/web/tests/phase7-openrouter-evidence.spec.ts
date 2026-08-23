@@ -212,8 +212,8 @@ test("Phase 7 OpenRouter Hub evidence", async ({ page }, testInfo) => {
 
   await page.getByRole("tab", { name: "Маршруты" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "API-ключ провайдера" })).toBeVisible();
-  await expect(page.getByLabel("Аккаунт")).toHaveValue(accountId);
-  const secretField = page.getByLabel("API-ключ");
+  await expect(page.getByLabel("АккаунтOpenRouter owner API", { exact: true })).toHaveValue(accountId);
+  const secretField = page.getByLabel("API-ключ", { exact: true });
   await expect(secretField).toHaveAttribute("type", "password");
   await expect(secretField).toHaveValue("");
   await expect(page.getByText(remoteModelId, { exact: false }).first()).toBeVisible();
