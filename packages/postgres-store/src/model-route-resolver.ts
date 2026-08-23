@@ -55,8 +55,7 @@ type RouteRow = QueryResultRow & {
 };
 
 const OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
-const OPENROUTER_REMOTE_MODEL_ID =
-  /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:/+-]*$/;
+const OPENROUTER_REMOTE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:/+-]*$/;
 
 const PROVIDER_PREFIX: Partial<Record<ProviderKind, string>> = {
   OPENAI: "openai",
