@@ -55,6 +55,8 @@ type RouteRow = QueryResultRow & {
 };
 
 const OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
+const OPENROUTER_REMOTE_MODEL_ID =
+  /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:/+-]*$/;
 
 const PROVIDER_PREFIX: Partial<Record<ProviderKind, string>> = {
   OPENAI: "openai",
@@ -71,6 +73,10 @@ const PROVIDER_PREFIX: Partial<Record<ProviderKind, string>> = {
   LM_STUDIO: "openai",
   CUSTOM_OPENAI_COMPATIBLE: "openai",
 };
+
+function validOpenRouterRemoteModelId(value: string): boolean {
+  return value.length > 2 && value.length <= 512 && OPENROUTER_REMOTE_MODEL_ID.test(value);
+}
 
 function apiBaseFor(
   providerKind: ProviderKind,
@@ -162,7 +168,8 @@ export class PostgresModelRouteResolver {
       row.availability !== "AVAILABLE" ||
       !row.route_enabled ||
       !row.provider_enabled ||
-      prefix === undefined
+      prefix === undefined ||
+      (row.provider_kind === "OPENROUTER" && !validOpenRouterRemoteModelId(row.remote_model_id))
     ) {
       throw new RouteResolutionError("INELIGIBLE_ROUTE");
     }
