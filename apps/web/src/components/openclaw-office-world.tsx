@@ -15,6 +15,7 @@ import {
   advancePosition,
   clampCamera,
   clampZoom,
+  COLLABORATION_POINT,
   fitWorldCamera,
   initialCameraForAgents,
   spriteIdentity,
@@ -413,6 +414,15 @@ export function OpenClawOfficeWorld({
     const motion = motionsRef.current.get(selectedAgentId);
     if (motion) setCamera({ x: motion.x, y: motion.y, zoom: 1.45 });
   };
+  const replayLatestHandoff = () => {
+    if (!latestHandoff) return;
+    setReplayId(latestHandoff.id);
+    setCamera({
+      x: COLLABORATION_POINT.x,
+      y: COLLABORATION_POINT.y,
+      zoom: cameraRef.current.zoom,
+    });
+  };
   const local = (event: ReactPointerEvent<HTMLCanvasElement>): WorldPoint => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
@@ -540,11 +550,7 @@ export function OpenClawOfficeWorld({
           <fieldset className={styles.controls}>
             <legend className={styles.srOnly}>Управление картой</legend>
             {latestHandoff ? (
-              <button
-                className={styles.handoff}
-                onClick={() => setReplayId(latestHandoff.id)}
-                type="button"
-              >
+              <button className={styles.handoff} onClick={replayLatestHandoff} type="button">
                 Показать передачу
               </button>
             ) : null}
