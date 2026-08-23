@@ -4,7 +4,7 @@ import {
   HubReadModelSchema,
   resolveExecutionPreferences,
 } from "@agent-world/read-model";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { buildContractFixture } from "../src/test-fixtures";
 
 const providerId = "provider_70707070-7070-7070-7070-707070707070";
@@ -190,7 +190,9 @@ test("Phase 7 OpenRouter Hub evidence", async ({ page }, testInfo) => {
     caret: "hide",
     fullPage: false,
     path: testInfo.outputPath(
-      desktop ? "phase7-1440-hub-registry-openrouter.png" : "phase7-390-hub-registry-openrouter.png",
+      desktop
+        ? "phase7-1440-hub-registry-openrouter.png"
+        : "phase7-390-hub-registry-openrouter.png",
     ),
   });
 
