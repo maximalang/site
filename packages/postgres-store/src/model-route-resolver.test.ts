@@ -72,7 +72,9 @@ describe("PostgresModelRouteResolver", () => {
   });
 
   it("preserves the OpenRouter model slug while deriving the LiteLLM namespace and fixed origin", async () => {
-    const resolver = new PostgresModelRouteResolver(poolWith(openRouterRoute("anthropic/test-model")));
+    const resolver = new PostgresModelRouteResolver(
+      poolWith(openRouterRoute("anthropic/test-model")),
+    );
     await expect(resolver.resolve(routeId)).resolves.toMatchObject({
       providerKind: "OPENROUTER",
       mode: "API",
