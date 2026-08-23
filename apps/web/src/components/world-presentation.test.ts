@@ -107,19 +107,22 @@ describe("Phase 6 World presentation model", () => {
     { viewport: { x: 1024, y: 686 }, minimumZoom: 1.1 },
     { viewport: { x: 390, y: 770 }, minimumZoom: 1.1 },
     { viewport: { x: 320, y: 646 }, minimumZoom: 0.9 },
-  ])("keeps the canonical agent composition readable at $viewport.x px", ({ viewport, minimumZoom }) => {
-    const agents: AgentProjectionCore[] = [
-      { ...agent, status: "RUNNING" },
-      { ...reviewer, status: "IDLE" },
-    ];
-    const camera = initialCameraForAgents(agents, viewport);
-    expect(camera.zoom).toBeGreaterThanOrEqual(minimumZoom);
-    expect(camera.zoom).toBeGreaterThan(fitWorldCamera(viewport).zoom);
-    expect(camera.x).toBeGreaterThan(0);
-    expect(camera.x).toBeLessThan(WORLD_SIZE.width);
-    expect(camera.y).toBeGreaterThan(0);
-    expect(camera.y).toBeLessThan(WORLD_SIZE.height);
-  });
+  ])(
+    "keeps the canonical agent composition readable at $viewport.x px",
+    ({ viewport, minimumZoom }) => {
+      const agents: AgentProjectionCore[] = [
+        { ...agent, status: "RUNNING" },
+        { ...reviewer, status: "IDLE" },
+      ];
+      const camera = initialCameraForAgents(agents, viewport);
+      expect(camera.zoom).toBeGreaterThanOrEqual(minimumZoom);
+      expect(camera.zoom).toBeGreaterThan(fitWorldCamera(viewport).zoom);
+      expect(camera.x).toBeGreaterThan(0);
+      expect(camera.x).toBeLessThan(WORLD_SIZE.width);
+      expect(camera.y).toBeGreaterThan(0);
+      expect(camera.y).toBeLessThan(WORLD_SIZE.height);
+    },
+  );
 
   it("focuses compact initial composition on canonical active agents without fixture-specific IDs", () => {
     const viewport = { x: 390, y: 770 };
