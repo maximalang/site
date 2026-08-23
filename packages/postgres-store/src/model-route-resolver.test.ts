@@ -61,6 +61,25 @@ describe("PostgresModelRouteResolver", () => {
     });
   });
 
+  it("preserves the OpenRouter model slug while deriving the LiteLLM namespace", async () => {
+    const openRouterRoute = {
+      ...apiRoute,
+      provider_kind: "OPENROUTER",
+      provider_base_url: "https://untrusted.example/v1",
+      remote_model_id: "anthropic/test-model",
+      credential_ref: "secret-store:accounts/openrouter/provider-api-key",
+    };
+    const resolver = new PostgresModelRouteResolver(poolWith(openRouterRoute));
+    await expect(resolver.resolve(routeId)).resolves.toMatchObject({
+      providerKind: "OPENROUTER",
+      mode: "API",
+      remoteModelId: "anthropic/test-model",
+      providerModel: "openrouter/anthropic/test-model",
+      apiBase: "https://openrouter.ai/api/v1",
+      credentialRef: "secret-store:accounts/openrouter/provider-api-key",
+    });
+  });
+
   it.each([
     ["missing", undefined],
     ["disabled route", { ...apiRoute, route_enabled: false }],

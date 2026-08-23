@@ -106,6 +106,34 @@ describe("LiteLlmModelGateway", () => {
     expect(String(failure)).not.toContain("gateway-master-key");
   });
 
+  it.each([
+    [429, "RATE_LIMITED"],
+    [503, "UPSTREAM_UNAVAILABLE"],
+    [504, "TIMEOUT"],
+  ] as const)("maps upstream HTTP %s to %s", async (status, code) => {
+    const gateway = createGateway(
+      vi.fn<typeof fetch>(
+        async () => new Response("test-openrouter-key must stay hidden", { status }),
+      ),
+    );
+    const failure = await gateway.complete(gatewayRequest).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ModelGatewayFailure);
+    expect(failure).toMatchObject({ code });
+    expect(String(failure)).not.toContain("test-openrouter-key");
+  });
+
+  it("normalizes transport failures without reflecting the network cause", async () => {
+    const gateway = createGateway(
+      vi.fn<typeof fetch>(async () => {
+        throw new Error("network failure carried test-openrouter-key");
+      }),
+    );
+    const failure = await gateway.complete(gatewayRequest).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ModelGatewayFailure);
+    expect(failure).toMatchObject({ code: "UPSTREAM_UNAVAILABLE" });
+    expect(String(failure)).not.toContain("test-openrouter-key");
+  });
+
   it("rejects malformed upstream tool arguments", async () => {
     const gateway = createGateway(
       vi.fn<typeof fetch>(
