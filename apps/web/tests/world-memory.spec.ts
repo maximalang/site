@@ -204,43 +204,30 @@ async function installReadRoutes(page: import("@playwright/test").Page) {
   });
 }
 
-test("World skin preference and Memory Network remain canonical in the browser", async ({
+test("World renderer and Memory Network remain canonical in the browser", async ({
   page,
 }, testInfo) => {
   await installReadRoutes(page);
   await page.goto("/");
 
-  const skinSelector = page.getByLabel("Вид карты");
-  await expect(skinSelector).toHaveValue("openclaw-office-open-floor-v1");
+  const worldRenderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
+  await expect(worldRenderer).toBeVisible();
+  await expect(page.getByTestId("agent-world-canvas")).toBeVisible();
+  await expect(page.getByLabel("Вид карты")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: /Research Lead.*Открыть карточку агента/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Research Lead:/ })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
     ),
   ).toBe(true);
-
-  await skinSelector.selectOption("space-station-v1");
-  const spaceStation = page.locator('[data-skin="space-station-v1"]');
-  await expect(spaceStation).toBeVisible();
-  await expect(spaceStation.getByRole("button", { name: /Research Lead/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Сбросить" })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBe(
-    "space-station-v1",
-  );
+  expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBeNull();
   await page.screenshot({
     animations: "disabled",
     caret: "hide",
     fullPage: true,
-    path: testInfo.outputPath(`${testInfo.project.name}-world-space-station.png`),
+    path: testInfo.outputPath(`${testInfo.project.name}-world-ai-town.png`),
   });
-
-  await page.getByRole("button", { name: "Сбросить" }).click();
-  await expect(page.locator('[data-skin="openclaw-office-open-floor-v1"]')).toBeVisible();
-  await expect(page.getByRole("button", { name: "Сбросить" })).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem("agent-world.office-skin.v1"))).toBeNull();
 
   await page.getByRole("tab", { name: "Hub" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Canonical Hub" })).toBeVisible();

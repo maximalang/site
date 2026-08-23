@@ -496,18 +496,24 @@ test("World, Command and Hub expose one canonical control surface", async ({ pag
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
   const brandSubtitle = page.getByText("Операторская среда", { exact: true });
-  if ((page.viewportSize()?.width ?? 1440) <= 640) {
-    await expect(brandSubtitle).toBeHidden();
-  } else {
-    await expect(brandSubtitle).toBeVisible();
-  }
-  await expect(page.getByText("Тестовые данные", { exact: true })).toBeVisible();
+  await expect(brandSubtitle).toBeHidden();
   await expect(page.getByRole("note")).toContainText("тестовые данные");
   await expect(page.getByRole("note")).toContainText("не отражает состояние Runtime");
   await expect(page.locator("main")).toHaveCount(1);
-  await expect(page.getByText("Research Lead → Reviewer", { exact: true })).toBeVisible();
+  const worldRenderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
+  await expect(worldRenderer).toBeVisible();
+  await expect(page.getByTestId("agent-world-canvas")).toBeVisible();
+  await expect(page.getByLabel("Вид карты")).toHaveCount(0);
+  await expect(page.locator("[data-handoff-cue]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Показать передачу" }).click();
+  await expect(page.getByText("Передача: Research Lead → Reviewer", { exact: true })).toBeVisible();
   await expect(page.locator("[data-handoff-cue]")).toHaveCount(1);
 
+  await page.evaluate(() => {
+    document.body.tabIndex = -1;
+    document.body.focus();
+    document.body.removeAttribute("tabindex");
+  });
   const skipLink = page.getByRole("link", { name: "К содержанию" });
   await page.keyboard.press("Tab");
   await expect(skipLink).toBeFocused();
