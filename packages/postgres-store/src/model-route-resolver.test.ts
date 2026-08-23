@@ -44,6 +44,16 @@ const apiRoute = {
   secret_purpose: "PROVIDER_API_KEY",
 };
 
+function openRouterRoute(remoteModelId: string) {
+  return {
+    ...apiRoute,
+    provider_kind: "OPENROUTER",
+    provider_base_url: "https://untrusted.example/v1",
+    remote_model_id: remoteModelId,
+    credential_ref: "secret-store:accounts/openrouter/provider-api-key",
+  };
+}
+
 describe("PostgresModelRouteResolver", () => {
   it("resolves one eligible API route without reading secret plaintext", async () => {
     const resolver = new PostgresModelRouteResolver(poolWith(apiRoute));
@@ -61,15 +71,8 @@ describe("PostgresModelRouteResolver", () => {
     });
   });
 
-  it("preserves the OpenRouter model slug while deriving the LiteLLM namespace", async () => {
-    const openRouterRoute = {
-      ...apiRoute,
-      provider_kind: "OPENROUTER",
-      provider_base_url: "https://untrusted.example/v1",
-      remote_model_id: "anthropic/test-model",
-      credential_ref: "secret-store:accounts/openrouter/provider-api-key",
-    };
-    const resolver = new PostgresModelRouteResolver(poolWith(openRouterRoute));
+  it("preserves the OpenRouter model slug while deriving the LiteLLM namespace and fixed origin", async () => {
+    const resolver = new PostgresModelRouteResolver(poolWith(openRouterRoute("anthropic/test-model")));
     await expect(resolver.resolve(routeId)).resolves.toMatchObject({
       providerKind: "OPENROUTER",
       mode: "API",
@@ -81,13 +84,43 @@ describe("PostgresModelRouteResolver", () => {
   });
 
   it.each([
+    "openai/gpt-5",
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-sonnet-4.5:beta",
+    "openrouter/free",
+  ])("accepts canonical OpenRouter model id %s", async (remoteModelId) => {
+    const resolver = new PostgresModelRouteResolver(poolWith(openRouterRoute(remoteModelId)));
+    await expect(resolver.resolve(routeId)).resolves.toMatchObject({
+      remoteModelId,
+      providerModel: `openrouter/${remoteModelId}`,
+      apiBase: "https://openrouter.ai/api/v1",
+    });
+  });
+
+  it.each([
+    "gpt-5",
+    "/gpt-5",
+    "openai/",
+    "openai/gpt 5",
+    "https://openrouter.ai/model",
+    " openai/gpt-5",
+    "openai/gpt-5 ",
+    `openai/${"x".repeat(507)}`,
+  ])("rejects malformed OpenRouter model id %s", async (remoteModelId) => {
+    const resolver = new PostgresModelRouteResolver(poolWith(openRouterRoute(remoteModelId)));
+    await expect(resolver.resolve(routeId)).rejects.toMatchObject({ code: "INELIGIBLE_ROUTE" });
+  });
+
+  it.each([
     ["missing", undefined],
     ["disabled route", { ...apiRoute, route_enabled: false }],
     ["degraded route", { ...apiRoute, availability: "DEGRADED" }],
     ["disabled provider", { ...apiRoute, provider_enabled: false }],
     ["unconfigured account", { ...apiRoute, account_health: "UNCONFIGURED" }],
+    ["disabled account", { ...apiRoute, account_enabled: false }],
     ["missing key reference", { ...apiRoute, credential_ref: null }],
     ["missing encrypted secret", { ...apiRoute, secret_purpose: null }],
+    ["wrong secret purpose", { ...apiRoute, secret_purpose: "INTEGRATION_CREDENTIAL" }],
   ])("fails closed for %s", async (_label, row) => {
     const resolver = new PostgresModelRouteResolver(poolWith(row));
     await expect(resolver.resolve(routeId)).rejects.toBeInstanceOf(RouteResolutionError);
