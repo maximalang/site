@@ -19,7 +19,7 @@ describe("model route check HTTP", () => {
       providerId: "provider_33333333-3333-3333-3333-333333333333",
       accountId: "account_44444444-4444-4444-4444-444444444444",
       mode: "API",
-      remoteModelId: "gpt-5-mini",
+      remoteModelId: "anthropic/test-model",
       status: "SUCCEEDED",
       usage: { inputTokens: 6, outputTokens: 1, totalTokens: 7 },
     }));
@@ -27,7 +27,12 @@ describe("model route check HTTP", () => {
       request(),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ modelRouteId, mode: "API", status: "SUCCEEDED" });
+    expect(await response.json()).toMatchObject({
+      modelRouteId,
+      mode: "API",
+      remoteModelId: "anthropic/test-model",
+      status: "SUCCEEDED",
+    });
     expect(check).toHaveBeenCalledWith(modelRouteId);
   });
 
@@ -45,5 +50,28 @@ describe("model route check HTTP", () => {
       ).status,
     ).toBe(400);
     expect(check).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "UPSTREAM_AUTH",
+    "RATE_LIMITED",
+    "TIMEOUT",
+    "UPSTREAM_UNAVAILABLE",
+    "INVALID_UPSTREAM_RESPONSE",
+  ])("normalizes %s without reflecting upstream details or credentials", async (failure) => {
+    const secret = "sk-or-super-secret";
+    const upstream = `${failure}: OpenRouter rejected Authorization: Bearer ${secret}`;
+    const response = await createModelRouteCheckHandler({
+      authorize: async () => true,
+      check: async () => {
+        throw new Error(upstream);
+      },
+    })(request());
+    const body = JSON.stringify(await response.json());
+    expect(response.status).toBe(503);
+    expect(body).toBe('{"error":{"code":"MODEL_ROUTE_CHECK_FAILED"}}');
+    expect(body).not.toContain(secret);
+    expect(body).not.toContain(failure);
+    expect(body).not.toContain("OpenRouter rejected");
   });
 });

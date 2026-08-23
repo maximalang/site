@@ -34,6 +34,31 @@ describe("LiteLlmProjectionReconciler", () => {
     });
   });
 
+  it("projects the canonical OpenRouter origin, namespaced model and credential", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
+    const reconciler = new LiteLlmProjectionReconciler({
+      baseUrl: "http://litellm:4000",
+      credentialProvider: async () => "gateway-master-key",
+      fetch: fetchMock,
+    });
+    const openRouterProjection = {
+      ...projection,
+      providerModel: "openrouter/anthropic/test-model",
+      apiBase: "https://openrouter.ai/api/v1",
+      credential: "test-openrouter-key",
+    };
+
+    await expect(reconciler.reconcile(openRouterProjection)).resolves.toEqual({
+      outcome: "UPDATED",
+    });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.litellm_params).toEqual({
+      model: "openrouter/anthropic/test-model",
+      api_base: "https://openrouter.ai/api/v1",
+      api_key: "test-openrouter-key",
+    });
+  });
+
   it("creates the same deterministic projection when absent", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

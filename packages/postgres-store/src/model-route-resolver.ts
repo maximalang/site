@@ -54,6 +54,9 @@ type RouteRow = QueryResultRow & {
   secret_purpose: string | null;
 };
 
+const OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
+const OPENROUTER_REMOTE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:/+-]*$/;
+
 const PROVIDER_PREFIX: Partial<Record<ProviderKind, string>> = {
   OPENAI: "openai",
   ANTHROPIC: "anthropic",
@@ -69,6 +72,18 @@ const PROVIDER_PREFIX: Partial<Record<ProviderKind, string>> = {
   LM_STUDIO: "openai",
   CUSTOM_OPENAI_COMPATIBLE: "openai",
 };
+
+function validOpenRouterRemoteModelId(value: string): boolean {
+  return value.length > 2 && value.length <= 512 && OPENROUTER_REMOTE_MODEL_ID.test(value);
+}
+
+function apiBaseFor(
+  providerKind: ProviderKind,
+  configuredBaseUrl: string | null,
+): string | undefined {
+  if (providerKind === "OPENROUTER") return OPENROUTER_API_BASE;
+  return configuredBaseUrl ?? undefined;
+}
 
 function exactOrigin(value: string): string {
   let url: URL;
@@ -152,7 +167,8 @@ export class PostgresModelRouteResolver {
       row.availability !== "AVAILABLE" ||
       !row.route_enabled ||
       !row.provider_enabled ||
-      prefix === undefined
+      prefix === undefined ||
+      (row.provider_kind === "OPENROUTER" && !validOpenRouterRemoteModelId(row.remote_model_id))
     ) {
       throw new RouteResolutionError("INELIGIBLE_ROUTE");
     }
@@ -177,11 +193,12 @@ export class PostgresModelRouteResolver {
       ) {
         throw new RouteResolutionError("INELIGIBLE_ROUTE");
       }
+      const apiBase = apiBaseFor(row.provider_kind, row.provider_base_url);
       return {
         ...common,
         accountId: AccountIdSchema.parse(row.account_id),
         mode: "API",
-        ...(row.provider_base_url === null ? {} : { apiBase: row.provider_base_url }),
+        ...(apiBase === undefined ? {} : { apiBase }),
         credentialRef: row.credential_ref,
       };
     }

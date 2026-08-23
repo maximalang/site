@@ -9,9 +9,19 @@ import { ModelExecutionConnectionPanel } from "./model-execution-connection-pane
 afterEach(cleanup);
 
 const model = {
+  providers: [],
+  accounts: [],
   models: [
     {
+      modelId: "model_44444444-4444-4444-8444-444444444444",
       displayName: "GPT-X",
+      isEnabled: true,
+      capabilities: {
+        reasoning: false,
+        toolUse: true,
+        modalities: ["TEXT"],
+        contextWindowTokens: 128_000,
+      },
       routes: [
         {
           modelRouteId: "model_route_11111111-1111-4111-8111-111111111111",
@@ -36,7 +46,7 @@ const model = {
       displayName: "Researcher",
     },
   ],
-} as HubReadModel;
+} as unknown as HubReadModel;
 
 describe("ModelExecutionConnectionPanel", () => {
   it("creates one atomic Auto-selected model execution connection", async () => {
