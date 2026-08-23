@@ -52,9 +52,15 @@ describe("model route check HTTP", () => {
     expect(check).not.toHaveBeenCalled();
   });
 
-  it("never reflects OpenRouter upstream errors or credentials", async () => {
-    const secret = "test-openrouter-key";
-    const upstream = `OpenRouter rejected Authorization: Bearer ${secret}`;
+  it.each([
+    "UPSTREAM_AUTH",
+    "RATE_LIMITED",
+    "TIMEOUT",
+    "UPSTREAM_UNAVAILABLE",
+    "INVALID_UPSTREAM_RESPONSE",
+  ])("normalizes %s without reflecting upstream details or credentials", async (failure) => {
+    const secret = "sk-or-super-secret";
+    const upstream = `${failure}: OpenRouter rejected Authorization: Bearer ${secret}`;
     const response = await createModelRouteCheckHandler({
       authorize: async () => true,
       check: async () => {
@@ -65,6 +71,7 @@ describe("model route check HTTP", () => {
     expect(response.status).toBe(503);
     expect(body).toBe('{"error":{"code":"MODEL_ROUTE_CHECK_FAILED"}}');
     expect(body).not.toContain(secret);
+    expect(body).not.toContain(failure);
     expect(body).not.toContain("OpenRouter rejected");
   });
 });
