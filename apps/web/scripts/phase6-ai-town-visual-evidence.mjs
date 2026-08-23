@@ -112,11 +112,29 @@ async function assertWorldDominant(page, target, selected = false) {
   await assertFixtureStrip(page, target);
 }
 async function assertSelectedGeometry(page, target, name) {
+  const renderer = page.locator('[data-renderer="agent-world-canvas-v1"]');
+  const canvas = page.getByTestId("agent-world-canvas");
   const agentButton = page.getByRole("button", { name: new RegExp(`^${name}:`) });
   const inspector = page.getByRole("region", { name });
   const agentRail = page.getByRole("navigation", { name: "Агенты мира" });
+  const rendererBox = await boxOf(renderer, `${target.label} renderer`);
+  const canvasBox = await boxOf(canvas, `${target.label} canvas`);
+  const agentButtonBox = await boxOf(agentButton, `${target.label} selected agent button`);
   const inspectorBox = await boxOf(inspector, `${target.label} inspector`);
   const railBox = await boxOf(agentRail, `${target.label} agent rail`);
+  if (target.viewport.width <= 720) {
+    console.log(
+      `PHASE6_MOBILE_GEOMETRY ${JSON.stringify({
+        viewport: target.label,
+        renderer: rendererBox,
+        canvas: canvasBox,
+        rail: railBox,
+        selectedAgentButton: agentButtonBox,
+        inspector: inspectorBox,
+        gap: railBox.y - (inspectorBox.y + inspectorBox.height),
+      })}`,
+    );
+  }
   assert(
     !overlaps(inspectorBox, railBox),
     `${target.label}: selected inspector intersects the agent rail`,
