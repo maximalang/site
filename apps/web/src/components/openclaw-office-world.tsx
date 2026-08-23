@@ -13,9 +13,9 @@ import {
 import styles from "./phase6-world.module.css";
 import {
   advancePosition,
+  COLLABORATION_POINT,
   clampCamera,
   clampZoom,
-  COLLABORATION_POINT,
   fitWorldCamera,
   initialCameraForAgents,
   spriteIdentity,
