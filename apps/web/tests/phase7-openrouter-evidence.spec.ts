@@ -4,7 +4,7 @@ import {
   HubReadModelSchema,
   resolveExecutionPreferences,
 } from "@agent-world/read-model";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { buildContractFixture } from "../src/test-fixtures";
 
 const providerId = "provider_70707070-7070-7070-7070-707070707070";
@@ -16,7 +16,7 @@ const projectId = "project_33333333-3333-3333-3333-333333333333";
 const remoteModelId = "anthropic/claude-sonnet-4.5";
 const csrfToken = "o".repeat(43);
 
-async function assertNoHorizontalOverflow(page: Parameters<typeof test>[0] extends never ? never : any) {
+async function assertNoHorizontalOverflow(page: Page) {
   const metrics = await page.evaluate(() => ({
     viewport: innerWidth,
     document: document.documentElement.scrollWidth,
