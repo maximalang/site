@@ -12,6 +12,9 @@ const MAX_ZOOM = 2.4;
 const WORLD_FIT_PADDING = 20;
 const AGENT_FIT_PADDING = 92;
 const AGENT_CLUSTER_MIN_SIZE = { width: 520, height: 360 } as const;
+const COMPACT_VIEWPORT_MAX_WIDTH = 720;
+const COMPACT_AGENT_FIT_PADDING = 32;
+const COMPACT_AGENT_CLUSTER_MIN_SIZE = { width: 280, height: 320 } as const;
 const ZONE_CENTERS = {
   COMMONS: { x: 430, y: 690 },
   WORK: { x: 410, y: 300 },
@@ -44,6 +47,10 @@ function fitZoom(
   const availableWidth = Math.max(1, viewport.x - padding * 2);
   const availableHeight = Math.max(1, viewport.y - padding * 2);
   return Math.min(availableWidth / content.width, availableHeight / content.height);
+}
+
+function isActiveForInitialCamera(status: AgentProjectionCore["status"]): boolean {
+  return status !== "IDLE" && status !== "OFFLINE";
 }
 
 export function statusTargetZone(
@@ -163,7 +170,13 @@ export function initialCameraForAgents(
 ): WorldCamera {
   if (agents.length === 0) return fitWorldCamera(viewport);
 
-  const targets = agents.map((agent, index) => targetForAgent(agent, index));
+  const indexedAgents = agents.map((agent, index) => ({ agent, index }));
+  const compact = viewport.x <= COMPACT_VIEWPORT_MAX_WIDTH;
+  const activeAgents = compact
+    ? indexedAgents.filter(({ agent }) => isActiveForInitialCamera(agent.status))
+    : [];
+  const focusAgents = compact && activeAgents.length > 0 ? activeAgents : indexedAgents;
+  const targets = focusAgents.map(({ agent, index }) => targetForAgent(agent, index));
   const xs = targets.map((target) => target.x);
   const ys = targets.map((target) => target.y);
   const minX = Math.min(...xs);
@@ -171,11 +184,13 @@ export function initialCameraForAgents(
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
   const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  const minimumSize = compact ? COMPACT_AGENT_CLUSTER_MIN_SIZE : AGENT_CLUSTER_MIN_SIZE;
   const content = {
-    width: Math.max(AGENT_CLUSTER_MIN_SIZE.width, maxX - minX),
-    height: Math.max(AGENT_CLUSTER_MIN_SIZE.height, maxY - minY),
+    width: Math.max(minimumSize.width, maxX - minX),
+    height: Math.max(minimumSize.height, maxY - minY),
   };
-  const zoom = clampZoom(Math.min(1.15, fitZoom(content, viewport, AGENT_FIT_PADDING)));
+  const padding = compact ? COMPACT_AGENT_FIT_PADDING : AGENT_FIT_PADDING;
+  const zoom = clampZoom(Math.min(1.15, fitZoom(content, viewport, padding)));
   const clamped = clampCamera(center, zoom, viewport);
   return { ...clamped, zoom };
 }
